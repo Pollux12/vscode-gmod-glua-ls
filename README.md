@@ -9,7 +9,7 @@ EmmyLua is a powerful Lua language support extension for Visual Studio Code, pro
 - 📖 [Documentation](https://github.com/EmmyLuaLs/emmylua-analyzer-rust/blob/main/docs/config/emmyrc_json_EN.md)
 - 📝 [Changelog (English)](CHANGELOG.md)
 - 📝 [更新日志 (中文)](CHANGELOG_CN.md)
-- 🔧 [Language Server (Rust)](https://github.com/CppCXY/emmylua-analyzer-rust)
+- 🔧 [Language Server (Rust)](https://github.com/Pollux12/gmod-glua-ls)
 - 💬 QQ Group: `29850775`
 
 [![Online EmmyLua Doc](https://img.shields.io/badge/emmy-doc-46BC99.svg?style=flat-square)](https://emmylua.github.io)
@@ -46,8 +46,108 @@ Create a `.emmyrc.json` file in your project root to customize behavior:
 ```
 
 For detailed configuration options, see:
-- [English Documentation](https://github.com/CppCXY/emmylua-analyzer-rust/blob/main/docs/config/emmyrc_json_EN.md)
-- [中文文档](https://github.com/CppCXY/emmylua-analyzer-rust/blob/main/docs/config/emmyrc_json_CN.md)
+
+- [English Documentation](https://github.com/Pollux12/gmod-glua-ls/blob/main/docs/config/emmyrc_json_EN.md)
+- [中文文档](https://github.com/Pollux12/gmod-glua-ls/blob/main/docs/config/emmyrc_json_CN.md)
+
+## 🧪 Language Server Selection
+
+The extension chooses the language server executable in this order:
+
+1. `emmylua.ls.executablePath` (if set)
+2. **Dev fallback** (Extension Development Host mode):
+   - `EMMY_DEV_LS_PATH` (if set)
+   - `../emmylua-analyzer-rust/target/debug/emmylua_ls(.exe)`
+   - `../emmylua-analyzer-rust/target/release/emmylua_ls(.exe)`
+3. Bundled `server/emmylua_ls(.exe)` from this extension package
+
+### Enable dev fallback
+
+- Start this extension using VS Code's **Run Extension** (`F5`).
+- Build your local server first (for example in sibling repo `emmylua-analyzer-rust`):
+  - `cargo build -p emmylua_ls`
+- Optional: set `EMMY_DEV_LS_PATH` to point to a specific local binary.
+
+No extra extension setting is required for dev fallback when running in extension development mode.
+
+## 🛠 Build and Install This Extension
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+- `@vscode/vsce` (or use `npx vsce`)
+
+### Build extension sources
+
+```bash
+npm install
+npm run compile
+```
+
+### Package a VSIX with bundled server
+
+Simple one-command options (Windows x64):
+
+```bash
+npm run package:dev
+npm run package:release
+```
+
+- `npm run package:dev`
+  - builds your local `../emmylua-analyzer-rust/target/release/emmylua_ls.exe`
+  - bundles it into `VSCode-EmmyLua-dev-win32-x64.vsix`
+- `npm run package:release`
+  - forces download from configured release source in `build/config.json`
+  - bundles it into `VSCode-EmmyLua-win32-x64.vsix`
+
+Manual packaging commands (same behavior):
+
+```bash
+node ./build/prepare.js emmylua_ls-win32-x64.zip
+npx vsce package --target win32-x64
+```
+
+`prepare.js` now resolves the language server in this order:
+
+- `--local-ls <path>`
+- `EMMY_LOCAL_LS_PATH`
+- `../emmylua-analyzer-rust/target/release/emmylua_ls(.exe)`
+- `../emmylua-analyzer-rust/target/debug/emmylua_ls(.exe)`
+- Download from `build/config.json` release URL
+
+To skip local lookup and always use GitHub release, pass:
+
+- `--remote-ls`
+
+Use this command to force local binary usage (Windows example):
+
+```bash
+node ./build/prepare.js emmylua_ls-win32-x64.zip --local-ls ../emmylua-analyzer-rust/target/release/emmylua_ls.exe
+```
+
+Use this command to force remote release usage:
+
+```bash
+node ./build/prepare.js emmylua_ls-win32-x64.zip --remote-ls
+```
+
+Use a different asset name/target for other platforms:
+
+- `emmylua_ls-win32-arm64.zip` → `--target win32-arm64`
+- `emmylua_ls-linux-x64-glibc.2.17.tar.gz` → `--target linux-x64`
+- `emmylua_ls-linux-aarch64-glibc.2.17.tar.gz` → `--target linux-arm64`
+- `emmylua_ls-darwin-x64.tar.gz` → `--target darwin-x64`
+- `emmylua_ls-darwin-arm64.tar.gz` → `--target darwin-arm64`
+
+### Install VSIX locally
+
+- Command line:
+  - `code --install-extension emmylua-<version>.vsix`
+- Or in VS Code:
+  - Extensions panel → `...` menu → **Install from VSIX...**
+
+When dev mode is disabled, the bundled server comes from local source first (if found), then falls back to this repository's configured GitHub release source (`build/config.json`).
 
 ## 🐛 Debugging
 
@@ -56,6 +156,7 @@ For detailed configuration options, see:
 1. **Insert Debugger Code**
    - Use command: `EmmyLua: Insert Emmy Debugger Code`
    - Or manually add:
+
    ```lua
    package.cpath = package.cpath .. ";path/to/emmy/debugger/?.dll"
    local dbg = require('emmy_core')
@@ -92,6 +193,7 @@ For detailed configuration options, see:
 <summary><strong>Why do I see many "undefined variable" warnings?</strong></summary>
 
 **English**: Create `.emmyrc.json` in your project root and disable the `undefined-global` diagnostic:
+
 ```json
 {
   "diagnostics": {
@@ -132,6 +234,7 @@ For detailed configuration options, see:
 ## 🤝 Contributing
 
 We welcome contributions! Please feel free to:
+
 - Report bugs and issues
 - Suggest new features
 - Submit pull requests

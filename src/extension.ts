@@ -48,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Initialize extension context
     extensionContext = new EmmyContext(
-        process.env['EMMY_DEV'] === 'true',
+        isDevelopmentMode(context),
         context
     );
 
@@ -110,6 +110,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidChangeTextDocument(onDidChangeTextDocument),
         vscode.window.onDidChangeActiveTextEditor(onDidChangeActiveTextEditor),
         vscode.workspace.onDidChangeConfiguration(onConfigurationChanged),
+        vscode.workspace.onDidChangeWorkspaceFolders(onWorkspaceFoldersChanged),
     ];
 
     context.subscriptions.push(...eventListeners);
@@ -147,6 +148,10 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
     if (e.affectsConfiguration('emmylua')) {
         onDidChangeConfiguration();
     }
+}
+
+function onWorkspaceFoldersChanged(): void {
+    onDidChangeConfiguration();
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -201,8 +206,7 @@ async function startServer(): Promise<void> {
  */
 async function doStartServer(): Promise<void> {
     const context = extensionContext.vscodeContext;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const configManager = new ConfigurationManager(workspaceFolder);
+    const configManager = new ConfigurationManager(getConfigurationScope());
 
     const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
@@ -212,9 +216,9 @@ async function doStartServer(): Promise<void> {
     let serverOptions: ServerOptions;
     const debugPort = configManager.getDebugPort();
 
-    if (debugPort || extensionContext.debugMode) {
+    if (debugPort) {
         // Connect to language server via socket (debug mode)
-        serverOptions = createDebugServerOptions(debugPort || 5007);
+        serverOptions = createDebugServerOptions(debugPort);
     } else {
         // Start language server as external process
         serverOptions = createProcessServerOptions(context, configManager);
@@ -229,6 +233,14 @@ async function doStartServer(): Promise<void> {
 
     await extensionContext.client.start();
     console.log('EmmyLua language server started successfully');
+}
+
+function getConfigurationScope(): vscode.ConfigurationScope | undefined {
+    return vscode.window.activeTextEditor?.document.uri;
+}
+
+function isDevelopmentMode(context: vscode.ExtensionContext): boolean {
+    return context.extensionMode === vscode.ExtensionMode.Development || process.env['EMMY_DEV'] === 'true';
 }
 
 /**
@@ -294,6 +306,10 @@ function resolveExecutablePath(
 ): string {
     let executablePath = configManager.getExecutablePath()?.trim();
 
+    if (!executablePath && extensionContext.debugMode) {
+        executablePath = resolveDevLocalExecutablePath(context);
+    }
+
     if (!executablePath) {
         // Use bundled language server
         const platform = os.platform();
@@ -310,6 +326,39 @@ function resolveExecutablePath(
     }
 
     return executablePath;
+}
+
+function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string | undefined {
+    const platform = os.platform();
+    const executableName = platform === 'win32' ? 'emmylua_ls.exe' : 'emmylua_ls';
+    const envPath = process.env['EMMY_DEV_LS_PATH']?.trim();
+
+    const candidates: string[] = [];
+    if (envPath) {
+        candidates.push(path.normalize(envPath));
+    }
+
+    candidates.push(
+        path.resolve(context.extensionPath, '..', 'emmylua-analyzer-rust', 'target', 'debug', executableName),
+        path.resolve(context.extensionPath, '..', 'emmylua-analyzer-rust', 'target', 'release', executableName)
+    );
+
+    for (const candidatePath of candidates) {
+        if (fs.existsSync(candidatePath)) {
+            if (platform !== 'win32') {
+                try {
+                    fs.chmodSync(candidatePath, '777');
+                } catch (error) {
+                    console.warn(`Failed to chmod dev language server:`, error);
+                }
+            }
+
+            console.log(`Using dev language server executable: ${candidatePath}`);
+            return candidatePath;
+        }
+    }
+
+    return undefined;
 }
 
 async function restartServer(): Promise<void> {

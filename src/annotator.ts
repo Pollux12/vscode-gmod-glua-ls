@@ -135,9 +135,9 @@ const updateDecorations = (): void => {
     // 获取配置以决定是否使用下划线
     const config = vscode.workspace.getConfiguration(
         undefined,
-        vscode.workspace.workspaceFolders?.[0]
+        vscode.window.activeTextEditor?.document.uri
     );
-    const mutableUnderline = get<string>(config, "emmylua.colors.mutableUnderline");
+    const mutableUnderline = get<boolean>(config, "emmylua.colors.mutableUnderline", false);
 
     // 创建可变变量的装饰器
     if (mutableUnderline) {
