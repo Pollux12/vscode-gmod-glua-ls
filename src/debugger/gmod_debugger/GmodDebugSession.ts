@@ -529,7 +529,7 @@ export class GmodDebugSession extends DebugSession {
           )
           bp.id = this._breakPointID++
           if (isLogPoint) {
-            bp.message = 'Logpoints are not supported by emmylua_gmod; use a conditional breakpoint or evaluate instead.'
+            bp.message = 'Logpoints are not supported by gluals_gmod; use a conditional breakpoint or evaluate instead.'
           }
           breakpoints.push(bp)
           if (verified) {
@@ -995,7 +995,7 @@ export class GmodDebugSession extends DebugSession {
       if (args.terminateDebuggee) {
         this.sendEvent(
           new OutputEvent(
-            'terminateDebuggee is not supported by emmylua_gmod; disconnecting debugger transport only.\n',
+            'terminateDebuggee is not supported by gluals_gmod; disconnecting debugger transport only.\n',
             'stderr'
           )
         )
@@ -1033,7 +1033,7 @@ export class GmodDebugSession extends DebugSession {
   ): void {
     response.success = false
     response.message =
-      'setExpression is not supported by emmylua_gmod because the LRDB protocol has no assignment/eval-set request.'
+      'setExpression is not supported by gluals_gmod because the LRDB protocol has no assignment/eval-set request.'
     response.body = {
       value: args.value,
       type: 'string',

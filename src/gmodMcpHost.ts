@@ -283,7 +283,7 @@ export class GmodMcpHost implements vscode.Disposable {
     }
 
     private readConfig(): { enabled: boolean; port: number; authToken: string; rateLimitPerMinute: number; } {
-        const config = vscode.workspace.getConfiguration('emmylua.gmod.mcp');
+        const config = vscode.workspace.getConfiguration('gluals.gmod.mcp');
         const enabled = config.get<boolean>('enabled', true);
         const configuredPort = config.get<number>('port', 0);
         const port = Number.isFinite(configuredPort) ? Math.max(0, Math.floor(configuredPort)) : 0;

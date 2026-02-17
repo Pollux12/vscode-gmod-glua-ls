@@ -3,8 +3,8 @@ import * as vscode from 'vscode';
 
 /**
  * 获取配置值, 且支持重命名的键名.
- * 
- * 
+ *
+ *
  * @param config - 配置
  * @param key - 必须传入最新的配置键名以正确获取配置值
  * @param defaultValue - 可选的默认值
@@ -25,7 +25,7 @@ export class ConfigurationManager {
     private readonly config: vscode.WorkspaceConfiguration;
 
     constructor(scope?: vscode.ConfigurationScope) {
-        this.config = vscode.workspace.getConfiguration('emmylua', scope);
+        this.config = vscode.workspace.getConfiguration('gluals', scope);
     }
 
     /**

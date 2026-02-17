@@ -1,5 +1,5 @@
 {
-    "debuggerType": "emmylua_gmod",
+    "debuggerType": "gluals_gmod",
     "protocolVersion": "gmod-1",
     "capabilities": {
         "supportsSetVariable": true,

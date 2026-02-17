@@ -19,8 +19,8 @@ export function setClientGetter(getter: () => LanguageClient | undefined): void 
  * Similar to rust-analyzer's syntax tree viewer
  */
 export class SyntaxTreeProvider implements vscode.TextDocumentContentProvider {
-    static readonly SCHEME = 'emmylua-syntax-tree';
-    
+    static readonly SCHEME = 'gluals-syntax-tree';
+
     private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     private cache = new Map<string, string>();
 
@@ -80,9 +80,9 @@ export class SyntaxTreeProvider implements vscode.TextDocumentContentProvider {
         token: vscode.CancellationToken
     ): Promise<string> {
         const client = await this.getLanguageClient();
-        
+
         if (!client) {
-            return '// Language server is not running\n// Please ensure EmmyLua language server is started';
+            return '// Language server is not running\n// Please ensure GLua Language Server is started';
         }
 
         try {
@@ -91,7 +91,7 @@ export class SyntaxTreeProvider implements vscode.TextDocumentContentProvider {
             };
 
             const result = await client.sendRequest<SyntaxTreeResponse>(
-                'emmy/syntaxTree',
+                'gluals/syntaxTree',
                 params,
                 token
             );
@@ -128,7 +128,7 @@ export class SyntaxTreeProvider implements vscode.TextDocumentContentProvider {
     refresh(sourceUri: vscode.Uri): void {
         const cacheKey = sourceUri.toString();
         this.cache.delete(cacheKey);
-        
+
         const syntaxTreeUri = SyntaxTreeProvider.createUri(sourceUri);
         this._onDidChange.fire(syntaxTreeUri);
     }
@@ -159,7 +159,7 @@ export class SyntaxTreeManager implements vscode.Disposable {
 
     constructor() {
         this.provider = new SyntaxTreeProvider();
-        
+
         // Register content provider
         this.disposables.push(
             vscode.workspace.registerTextDocumentContentProvider(
@@ -189,12 +189,12 @@ export class SyntaxTreeManager implements vscode.Disposable {
     }
 
     private updateTimeout?: NodeJS.Timeout;
-    
+
     private scheduleRefresh(uri: vscode.Uri): void {
         if (this.updateTimeout) {
             clearTimeout(this.updateTimeout);
         }
-        
+
         this.updateTimeout = setTimeout(() => {
             this.provider.refresh(uri);
         }, 500); // 500ms debounce
@@ -209,13 +209,13 @@ export class SyntaxTreeManager implements vscode.Disposable {
             if (editor.document.uri.scheme !== SyntaxTreeProvider.SCHEME) {
                 return false;
             }
-            
+
             // Parse the source URI from the syntax tree document
             const query = editor.document.uri.query;
             if (!query) {
                 return false;
             }
-            
+
             try {
                 const sourceUri = vscode.Uri.parse(decodeURIComponent(query));
                 return sourceUri.toString() === uri.toString();
@@ -230,7 +230,7 @@ export class SyntaxTreeManager implements vscode.Disposable {
      */
     async show(sourceUri: vscode.Uri, selection?: vscode.Selection): Promise<void> {
         const syntaxTreeUri = SyntaxTreeProvider.createUri(sourceUri);
-        
+
         try {
             const doc = await vscode.workspace.openTextDocument(syntaxTreeUri);
             await vscode.window.showTextDocument(doc, {

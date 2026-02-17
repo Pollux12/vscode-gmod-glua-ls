@@ -38,13 +38,13 @@ let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 const gmodSessionRealms = new Map<string, GmodRealm>();
-const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'emmylua.gmod.realm.workspace.';
+const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
 
 /**
  * Extension activation entry point
  */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    console.log('EmmyLua extension activated!');
+    console.log('GLuaLS extension activated!');
 
     // Provide `.emmyrc.json` schema with i18n support
     context.subscriptions.push(
@@ -89,33 +89,33 @@ export async function deactivate(): Promise<void> {
 function registerCommands(context: vscode.ExtensionContext): void {
     const commandEntries: CommandEntry[] = [
         // Server commands
-        { id: 'emmy.stopServer', handler: stopServer },
-        { id: 'emmy.restartServer', handler: restartServer },
-        { id: 'emmy.showServerMenu', handler: showServerMenu },
-        { id: 'emmy.showReferences', handler: showReferences },
-        { id: 'emmy.showSyntaxTree', handler: showSyntaxTree },
+        { id: 'gluals.stopServer', handler: stopServer },
+        { id: 'gluals.restartServer', handler: restartServer },
+        { id: 'gluals.showServerMenu', handler: showServerMenu },
+        { id: 'gluals.showReferences', handler: showReferences },
+        { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
         // debugger commands
-        { id: 'emmy.insertEmmyDebugCode', handler: insertEmmyDebugCode },
+        { id: 'gluals.insertEmmyDebugCode', handler: insertEmmyDebugCode },
         // GMod annotations commands
-        { id: 'emmy.gmod.updateAnnotations', handler: updateGmodAnnotations },
-        { id: 'emmy.gmod.removeAnnotations', handler: removeGmodAnnotations },
+        { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
+        { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         // GMod debug control commands
-        { id: 'emmy.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
-        { id: 'emmy.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
-        { id: 'emmy.gmod.resume', handler: () => runGmodControlCommand('resume') },
-        { id: 'emmy.gmod.breakHere', handler: () => runGmodControlCommand('breakHere') },
-        { id: 'emmy.gmod.waitIDE', handler: () => runGmodControlCommand('waitIDE') },
-        { id: 'emmy.gmod.runLua', handler: runGmodRunLua },
-        { id: 'emmy.gmod.runFile', handler: runGmodRunFile },
-        { id: 'emmy.gmod.runCommand', handler: runGmodRunCommand },
-        { id: 'emmy.gmod.setRealm', handler: setGmodRealm },
-        { id: 'emmy.gmod.explorer.refresh', handler: refreshGmodExplorer },
-        { id: 'emmy.gmod.onboarding.start', handler: runGmodOnboarding },
-        { id: 'emmy.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
-        { id: 'emmy.gmod.mcp.startHost', handler: startGmodMcpHost },
-        { id: 'emmy.gmod.mcp.stopHost', handler: stopGmodMcpHost },
-        { id: 'emmy.gmod.mcp.restartHost', handler: restartGmodMcpHost },
-        { id: 'emmy.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
+        { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
+        { id: 'gluals.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
+        { id: 'gluals.gmod.resume', handler: () => runGmodControlCommand('resume') },
+        { id: 'gluals.gmod.breakHere', handler: () => runGmodControlCommand('breakHere') },
+        { id: 'gluals.gmod.waitIDE', handler: () => runGmodControlCommand('waitIDE') },
+        { id: 'gluals.gmod.runLua', handler: runGmodRunLua },
+        { id: 'gluals.gmod.runFile', handler: runGmodRunFile },
+        { id: 'gluals.gmod.runCommand', handler: runGmodRunCommand },
+        { id: 'gluals.gmod.setRealm', handler: setGmodRealm },
+        { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
+        { id: 'gluals.gmod.onboarding.start', handler: runGmodOnboarding },
+        { id: 'gluals.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
+        { id: 'gluals.gmod.mcp.startHost', handler: startGmodMcpHost },
+        { id: 'gluals.gmod.mcp.stopHost', handler: stopGmodMcpHost },
+        { id: 'gluals.gmod.mcp.restartHost', handler: restartGmodMcpHost },
+        { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
     ];
 
     // Register all commands
@@ -161,7 +161,7 @@ function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
 async function initializeExtension(): Promise<void> {
     // Initialize GMod annotation manager
     gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
-    
+
     // Initialize annotations before starting server
     await gmodAnnotationManager.initializeAnnotations();
 
@@ -180,10 +180,10 @@ async function initializeExtension(): Promise<void> {
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
-    if (e.affectsConfiguration('emmylua')) {
+    if (e.affectsConfiguration('gluals')) {
         onDidChangeConfiguration();
     }
-    if (e.affectsConfiguration('emmylua.gmod.mcp')) {
+    if (e.affectsConfiguration('gluals.gmod.mcp')) {
         void restartGmodMcpHost(false);
     }
 }
@@ -222,11 +222,11 @@ async function startServer(): Promise<void> {
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
         extensionContext.setServerError(
-            'Failed to start EmmyLua language server',
+            'Failed to start GLua Language Server',
             errorMessage
         );
         vscode.window.showErrorMessage(
-            `Failed to start EmmyLua language server: ${errorMessage}`,
+            `Failed to start GLua Language Server: ${errorMessage}`,
             'Retry',
             'Show Logs'
         ).then(action => {
@@ -273,13 +273,13 @@ async function doStartServer(): Promise<void> {
 
     extensionContext.client = new LanguageClient(
         extensionContext.LANGUAGE_ID,
-        'EmmyLua Language Server',
+        'GLua Language Server',
         serverOptions,
         clientOptions
     );
 
     await extensionContext.client.start();
-    console.log('EmmyLua language server started successfully');
+    console.log('GLua Language Server started successfully');
 }
 
 function getConfigurationScope(): vscode.ConfigurationScope | undefined {
@@ -338,7 +338,7 @@ function createProcessServerOptions(
         if (!serverOptions.options.env) {
             serverOptions.options.env = {};
         }
-        serverOptions.options.env['EMMYLUALS_CONFIG'] = globalConfigPath;
+        serverOptions.options.env['GLUALS_CONFIG'] = globalConfigPath;
     }
 
     return serverOptions;
@@ -447,7 +447,7 @@ function showReferences(uri: string, pos: IServerPosition, locations: IServerLoc
 async function stopServer(): Promise<void> {
     try {
         await extensionContext.stopServer();
-        vscode.window.showInformationMessage('EmmyLua language server stopped');
+        vscode.window.showInformationMessage('GLua Language Server stopped');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Failed to stop server: ${errorMessage}`);
@@ -523,14 +523,14 @@ type GmodControlCommand =
 
 function getActiveGmodDebugSession(): vscode.DebugSession | undefined {
     const session = vscode.debug.activeDebugSession;
-    if (session?.type === 'emmylua_gmod') {
+    if (session?.type === 'gluals_gmod') {
         return session;
     }
     return undefined;
 }
 
 function getGmodRealmWorkspaceFolder(session?: vscode.DebugSession): vscode.WorkspaceFolder | undefined {
-    const activeSession = session?.type === 'emmylua_gmod' ? session : getActiveGmodDebugSession();
+    const activeSession = session?.type === 'gluals_gmod' ? session : getActiveGmodDebugSession();
     if (activeSession?.workspaceFolder) {
         return activeSession.workspaceFolder;
     }
@@ -549,7 +549,7 @@ function getGmodRealmWorkspaceStateKey(folder: vscode.WorkspaceFolder): string {
 }
 
 function getPersistedGmodRealm(session?: vscode.DebugSession): GmodRealm {
-    const activeSession = session?.type === 'emmylua_gmod' ? session : getActiveGmodDebugSession();
+    const activeSession = session?.type === 'gluals_gmod' ? session : getActiveGmodDebugSession();
     if (activeSession) {
         const sessionRealm = gmodSessionRealms.get(activeSession.id);
         if (sessionRealm) {
@@ -564,7 +564,7 @@ function getPersistedGmodRealm(session?: vscode.DebugSession): GmodRealm {
         }
     }
     const configured = vscode.workspace
-        .getConfiguration('emmylua.gmod', folder)
+        .getConfiguration('gluals.gmod', folder)
         .get<string>('debugRealm');
     return normalizeGmodRealm(configured);
 }
@@ -645,7 +645,7 @@ async function setGmodRealm(realm?: string): Promise<void> {
         ? vscode.ConfigurationTarget.WorkspaceFolder
         : vscode.ConfigurationTarget.Workspace;
     await vscode.workspace
-        .getConfiguration('emmylua.gmod', folder)
+        .getConfiguration('gluals.gmod', folder)
         .update('debugRealm', selectedRealm, target);
     if (folder) {
         await extensionContext.vscodeContext.workspaceState.update(getGmodRealmWorkspaceStateKey(folder), selectedRealm);
@@ -661,14 +661,14 @@ async function setGmodRealm(realm?: string): Promise<void> {
 }
 
 function onDidStartDebugSession(session: vscode.DebugSession): void {
-    if (session.type !== 'emmylua_gmod') {
+    if (session.type !== 'gluals_gmod') {
         return;
     }
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
 }
 
 function onDidTerminateDebugSession(session: vscode.DebugSession): void {
-    if (session.type !== 'emmylua_gmod') {
+    if (session.type !== 'gluals_gmod') {
         return;
     }
     gmodSessionRealms.delete(session.id);
@@ -727,16 +727,16 @@ function getGmodMcpHealth(): ReturnType<GmodMcpHost['getHealth']> | undefined {
 
 async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
     const issues: GmodSetupIssue[] = [];
-    const lsConfig = vscode.workspace.getConfiguration('emmylua.ls', getConfigurationScope());
+    const lsConfig = vscode.workspace.getConfiguration('gluals.ls', getConfigurationScope());
     const configuredExecutable = (lsConfig.get<string>('executablePath') ?? '').trim();
     if (configuredExecutable.length > 0 && !fs.existsSync(configuredExecutable)) {
         issues.push({
             id: 'missing-configured-binary',
             severity: 'error',
             message: `Configured language server binary is missing: ${configuredExecutable}`,
-            repairLabel: 'Open EmmyLua Binary Setting',
+            repairLabel: 'Open GLua Language Server Binary Setting',
             repair: async () => {
-                await vscode.commands.executeCommand('workbench.action.openSettings', 'emmylua.ls.executablePath');
+                await vscode.commands.executeCommand('workbench.action.openSettings', 'gluals.ls.executablePath');
             }
         });
     }
@@ -745,21 +745,21 @@ async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
         issues.push({
             id: 'missing-bundled-binary',
             severity: 'error',
-            message: 'Bundled EmmyLua language server binary is missing from the extension server folder.',
-            repairLabel: 'Open EmmyLua Binary Setting',
+            message: 'Bundled GLua Language Server binary is missing from the extension server folder.',
+            repairLabel: 'Open GLua Language Server Binary Setting',
             repair: async () => {
-                await vscode.commands.executeCommand('workbench.action.openSettings', 'emmylua.ls.executablePath');
+                await vscode.commands.executeCommand('workbench.action.openSettings', 'gluals.ls.executablePath');
             }
         });
     }
 
     const launchConfigs = await readLaunchConfigurations();
-    const gmodConfigs = launchConfigs.filter((entry) => entry['type'] === 'emmylua_gmod');
+    const gmodConfigs = launchConfigs.filter((entry) => entry['type'] === 'gluals_gmod');
     if (gmodConfigs.length === 0) {
         issues.push({
             id: 'missing-gmod-launch-config',
             severity: 'warning',
-            message: 'No `emmylua_gmod` debug configuration found in `.vscode/launch.json`.',
+            message: 'No `gluals_gmod` debug configuration found in `.vscode/launch.json`.',
             repairLabel: 'Open launch.json',
             repair: async () => {
                 await vscode.commands.executeCommand('workbench.action.openLaunchJson');
@@ -787,7 +787,7 @@ async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
     }
 
     const health = getGmodMcpHealth();
-    const mcpConfig = vscode.workspace.getConfiguration('emmylua.gmod.mcp');
+    const mcpConfig = vscode.workspace.getConfiguration('gluals.gmod.mcp');
     const mcpEnabled = mcpConfig.get<boolean>('enabled', true);
     const configuredToken = (mcpConfig.get<string>('authToken', '') ?? '').trim();
 
@@ -1006,7 +1006,7 @@ function getGmodDebugState(): Record<string, unknown> {
 }
 
 function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEvent): void {
-    if (event.session.type !== 'emmylua_gmod') {
+    if (event.session.type !== 'gluals_gmod') {
         return;
     }
 

@@ -13,13 +13,13 @@ export interface EmmyDebugConfiguration extends DebugConfigurationBase {
 
 export class EmmyNewDebuggerProvider extends DebuggerProvider {
     private showWaitConnectionToken = new vscode.CancellationTokenSource();
-    
+
     resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, debugConfiguration: EmmyDebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
         debugConfiguration.extensionPath = extensionContext.vscodeContext.extensionPath;
         debugConfiguration.sourcePaths = this.getSourceRoots();
         if (!debugConfiguration.request) {
             debugConfiguration.request = "launch";
-            debugConfiguration.type = "emmylua_new";
+            debugConfiguration.type = "gluals_new";
             debugConfiguration.ideConnectDebugger = true;
             debugConfiguration.host = 'localhost';
             debugConfiguration.port = 9966;
@@ -28,7 +28,7 @@ export class EmmyNewDebuggerProvider extends DebuggerProvider {
 
         return debugConfiguration;
     }
-    
+
     protected async onDebugCustomEvent(e: vscode.DebugSessionCustomEvent) {
         if (e.event === 'showWaitConnection') {
             this.showWaitConnectionToken.cancel();

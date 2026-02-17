@@ -40,7 +40,7 @@ export class GmodAnnotationManager {
      * Get the path to annotations (only if enabled and available)
      */
     public getAnnotationsPath(): string | undefined {
-        const config = vscode.workspace.getConfiguration('emmylua');
+        const config = vscode.workspace.getConfiguration('gluals');
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
 
         if (!enabled) {
@@ -66,7 +66,7 @@ export class GmodAnnotationManager {
      * Initialize annotations - download if needed
      */
     public async initializeAnnotations(): Promise<void> {
-        const config = vscode.workspace.getConfiguration('emmylua');
+        const config = vscode.workspace.getConfiguration('gluals');
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
 
         if (!enabled) {
@@ -97,7 +97,7 @@ export class GmodAnnotationManager {
 
             // Clone the specific branch
             console.log(`Cloning ${this.BRANCH} branch from ${this.REPO_URL}...`);
-            
+
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -124,7 +124,7 @@ export class GmodAnnotationManager {
             console.error('Failed to download GMod annotations:', errorMessage);
             vscode.window.showErrorMessage(
                 `Failed to download GMod annotations: ${errorMessage}. ` +
-                `You can disable auto-loading in settings (emmylua.gmod.autoLoadAnnotations).`
+                `You can disable auto-loading in settings (gluals.gmod.autoLoadAnnotations).`
             );
         }
     }
@@ -157,16 +157,16 @@ export class GmodAnnotationManager {
             );
 
             vscode.window.showInformationMessage('GMod annotations updated successfully');
-            
+
             // Suggest restarting the language server
             const action = await vscode.window.showInformationMessage(
                 'Annotations updated. Restart language server to apply changes?',
                 'Restart',
                 'Later'
             );
-            
+
             if (action === 'Restart') {
-                await vscode.commands.executeCommand('emmy.restartServer');
+                await vscode.commands.executeCommand('gluals.restartServer');
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -197,16 +197,16 @@ export class GmodAnnotationManager {
         try {
             fs.rmSync(this.annotationsPath, { recursive: true, force: true });
             vscode.window.showInformationMessage('GMod annotations removed');
-            
+
             // Suggest restarting
             const restartAction = await vscode.window.showInformationMessage(
                 'Restart language server to apply changes?',
                 'Restart',
                 'Later'
             );
-            
+
             if (restartAction === 'Restart') {
-                await vscode.commands.executeCommand('emmy.restartServer');
+                await vscode.commands.executeCommand('gluals.restartServer');
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);

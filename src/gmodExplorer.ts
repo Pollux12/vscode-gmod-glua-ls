@@ -29,7 +29,7 @@ class GmodExplorerItem extends vscode.TreeItem {
             this.iconPath = new vscode.ThemeIcon('debug-alt-small');
             this.description = this.realm;
             this.command = {
-                command: 'emmy.gmod.setRealm',
+                command: 'gluals.gmod.setRealm',
                 title: 'Set GMod Realm',
                 arguments: [this.realm]
             };
@@ -119,7 +119,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
 export function registerGmodExplorer(context: vscode.ExtensionContext): GmodExplorerProvider {
     const provider = new GmodExplorerProvider();
-    const treeView = vscode.window.createTreeView('emmy.gmodExplorer', {
+    const treeView = vscode.window.createTreeView('gluals.gmodExplorer', {
         treeDataProvider: provider,
         showCollapseAll: true,
     });

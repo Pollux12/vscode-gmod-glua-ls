@@ -9,19 +9,19 @@ export class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorF
 
     createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
         switch (_session.type) {
-            case 'emmylua_attach': {
+            case 'gluals_attach': {
                 return new vscode.DebugAdapterInlineImplementation(new EmmyAttachDebugSession());
             }
-            case 'emmylua_launch': {
+            case 'gluals_launch': {
                 return new vscode.DebugAdapterInlineImplementation(new EmmyLaunchDebugSession());
             }
-            case 'emmylua_new': {
+            case 'gluals_new': {
                 return new vscode.DebugAdapterInlineImplementation(new EmmyNewDebugSession());
             }
-            case "emmylua_gmod": {
+            case "gluals_gmod": {
                 return new vscode.DebugAdapterInlineImplementation(new GmodDebugSession());
             }
         }
-        
+
     }
 }

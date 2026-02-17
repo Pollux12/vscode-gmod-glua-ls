@@ -70,7 +70,7 @@ export class EmmyContext implements vscode.Disposable {
         );
 
         // Status bar click shows quick pick menu instead of direct action
-        this._statusBar.command = 'emmy.showServerMenu';
+        this._statusBar.command = 'gluals.showServerMenu';
 
         this._disposables.push(this._statusBar);
         this.updateStatusBar();
@@ -119,7 +119,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStarting(message?: string): void {
         this._serverStatus = {
             state: ServerState.Starting,
-            message: message || 'Starting EmmyLua language server...',
+            message: message || 'Starting GLua Language Server...',
         };
         this.updateStatusBar();
     }
@@ -130,7 +130,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerRunning(message?: string): void {
         this._serverStatus = {
             state: ServerState.Running,
-            message: message || 'EmmyLua language server is running',
+            message: message || 'GLua Language Server is running',
         };
         this.updateStatusBar();
     }
@@ -141,7 +141,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStopping(message?: string): void {
         this._serverStatus = {
             state: ServerState.Stopping,
-            message: message || 'Stopping EmmyLua language server...',
+            message: message || 'Stopping GLua Language Server...',
         };
         this.updateStatusBar();
     }
@@ -152,7 +152,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStopped(message?: string): void {
         this._serverStatus = {
             state: ServerState.Stopped,
-            message: message || 'EmmyLua language server is stopped',
+            message: message || 'GLua Language Server is stopped',
         };
         this.updateStatusBar();
     }
@@ -210,19 +210,19 @@ export class EmmyContext implements vscode.Disposable {
                 {
                     label: '$(debug-restart) Restart Server',
                     description: 'Restart the language server',
-                    detail: 'Stop and restart the EmmyLua language server',
+                    detail: 'Stop and restart the GLua Language Server',
                 },
                 {
                     label: '$(stop-circle) Stop Server',
                     description: 'Stop the language server',
-                    detail: 'Gracefully stop the EmmyLua language server',
+                    detail: 'Gracefully stop the GLua Language Server',
                 }
             );
         } else {
             items.push({
                 label: '$(play) Start Server',
                 description: 'Start the language server',
-                detail: 'Start the EmmyLua language server',
+                detail: 'Start the GLua Language Server',
             });
         }
 
@@ -245,7 +245,7 @@ export class EmmyContext implements vscode.Disposable {
         );
 
         const selected = await vscode.window.showQuickPick(items, {
-            placeHolder: 'EmmyLua Language Server',
+            placeHolder: 'GLua Language Server',
             title: 'Server Control',
         });
 
@@ -255,17 +255,17 @@ export class EmmyContext implements vscode.Disposable {
 
         // Execute selected action
         if (selected.label.includes('Restart')) {
-            await vscode.commands.executeCommand('emmy.restartServer');
+            await vscode.commands.executeCommand('gluals.restartServer');
         } else if (selected.label.includes('Stop')) {
-            await vscode.commands.executeCommand('emmy.stopServer');
+            await vscode.commands.executeCommand('gluals.stopServer');
         } else if (selected.label.includes('Start')) {
-            await vscode.commands.executeCommand('emmy.startServer');
+            await vscode.commands.executeCommand('gluals.startServer');
         } else if (selected.label.includes('Server Info')) {
             this.showServerInfo();
         } else if (selected.label.includes('Output')) {
             this._client?.outputChannel?.show();
         } else if (selected.label.includes('Syntax Tree')) {
-            await vscode.commands.executeCommand('emmy.showSyntaxTree');
+            await vscode.commands.executeCommand('gluals.showSyntaxTree');
         }
     }
 
@@ -274,7 +274,7 @@ export class EmmyContext implements vscode.Disposable {
      */
     private showServerInfo(): void {
         const info: string[] = [
-            '# EmmyLua Language Server',
+            '# GLua Language Server',
             '',
             `**Status:** ${this._serverStatus.state}`,
         ];
@@ -312,7 +312,7 @@ export class EmmyContext implements vscode.Disposable {
     private updateStatusBar(): void {
         const config = this.getStatusBarConfig();
 
-        this._statusBar.text = `${config.icon}EmmyLua`;
+        this._statusBar.text = `${config.icon}GLuaLS`;
         this._statusBar.color = config.color;
         this._statusBar.backgroundColor = config.backgroundColor;
         this._statusBar.tooltip = this.createTooltip();
@@ -359,7 +359,7 @@ export class EmmyContext implements vscode.Disposable {
         tooltip.isTrusted = true;
 
         // Title
-        tooltip.appendMarkdown('**EmmyLua Language Server**\n\n');
+        tooltip.appendMarkdown('**GLua Language Server**\n\n');
         tooltip.appendMarkdown('---\n\n');
 
         // Status
@@ -390,17 +390,17 @@ export class EmmyContext implements vscode.Disposable {
         if (state !== ServerState.Stopped && state !== ServerState.Stopping) {
             actions.push({
                 label: 'Stop server',
-                command: 'emmy.stopServer',
+                command: 'gluals.stopServer',
                 icon: '$(stop-circle)',
-                tooltip: 'Stop the EmmyLua language server',
+                tooltip: 'Stop the GLua Language Server',
             });
         }
 
         actions.push({
             label: 'Restart server',
-            command: 'emmy.restartServer',
+            command: 'gluals.restartServer',
             icon: '$(debug-restart)',
-            tooltip: 'Restart the EmmyLua language server',
+            tooltip: 'Restart the GLua Language Server',
         });
         return actions;
     }

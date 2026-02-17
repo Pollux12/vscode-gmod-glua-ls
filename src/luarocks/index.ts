@@ -28,7 +28,7 @@ export async function initializeLuaRocks(): Promise<void> {
     luaRocksTreeProvider = new LuaRocksTreeProvider(luaRocksManager);
 
     // Register tree view
-    const treeView = vscode.window.createTreeView('emmylua.luarocks', {
+    const treeView = vscode.window.createTreeView('gluals.luarocks', {
         treeDataProvider: luaRocksTreeProvider,
         showCollapseAll: true
     });
@@ -250,7 +250,7 @@ export async function refreshPackages(): Promise<void> {
 }
 
 export async function showPackagesView(): Promise<void> {
-    await vscode.commands.executeCommand('emmylua.luarocks.focus');
+    await vscode.commands.executeCommand('gluals.luarocks.focus');
 }
 
 export function clearSearch(): void {

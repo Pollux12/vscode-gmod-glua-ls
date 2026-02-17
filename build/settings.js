@@ -60,7 +60,7 @@ export function main() {
 function extractSettings(
     definitions,
     obj,
-    currentPath = ["emmylua"],
+    currentPath = ["gluals"],
     result = {}
 ) {
     if (typeof obj !== "object") {

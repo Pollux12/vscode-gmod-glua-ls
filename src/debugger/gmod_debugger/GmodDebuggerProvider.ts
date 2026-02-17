@@ -22,7 +22,7 @@ export class GmodDebuggerProvider extends DebuggerProvider {
         configuration.extensionPath = this.context.extensionPath;
         configuration.sourcePaths = this.getSourceRoots();
         configuration.ext = this.getExt();
-        configuration.type = "emmylua_gmod";
+        configuration.type = "gluals_gmod";
 
         const workspaceRoot = folder?.uri.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
         configuration.sourceRoot = configuration.sourceRoot || workspaceRoot;
@@ -30,7 +30,7 @@ export class GmodDebuggerProvider extends DebuggerProvider {
         configuration.port = configuration.port || 21111;
         configuration.stopOnEntry = configuration.stopOnEntry ?? true;
         const configuredRealm = vscode.workspace
-            .getConfiguration("emmylua.gmod", folder)
+            .getConfiguration("gluals.gmod", folder)
             .get<string>("debugRealm");
         configuration.realm = normalizeGmodRealm(configuration.realm ?? configuredRealm);
 

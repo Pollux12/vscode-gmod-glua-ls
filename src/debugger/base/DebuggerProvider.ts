@@ -31,7 +31,7 @@ export abstract class DebuggerProvider implements vscode.DebugConfigurationProvi
     protected getSourceRoots(): string[] {
         const workspaceFolders = vscode.workspace.workspaceFolders || [];
         const list = workspaceFolders.map(f => { return f.uri.fsPath; });
-        const config = <Array<string>>vscode.workspace.getConfiguration("emmylua").get("source.roots") || [];
+        const config = <Array<string>>vscode.workspace.getConfiguration("gluals").get("source.roots") || [];
         return list.concat(config.map(item => { return path.normalize(item); }));
     }
 
@@ -101,7 +101,7 @@ export abstract class DebuggerProvider implements vscode.DebugConfigurationProvi
                     break;
                 }
             }
-            
+
             if (results.length !== 0) {
                 results = results.sort((a, b) => a.length - b.length)
             }

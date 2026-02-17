@@ -72,10 +72,10 @@ export function registerDebuggers(): void {
     const context = extensionContext.vscodeContext;
 
     const debuggerConfigs: DebuggerConfig[] = [
-        { type: 'emmylua_new', provider: new EmmyNewDebuggerProvider('emmylua_new', context) },
-        { type: 'emmylua_attach', provider: new EmmyAttachDebuggerProvider('emmylua_attach', context) },
-        { type: 'emmylua_launch', provider: new EmmyLaunchDebuggerProvider('emmylua_launch', context) },
-        { type: "emmylua_gmod", provider: new GmodDebuggerProvider("emmylua_gmod", context) },
+        { type: 'gluals_new', provider: new EmmyNewDebuggerProvider('gluals_new', context) },
+        { type: 'gluals_attach', provider: new EmmyAttachDebuggerProvider('gluals_attach', context) },
+        { type: 'gluals_launch', provider: new EmmyLaunchDebuggerProvider('gluals_launch', context) },
+        { type: "gluals_gmod", provider: new GmodDebuggerProvider("gluals_gmod", context) },
     ];
 
     debuggerConfigs.forEach(({ type, provider }) => {

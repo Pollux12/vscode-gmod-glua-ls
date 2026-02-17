@@ -222,7 +222,7 @@ export class PackageTreeItem extends vscode.TreeItem {
             case 'search':
                 this.iconPath = new vscode.ThemeIcon('search');
                 this.command = {
-                    command: 'emmylua.luarocks.searchPackages',
+                    command: 'gluals.luarocks.searchPackages',
                     title: 'Search Packages'
                 };
                 this.contextValue = 'search';

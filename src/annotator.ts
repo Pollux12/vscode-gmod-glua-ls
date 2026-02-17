@@ -31,7 +31,7 @@ const createDecoration = (key: string): vscode.TextEditorDecorationType => {
     }
 
     const config: vscode.DecorationRenderOptions = {};
-    const color = vscode.workspace.getConfiguration("emmylua").get<string>(key);
+    const color = vscode.workspace.getConfiguration("gluals").get<string>(key);
 
     if (color) {
         config.light = { color };
@@ -53,7 +53,7 @@ const createDecorationUnderline = (key: string): vscode.TextEditorDecorationType
     }
 
     const config: vscode.DecorationRenderOptions = {};
-    const color = vscode.workspace.getConfiguration("emmylua").get<string>(key);
+    const color = vscode.workspace.getConfiguration("gluals").get<string>(key);
 
     const textDecoration = color
         ? `underline;text-decoration-color:${color};text-underline-offset: 4px;`
@@ -137,7 +137,7 @@ const updateDecorations = (): void => {
         undefined,
         vscode.window.activeTextEditor?.document.uri
     );
-    const mutableUnderline = get<boolean>(config, "emmylua.colors.mutableUnderline", false);
+    const mutableUnderline = get<boolean>(config, "gluals.colors.mutableUnderline", false);
 
     // 创建可变变量的装饰器
     if (mutableUnderline) {
@@ -190,7 +190,7 @@ const requestAnnotatorsImpl = async (editor: vscode.TextEditor, client: Language
     };
 
     try {
-        const annotationList = await client.sendRequest<notifications.IAnnotator[]>("emmy/annotator", params);
+        const annotationList = await client.sendRequest<notifications.IAnnotator[]>("gluals/annotator", params);
 
         if (!annotationList) {
             return;

@@ -2,7 +2,7 @@
     "name": "gmod-glua-ls",
     "displayName": "Garry's Mod Language Server",
     "description": "Language Server for Garry's Mod GLua",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "icon": "",
     "publisher": "Pollux",
     "engines": {
@@ -15,9 +15,9 @@
     "activationEvents": [
         "onDebug",
         "onLanguage:lua",
-        "onView:emmy.gmodExplorer",
-        "onCommand:emmy.gmod.onboarding.start",
-        "onCommand:emmy.gmod.diagnostics.repair"
+        "onView:gluals.gmodExplorer",
+        "onCommand:gluals.gmod.onboarding.start",
+        "onCommand:gluals.gmod.diagnostics.repair"
     ],
     "keywords": [
         "lua",
@@ -35,113 +35,113 @@
     "contributes": {
         "commands": [
             {
-                "command": "emmy.restartServer",
-                "title": "EmmyLua: Restart Lua Server"
+                "command": "gluals.restartServer",
+                "title": "GLuaLS: Restart Lua Server"
             },
             {
-                "command": "emmy.insertEmmyDebugCode",
-                "title": "EmmyLua: Insert Emmy Debugger Code"
+                "command": "gluals.insertEmmyDebugCode",
+                "title": "GLuaLS: Insert Emmy Debugger Code"
             },
             {
-                "command": "emmy.stopServer",
-                "title": "EmmyLua: Stop EmmyLua Language Server"
+                "command": "gluals.stopServer",
+                "title": "GLuaLS: Stop GLua Language Server"
             },
             {
-                "command": "emmy.showSyntaxTree",
-                "title": "EmmyLua: Show Syntax Tree",
+                "command": "gluals.showSyntaxTree",
+                "title": "GLuaLS: Show Syntax Tree",
                 "icon": "$(symbol-structure)"
             },
             {
-                "command": "emmy.gmod.updateAnnotations",
-                "title": "GMod: Update EmmyLua Annotations",
-                "category": "EmmyLua"
+                "command": "gluals.gmod.updateAnnotations",
+                "title": "GMod: Update GLuaLS Annotations",
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.removeAnnotations",
-                "title": "GMod: Remove EmmyLua Annotations",
-                "category": "EmmyLua"
+                "command": "gluals.gmod.removeAnnotations",
+                "title": "GMod: Remove GLuaLS Annotations",
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.pauseSoft",
+                "command": "gluals.gmod.pauseSoft",
                 "title": "GMod Debug: Pause (Soft)",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.pauseNow",
+                "command": "gluals.gmod.pauseNow",
                 "title": "GMod Debug: Pause (Immediate)",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.resume",
+                "command": "gluals.gmod.resume",
                 "title": "GMod Debug: Resume",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.breakHere",
+                "command": "gluals.gmod.breakHere",
                 "title": "GMod Debug: Break Here",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.waitIDE",
+                "command": "gluals.gmod.waitIDE",
                 "title": "GMod Debug: Wait IDE",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.runLua",
+                "command": "gluals.gmod.runLua",
                 "title": "GMod Debug: Run Lua",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.runFile",
+                "command": "gluals.gmod.runFile",
                 "title": "GMod Debug: Run File",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.runCommand",
+                "command": "gluals.gmod.runCommand",
                 "title": "GMod Debug: Run Command",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.setRealm",
+                "command": "gluals.gmod.setRealm",
                 "title": "GMod Debug: Set Realm",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.mcp.startHost",
+                "command": "gluals.gmod.mcp.startHost",
                 "title": "GMod MCP: Start Host",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.mcp.stopHost",
+                "command": "gluals.gmod.mcp.stopHost",
                 "title": "GMod MCP: Stop Host",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.mcp.restartHost",
+                "command": "gluals.gmod.mcp.restartHost",
                 "title": "GMod MCP: Restart Host",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.mcp.healthCheck",
+                "command": "gluals.gmod.mcp.healthCheck",
                 "title": "GMod MCP: Health Check",
-                "category": "EmmyLua"
+                "category": "GLuaLS"
             },
             {
-                "command": "emmy.gmod.explorer.refresh",
+                "command": "gluals.gmod.explorer.refresh",
                 "title": "GMod Explorer: Refresh",
-                "category": "EmmyLua",
+                "category": "GLuaLS",
                 "icon": "$(refresh)"
             },
             {
-                "command": "emmy.gmod.onboarding.start",
+                "command": "gluals.gmod.onboarding.start",
                 "title": "GMod: Run Setup Wizard",
-                "category": "EmmyLua",
+                "category": "GLuaLS",
                 "icon": "$(rocket)"
             },
             {
-                "command": "emmy.gmod.diagnostics.repair",
+                "command": "gluals.gmod.diagnostics.repair",
                 "title": "GMod: Run Diagnostics and Repair",
-                "category": "EmmyLua",
+                "category": "GLuaLS",
                 "icon": "$(tools)"
             }
         ],
@@ -152,7 +152,10 @@
                     ".lua"
                 ],
                 "aliases": [
-                    "EmmyLua"
+                    "GLua",
+                    "GLuaLS",
+                    "GLua Language Server",
+                    "Garry's Mod Lua"
                 ],
                 "configuration": "./language-configuration.json"
             }
@@ -174,8 +177,8 @@
         ],
         "debuggers": [
             {
-                "type": "emmylua_attach",
-                "label": "EmmyLua Attach Debug",
+                "type": "gluals_attach",
+                "label": "GLuaLS Attach Debug",
                 "program": "./out/debugger/attach/EmmyAttachDebugAdapter.js",
                 "runtime": "node",
                 "configurationAttributes": {
@@ -204,7 +207,7 @@
                 },
                 "initialConfigurations": [
                     {
-                        "type": "emmylua_attach",
+                        "type": "gluals_attach",
                         "request": "attach",
                         "name": "%debug.attach.name%",
                         "pid": 0,
@@ -217,7 +220,7 @@
                         "label": "%debug.attach.label%",
                         "description": "%debug.attach.desc%",
                         "body": {
-                            "type": "emmylua_attach",
+                            "type": "gluals_attach",
                             "request": "attach",
                             "name": "%debug.attach.name%",
                             "pid": 0,
@@ -230,8 +233,8 @@
                 ]
             },
             {
-                "type": "emmylua_launch",
-                "label": "EmmyLua Launch Debug",
+                "type": "gluals_launch",
+                "label": "GLuaLS Launch Debug",
                 "program": "./out/debugger/launch/EmmyLaunchDebugAdapter.js",
                 "runtime": "node",
                 "configurationAttributes": {
@@ -268,7 +271,7 @@
                 },
                 "initialConfigurations": [
                     {
-                        "type": "emmylua_launch",
+                        "type": "gluals_launch",
                         "request": "launch",
                         "name": "%debug.launch.name%",
                         "program": "",
@@ -282,7 +285,7 @@
                         "label": "%debug.launch.label%",
                         "description": "%debug.launch.desc%",
                         "body": {
-                            "type": "emmylua_launch",
+                            "type": "gluals_launch",
                             "request": "launch",
                             "name": "%debug.launch.name%",
                             "program": "",
@@ -297,8 +300,8 @@
                 ]
             },
             {
-                "type": "emmylua_new",
-                "label": "EmmyLua New Debugger",
+                "type": "gluals_new",
+                "label": "GLuaLS New Debugger",
                 "program": "./out/debugger/new_debugger/EmmyNewDebugAdapter.js",
                 "runtime": "node",
                 "configurationAttributes": {
@@ -336,9 +339,9 @@
                 },
                 "initialConfigurations": [
                     {
-                        "type": "emmylua_new",
+                        "type": "gluals_new",
                         "request": "launch",
-                        "name": "EmmyLua New Debug",
+                        "name": "GLuaLS New Debug",
                         "host": "localhost",
                         "port": 9966,
                         "ext": [
@@ -351,12 +354,12 @@
                 ],
                 "configurationSnippets": [
                     {
-                        "label": "EmmyLua New Debug",
-                        "description": "EmmyLua New Debug",
+                        "label": "GLuaLS New Debug",
+                        "description": "GLuaLS New Debug",
                         "body": {
-                            "type": "emmylua_new",
+                            "type": "gluals_new",
                             "request": "launch",
-                            "name": "EmmyLua New Debug",
+                            "name": "GLuaLS New Debug",
                             "host": "localhost",
                             "port": 9966,
                             "ext": [
@@ -373,7 +376,7 @@
                 ]
             },
             {
-                "type": "emmylua_gmod",
+                "type": "gluals_gmod",
                 "label": "GMod Remote Debug",
                 "program": "./out/debugger/gmod_debugger/GmodDebugAdapter.js",
                 "runtime": "node",
@@ -480,7 +483,7 @@
                 },
                 "initialConfigurations": [
                     {
-                        "type": "emmylua_gmod",
+                        "type": "gluals_gmod",
                         "request": "attach",
                         "name": "%debug.gmod.attach.name%",
                         "host": "127.0.0.1",
@@ -490,7 +493,7 @@
                             "${workspaceFolder}": "."
                         },
                         "stopOnEntry": true,
-                        "realm": "${config:emmylua.gmod.debugRealm}"
+                        "realm": "${config:gluals.gmod.debugRealm}"
                     }
                 ],
                 "configurationSnippets": [
@@ -498,7 +501,7 @@
                         "label": "%debug.gmod.attach.label%",
                         "description": "%debug.gmod.attach.desc%",
                         "body": {
-                            "type": "emmylua_gmod",
+                            "type": "gluals_gmod",
                             "request": "attach",
                             "name": "%debug.gmod.attach.name%",
                             "host": "127.0.0.1",
@@ -508,14 +511,14 @@
                                 "${workspaceFolder}": "."
                             },
                             "stopOnEntry": true,
-                            "realm": "${config:emmylua.gmod.debugRealm}"
+                            "realm": "${config:gluals.gmod.debugRealm}"
                         }
                     },
                     {
                         "label": "%debug.gmod.launch.label%",
                         "description": "%debug.gmod.launch.desc%",
                         "body": {
-                            "type": "emmylua_gmod",
+                            "type": "gluals_gmod",
                             "request": "launch",
                             "name": "%debug.gmod.launch.name%",
                             "program": "",
@@ -528,7 +531,7 @@
                                 "${workspaceFolder}": "."
                             },
                             "stopOnEntry": true,
-                            "realm": "${config:emmylua.gmod.debugRealm}"
+                            "realm": "${config:gluals.gmod.debugRealm}"
                         }
                     }
                 ],
@@ -540,7 +543,7 @@
         "views": {
             "explorer": [
                 {
-                    "id": "emmy.gmodExplorer",
+                    "id": "gluals.gmodExplorer",
                     "name": "GMod Toolkit",
                     "when": "workspaceFolderCount > 0",
                     "icon": "$(symbol-misc)"
@@ -550,32 +553,32 @@
         "menus": {
             "view/title": [
                 {
-                    "command": "emmy.gmod.explorer.refresh",
-                    "when": "view == emmy.gmodExplorer",
+                    "command": "gluals.gmod.explorer.refresh",
+                    "when": "view == gluals.gmodExplorer",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "emmy.gmod.onboarding.start",
-                    "when": "view == emmy.gmodExplorer",
+                    "command": "gluals.gmod.onboarding.start",
+                    "when": "view == gluals.gmodExplorer",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "emmy.gmod.diagnostics.repair",
-                    "when": "view == emmy.gmodExplorer",
+                    "command": "gluals.gmod.diagnostics.repair",
+                    "when": "view == gluals.gmodExplorer",
                     "group": "navigation@3"
                 }
             ],
             "commandPalette": [
                 {
-                    "command": "emmy.gmod.onboarding.start",
+                    "command": "gluals.gmod.onboarding.start",
                     "when": "resourceExtname == .lua"
                 },
                 {
-                    "command": "emmy.gmod.diagnostics.repair",
+                    "command": "gluals.gmod.diagnostics.repair",
                     "when": "resourceExtname == .lua"
                 },
                 {
-                    "command": "emmy.gmod.mcp.healthCheck",
+                    "command": "gluals.gmod.mcp.healthCheck",
                     "when": "resourceExtname == .lua"
                 }
             ]
@@ -585,7 +588,7 @@
                 "title": "Code Action",
                 "order": 0,
                 "properties": {
-                    "emmylua.codeAction.insertSpace": {
+                    "gluals.codeAction.insertSpace": {
                         "type": [
                             "boolean",
                             "null"
@@ -614,7 +617,7 @@
                 "title": "Code Lens",
                 "order": 1,
                 "properties": {
-                    "emmylua.codeLens.enable": {
+                    "gluals.codeLens.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -643,7 +646,7 @@
                 "title": "Completion",
                 "order": 2,
                 "properties": {
-                    "emmylua.completion.autoRequire": {
+                    "gluals.completion.autoRequire": {
                         "type": [
                             "boolean",
                             "null"
@@ -666,7 +669,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.completion.autoRequire.description%"
                     },
-                    "emmylua.completion.baseFunctionIncludesName": {
+                    "gluals.completion.baseFunctionIncludesName": {
                         "type": [
                             "boolean",
                             "null"
@@ -689,7 +692,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.completion.baseFunctionIncludesName.description%"
                     },
-                    "emmylua.completion.enable": {
+                    "gluals.completion.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -712,7 +715,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.completion.enable.description%"
                     },
-                    "emmylua.completion.postfix": {
+                    "gluals.completion.postfix": {
                         "default": null,
                         "enum": [
                             null,
@@ -738,7 +741,7 @@
                 "title": "Diagnostics",
                 "order": 3,
                 "properties": {
-                    "emmylua.diagnostics.diagnosticInterval": {
+                    "gluals.diagnostics.diagnosticInterval": {
                         "type": [
                             "integer",
                             "null"
@@ -753,7 +756,7 @@
                 "title": "Document Color",
                 "order": 4,
                 "properties": {
-                    "emmylua.documentColor.enable": {
+                    "gluals.documentColor.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -782,7 +785,7 @@
                 "title": "Hint",
                 "order": 5,
                 "properties": {
-                    "emmylua.hint.enable": {
+                    "gluals.hint.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -805,7 +808,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.enable.description%"
                     },
-                    "emmylua.hint.enumParamHint": {
+                    "gluals.hint.enumParamHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -828,7 +831,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.enumParamHint.description%"
                     },
-                    "emmylua.hint.indexHint": {
+                    "gluals.hint.indexHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -851,7 +854,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.indexHint.description%"
                     },
-                    "emmylua.hint.localHint": {
+                    "gluals.hint.localHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -874,7 +877,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.localHint.description%"
                     },
-                    "emmylua.hint.metaCallHint": {
+                    "gluals.hint.metaCallHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -897,7 +900,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.metaCallHint.description%"
                     },
-                    "emmylua.hint.overrideHint": {
+                    "gluals.hint.overrideHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -920,7 +923,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.hint.overrideHint.description%"
                     },
-                    "emmylua.hint.paramHint": {
+                    "gluals.hint.paramHint": {
                         "type": [
                             "boolean",
                             "null"
@@ -949,7 +952,7 @@
                 "title": "Hover",
                 "order": 6,
                 "properties": {
-                    "emmylua.hover.enable": {
+                    "gluals.hover.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -978,7 +981,7 @@
                 "title": "Inline Values",
                 "order": 7,
                 "properties": {
-                    "emmylua.inlineValues.enable": {
+                    "gluals.inlineValues.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -1007,7 +1010,7 @@
                 "title": "References",
                 "order": 8,
                 "properties": {
-                    "emmylua.references.enable": {
+                    "gluals.references.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -1030,7 +1033,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.references.enable.description%"
                     },
-                    "emmylua.references.fuzzySearch": {
+                    "gluals.references.fuzzySearch": {
                         "type": [
                             "boolean",
                             "null"
@@ -1053,7 +1056,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.references.fuzzySearch.description%"
                     },
-                    "emmylua.references.shortStringSearch": {
+                    "gluals.references.shortStringSearch": {
                         "type": [
                             "boolean",
                             "null"
@@ -1082,7 +1085,7 @@
                 "title": "Semantic Tokens",
                 "order": 9,
                 "properties": {
-                    "emmylua.semanticTokens.enable": {
+                    "gluals.semanticTokens.enable": {
                         "type": [
                             "boolean",
                             "null"
@@ -1105,7 +1108,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.semanticTokens.enable.description%"
                     },
-                    "emmylua.semanticTokens.renderDocumentationMarkup": {
+                    "gluals.semanticTokens.renderDocumentationMarkup": {
                         "type": [
                             "boolean",
                             "null"
@@ -1134,7 +1137,7 @@
                 "title": "Workspace",
                 "order": 10,
                 "properties": {
-                    "emmylua.workspace.enableReindex": {
+                    "gluals.workspace.enableReindex": {
                         "type": [
                             "boolean",
                             "null"
@@ -1157,7 +1160,7 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.workspace.enableReindex.description%"
                     },
-                    "emmylua.workspace.reindexDuration": {
+                    "gluals.workspace.reindexDuration": {
                         "type": [
                             "integer",
                             "null"
@@ -1172,31 +1175,31 @@
                 "title": "Colors",
                 "order": 11,
                 "properties": {
-                    "emmylua.colors.parameter": {
+                    "gluals.colors.parameter": {
                         "type": "string",
-                        "default": "#00bfae",
+                        "default": "",
                         "markdownDescription": "%config.emmylua.colors.parameter.description%"
                     },
-                    "emmylua.colors.global": {
+                    "gluals.colors.global": {
                         "type": "string",
-                        "default": "#FF6699",
+                        "default": "",
                         "markdownDescription": "%config.emmylua.colors.global.description%"
                     },
-                    "emmylua.colors.local": {
+                    "gluals.colors.local": {
                         "type": "string",
                         "default": "",
                         "markdownDescription": "%config.emmylua.colors.local.description%"
                     },
-                    "emmylua.colors.mutable_underline": {
+                    "gluals.colors.mutable_underline": {
                         "type": [
                             "boolean",
                             "null"
                         ],
                         "default": null,
                         "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%",
-                        "markdownDeprecationMessage": "Use `emmylua.colors.mutableUnderline` instead"
+                        "markdownDeprecationMessage": "Use `gluals.colors.mutableUnderline` instead"
                     },
-                    "emmylua.colors.mutableUnderline": {
+                    "gluals.colors.mutableUnderline": {
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%"
@@ -1207,16 +1210,16 @@
                 "title": "Misc",
                 "order": 12,
                 "properties": {
-                    "emmylua.language.completeAnnotation": {
+                    "gluals.language.completeAnnotation": {
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "%config.emmylua.language.completeAnnotation.description%"
                     },
-                    "emmylua.misc.autoInsertTripleDash": {
+                    "gluals.misc.autoInsertTripleDash": {
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "%config.emmylua.language.completeAnnotation.description%",
-                        "deprecationMessage": "Use `emmylua.language.completeAnnotation` instead"
+                        "deprecationMessage": "Use `gluals.language.completeAnnotation` instead"
                     }
                 }
             },
@@ -1224,12 +1227,12 @@
                 "title": "GMod",
                 "order": 14,
                 "properties": {
-                    "emmylua.gmod.autoLoadAnnotations": {
+                    "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
                         "default": true,
-                        "markdownDescription": "Automatically download and load Garry's Mod EmmyLua annotations as a core library. Annotations are downloaded from the `emmylua-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
+                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
                     },
-                    "emmylua.gmod.debugRealm": {
+                    "gluals.gmod.debugRealm": {
                         "type": "string",
                         "enum": [
                             "server",
@@ -1240,13 +1243,13 @@
                         "scope": "resource",
                         "markdownDescription": "Default realm used for GMod debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
                     },
-                    "emmylua.gmod.mcp.enabled": {
+                    "gluals.gmod.mcp.enabled": {
                         "type": "boolean",
                         "default": true,
                         "scope": "machine",
                         "markdownDescription": "Enable the local authenticated MCP host for GMod debug tool execution."
                     },
-                    "emmylua.gmod.mcp.port": {
+                    "gluals.gmod.mcp.port": {
                         "type": "integer",
                         "default": 0,
                         "minimum": 0,
@@ -1254,13 +1257,13 @@
                         "scope": "machine",
                         "markdownDescription": "Port for the local MCP host (`0` chooses a random ephemeral port)."
                     },
-                    "emmylua.gmod.mcp.authToken": {
+                    "gluals.gmod.mcp.authToken": {
                         "type": "string",
                         "default": "",
                         "scope": "machine",
                         "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure local token automatically."
                     },
-                    "emmylua.gmod.mcp.rateLimitPerMinute": {
+                    "gluals.gmod.mcp.rateLimitPerMinute": {
                         "type": "integer",
                         "default": 60,
                         "minimum": 1,
@@ -1274,7 +1277,7 @@
                 "title": "Language Server",
                 "order": 15,
                 "properties": {
-                    "emmylua.ls.startParameters": {
+                    "gluals.ls.startParameters": {
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -1282,12 +1285,12 @@
                         "default": [],
                         "markdownDescription": "%config.emmylua.ls.startParameters.description%"
                     },
-                    "emmylua.ls.executablePath": {
+                    "gluals.ls.executablePath": {
                         "type": "string",
                         "default": "",
                         "markdownDescription": "%config.emmylua.ls.executablePath.description%"
                     },
-                    "emmylua.ls.globalConfigPath": {
+                    "gluals.ls.globalConfigPath": {
                         "type": "string",
                         "default": "",
                         "markdownDescription": "%config.emmylua.ls.globalConfigPath.description%"
@@ -1303,7 +1306,7 @@
                         "scope": "window",
                         "markdownDescription": "%config.lua.trace.server.description%"
                     },
-                    "emmylua.ls.debugPort": {
+                    "gluals.ls.debugPort": {
                         "type": [
                             "integer",
                             "null"
