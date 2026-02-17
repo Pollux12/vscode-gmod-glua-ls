@@ -5,6 +5,7 @@ import {
   ContinuedEvent,
   StoppedEvent,
   OutputEvent,
+  Event as DebugEvent,
   Thread,
   StackFrame,
   Scope,
@@ -464,12 +465,17 @@ export class GmodDebugSession extends DebugSession {
     this.getControlService().execute(controlCommand, controlArgs)
       .then((result) => {
         this.emitControlResult(result)
+        this.sendEvent(new DebugEvent('gmod.controlResult', result))
         response.body = result as unknown as Record<string, unknown>
         this.sendResponse(response)
       })
       .catch((err) => {
         response.success = false
         response.message = err instanceof Error ? err.message : String(err)
+        this.sendEvent(new DebugEvent('gmod.controlError', {
+          message: response.message,
+          command: controlCommand,
+        }))
         this.sendEvent(new OutputEvent(`Control command failed: ${response.message}\n`, 'stderr'))
         this.sendResponse(response)
       })
@@ -1113,6 +1119,13 @@ export class GmodDebugSession extends DebugSession {
               'stdout'
             )
           )
+          this.sendEvent(new DebugEvent('gmod.output', {
+            message: formatted,
+            source: event.params.source ?? event.params.group ?? 'console',
+            severity: event.params.severity,
+            timestamp: event.params.timestamp,
+            realm: this._controlService?.getRealm() ?? 'server',
+          }))
           break
       }
     } catch(e) {
