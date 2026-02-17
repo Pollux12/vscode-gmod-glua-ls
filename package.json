@@ -48,6 +48,16 @@
                 "icon": "$(symbol-structure)"
             },
             {
+                "command": "emmy.gmod.updateAnnotations",
+                "title": "GMod: Update EmmyLua Annotations",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.removeAnnotations",
+                "title": "GMod: Remove EmmyLua Annotations",
+                "category": "EmmyLua"
+            },
+            {
                 "command": "emmylua.luarocks.searchPackages",
                 "title": "Search Packages",
                 "category": "LuaRocks",
@@ -1032,8 +1042,19 @@
                 }
             },
             {
+                "title": "GMod",
+                "order": 14,
+                "properties": {
+                    "emmylua.gmod.autoLoadAnnotations": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "Automatically download and load Garry's Mod EmmyLua annotations as a core library. Annotations are downloaded from the `emmylua-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
+                    }
+                }
+            },
+            {
                 "title": "Language Server",
-                "order": 13,
+                "order": 15,
                 "properties": {
                     "emmylua.ls.startParameters": {
                         "type": "array",

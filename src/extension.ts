@@ -17,6 +17,7 @@ import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
 import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { insertEmmyDebugCode, registerDebuggers } from './debugger';
 import * as LuaRocks from './luarocks';
+import { GmodAnnotationManager } from './gmodAnnotationManager';
 
 /**
  * Command registration entry
@@ -31,6 +32,7 @@ export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
 
 let syntaxTreeManager: SyntaxTreeManager | undefined;
+let gmodAnnotationManager: GmodAnnotationManager | undefined;
 
 /**
  * Extension activation entry point
@@ -83,6 +85,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'emmy.showSyntaxTree', handler: showSyntaxTree },
         // debugger commands
         { id: 'emmy.insertEmmyDebugCode', handler: insertEmmyDebugCode },
+        // GMod annotations commands
+        { id: 'emmy.gmod.updateAnnotations', handler: updateGmodAnnotations },
+        { id: 'emmy.gmod.removeAnnotations', handler: removeGmodAnnotations },
         // LuaRocks commands
         { id: 'emmylua.luarocks.searchPackages', handler: LuaRocks.searchPackages },
         { id: 'emmylua.luarocks.installPackage', handler: LuaRocks.installPackage },
@@ -132,6 +137,12 @@ function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
  * Initialize all extension features
  */
 async function initializeExtension(): Promise<void> {
+    // Initialize GMod annotation manager
+    gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
+    
+    // Initialize annotations before starting server
+    await gmodAnnotationManager.initializeAnnotations();
+
     // Initialize syntax tree manager
     syntaxTreeManager = new SyntaxTreeManager();
     extensionContext.vscodeContext.subscriptions.push(syntaxTreeManager);
@@ -208,9 +219,18 @@ async function doStartServer(): Promise<void> {
     const context = extensionContext.vscodeContext;
     const configManager = new ConfigurationManager(getConfigurationScope());
 
+    // Prepare initialization options with GMod annotations path if available
+    const initOptions: Record<string, any> = {};
+    if (gmodAnnotationManager) {
+        const annotationsPath = gmodAnnotationManager.getAnnotationsPath();
+        if (annotationsPath) {
+            initOptions.gmodAnnotationsPath = annotationsPath;
+        }
+    }
+
     const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
-        initializationOptions: {},
+        initializationOptions: initOptions,
     };
 
     let serverOptions: ServerOptions;
@@ -440,3 +460,26 @@ async function showSyntaxTree(): Promise<void> {
     // Show syntax tree using the manager
     await syntaxTreeManager.show(document.uri, editor.selection);
 }
+
+/**
+ * Update GMod annotations
+ */
+async function updateGmodAnnotations(): Promise<void> {
+    if (!gmodAnnotationManager) {
+        vscode.window.showErrorMessage('GMod annotation manager not initialized');
+        return;
+    }
+    await gmodAnnotationManager.updateAnnotations();
+}
+
+/**
+ * Remove GMod annotations
+ */
+async function removeGmodAnnotations(): Promise<void> {
+    if (!gmodAnnotationManager) {
+        vscode.window.showErrorMessage('GMod annotation manager not initialized');
+        return;
+    }
+    await gmodAnnotationManager.removeAnnotations();
+}
+
