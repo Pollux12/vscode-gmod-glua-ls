@@ -15,6 +15,7 @@ export type DebugRequest =
   | StepOutRequest
   | ContinueRequest
   | PauseRequest
+  | PauseNowRequest
   | AddBreakPointRequest
   | GetBreakPointsRequest
   | ClearBreakPointsRequest
@@ -24,6 +25,7 @@ export type DebugRequest =
   | EvalRequest
   | GetGlobalRequest
   | SetVarRequest
+  | CommandRequest
 
 export interface DebugClientAdapter {
   onMessage: TypedEventTarget<JsonRpcMessage>
@@ -105,6 +107,10 @@ export class Client {
     this.send({ method: 'continue', jsonrpc: '2.0', id: this.seqId++ })
   pause = (): Promise<DebugResponseType<PauseRequest>> =>
     this.send({ method: 'pause', jsonrpc: '2.0', id: this.seqId++ })
+  pauseSoft = (): Promise<DebugResponseType<PauseRequest>> =>
+    this.send({ method: 'pause', jsonrpc: '2.0', id: this.seqId++ })
+  pauseNow = (): Promise<DebugResponseType<PauseNowRequest>> =>
+    this.send({ method: 'pause_now', jsonrpc: '2.0', id: this.seqId++ })
 
   addBreakPoint = (
     params: AddBreakPointRequest['params']
@@ -181,6 +187,15 @@ export class Client {
       id: this.seqId++,
       params,
     })
+  command = (
+    params: CommandRequest['params']
+  ): Promise<DebugResponseType<CommandRequest>> =>
+    this.send({
+      method: 'command',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
 
   end(): void {
     this.adapter.end()
@@ -244,6 +259,10 @@ export interface ContinueRequest extends JsonRpcRequest {
 }
 export interface PauseRequest extends JsonRpcRequest {
   method: 'pause'
+  params?: never
+}
+export interface PauseNowRequest extends JsonRpcRequest {
+  method: 'pause_now'
   params?: never
 }
 export interface AddBreakPointRequest extends JsonRpcRequest {
@@ -310,6 +329,10 @@ export interface GetGlobalRequest extends JsonRpcRequest {
     depth?: number
   }
 }
+export interface CommandRequest extends JsonRpcRequest {
+  method: 'command'
+  params: string
+}
 
 type StackInfo = {
   file: string
@@ -338,10 +361,12 @@ type ResponseResultType = {
   step_out: never
   continue: never
   pause: never
+  pause_now: never
   add_breakpoint: never
   get_breakpoints: Breakpoint[]
   clear_breakpoints: never
   set_var: boolean
+  command: never
 }
 
 export type DebugResponseType<T extends DebugRequest> = Pick<T, 'id'> & {

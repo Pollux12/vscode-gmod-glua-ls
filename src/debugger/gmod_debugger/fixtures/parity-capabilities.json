@@ -8,6 +8,9 @@
         },
         "continue": "continue",
         "pause": "pause",
+        "pauseSoft": "pause",
+        "pauseNow": "pause_now",
+        "resume": "continue",
         "next": "step",
         "stepIn": "step_in",
         "stepOut": "step_out",
@@ -15,6 +18,7 @@
         "locals": "get_local_variable",
         "upvalues": "get_upvalues",
         "globals": "get_global",
-        "evaluate": "eval"
+        "evaluate": "eval",
+        "runCommand": "command"
     }
 }

@@ -17,9 +17,8 @@ import { readFileSync } from 'fs'
 import { spawn, ChildProcess } from 'child_process'
 import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
-import { JsonRpcNotify, JsonRpcRequest } from './lrdb/JsonRpc'
+import { JsonRpcNotify } from './lrdb/JsonRpc'
 import {
-  DebugRequest,
   EvalRequest,
   ExitNotify,
   GetGlobalRequest,
@@ -29,6 +28,14 @@ import {
   RunningNotify,
   SetVarRequest,
 } from './lrdb/Client'
+import {
+  formatGmodConsoleOutput,
+  GmodControlCommand,
+  GmodControlResult,
+  GmodDebugControlService,
+  GmodRealm,
+  normalizeGmodRealm,
+} from './GmodDebugControlService'
 
 export interface LaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
@@ -39,6 +46,7 @@ export interface LaunchRequestArguments
   sourceRoot?: string
   sourceFileMap?: Record<string, string>
   stopOnEntry?: boolean
+  realm?: GmodRealm
 }
 
 export interface AttachRequestArguments
@@ -48,6 +56,7 @@ export interface AttachRequestArguments
   sourceRoot: string
   sourceFileMap?: Record<string, string>
   stopOnEntry?: boolean
+  realm?: GmodRealm
 }
 
 type GetLocalVariableParam = {
@@ -96,10 +105,13 @@ interface Color {
 }
 
 interface NotificationOutput {
-  channel_id: number
-  severity: number
-  color: Color
-  message: string
+  channel_id?: number
+  severity?: number
+  group?: string
+  source?: string
+  timestamp?: number | string
+  color?: Color
+  message?: string
 }
 
 interface OutputNotify extends JsonRpcNotify {
@@ -113,11 +125,6 @@ declare type DebuggerNotify =
   | ExitNotify
   | RunningNotify
   | OutputNotify
-
-interface CommandRequest extends JsonRpcRequest {
-  method: 'command'
-  params: string
-}
 
 function getStringifiableObject(value: any): any {
   if (value == null) {
@@ -184,6 +191,17 @@ export class GmodDebugSession extends DebugSession {
   private static THREAD_ID = 1
 
   private static DEBUGGER_PROTOCOL_VERSION = 'gmod-1'
+  private static CONTROL_COMMANDS: ReadonlySet<GmodControlCommand> = new Set([
+    'pauseSoft',
+    'pauseNow',
+    'resume',
+    'breakHere',
+    'waitIDE',
+    'runLua',
+    'runFile',
+    'runCommand',
+    'setRealm',
+  ])
 
   private _debug_server_process?: ChildProcess
 
@@ -198,6 +216,8 @@ export class GmodDebugSession extends DebugSession {
   private _stopOnEntry?: boolean
 
   private _debuggee_protocol_version?: string
+  private _controlService?: GmodDebugControlService
+  private _sourceRoot?: string
 
   /**
    * Creates a new debug adapter that is used for one debug session.
@@ -309,6 +329,8 @@ export class GmodDebugSession extends DebugSession {
       const sourceRoot = args.sourceRoot ? args.sourceRoot : cwd
 
       this.setupSourceEnv(sourceRoot, args.sourceFileMap)
+      this._sourceRoot = sourceRoot
+      this.getControlService(args.realm, sourceRoot)
 
       const programArgs = args.args ? args.args : []
 
@@ -371,6 +393,8 @@ export class GmodDebugSession extends DebugSession {
       this._stopOnEntry = args.stopOnEntry
 
       this.setupSourceEnv(args.sourceRoot, args.sourceFileMap)
+      this._sourceRoot = args.sourceRoot
+      this.getControlService(args.realm, args.sourceRoot)
 
       const port = args.port ? args.port : 21111
       const host = args.host ? args.host : 'localhost'
@@ -419,6 +443,36 @@ export class GmodDebugSession extends DebugSession {
     response: DebugProtocol.ConfigurationDoneResponse
   ): void {
     this.sendResponse(response)
+  }
+
+  protected customRequest(
+    command: string,
+    response: DebugProtocol.Response,
+    args: any
+  ): void {
+    const controlCommand = this.resolveControlCommand(command, args)
+    if (!controlCommand) {
+      super.customRequest(command, response, args)
+      return
+    }
+
+    const controlArgs = command === 'gmod.control' && args ? args : { ...(args ?? {}) }
+    if (controlArgs.command) {
+      delete controlArgs.command
+    }
+
+    this.getControlService().execute(controlCommand, controlArgs)
+      .then((result) => {
+        this.emitControlResult(result)
+        response.body = result as unknown as Record<string, unknown>
+        this.sendResponse(response)
+      })
+      .catch((err) => {
+        response.success = false
+        response.message = err instanceof Error ? err.message : String(err)
+        this.sendEvent(new OutputEvent(`Control command failed: ${response.message}\n`, 'stderr'))
+        this.sendResponse(response)
+      })
   }
 
   protected setBreakPointsRequest(
@@ -880,7 +934,7 @@ export class GmodDebugSession extends DebugSession {
     _args: DebugProtocol.PauseArguments
   ): void {
     try {
-      this._debug_client?.pause()
+      this._debug_client?.pauseNow()
       this.sendResponse(response)
     } catch(e) {
       response.success = false
@@ -962,13 +1016,7 @@ export class GmodDebugSession extends DebugSession {
       }
 
       if (args.context === 'repl' && args.expression.startsWith('con ')) {
-        const request: CommandRequest = {
-          jsonrpc: '2.0',
-          method: 'command',
-          params: args.expression.substr(4) + '\n',
-          id: 0,
-        }
-        this._debug_client.send(request as unknown as DebugRequest)
+        this._debug_client.command(args.expression.substr(4) + '\n')
         response.success = true
         this.sendResponse(response)
         return
@@ -1057,9 +1105,11 @@ export class GmodDebugSession extends DebugSession {
           break
 
         case 'output':
+          const formatted = formatGmodConsoleOutput(event.params)
+          const color = event.params.color ?? { r: 255, g: 255, b: 255, a: 255 }
           this.sendEvent(
             new OutputEvent(
-              `\u001b[38;2;${event.params.color.r};${event.params.color.g};${event.params.color.b}m${event.params.message}\u001b[0m`,
+              `\u001b[38;2;${color.r};${color.g};${color.b}m${formatted}\u001b[0m`,
               'stdout'
             )
           )
@@ -1071,6 +1121,80 @@ export class GmodDebugSession extends DebugSession {
       } else if (e instanceof Error) {
         this.sendEvent(new OutputEvent(e.message))
       }
+    }
+  }
+
+  private resolveControlCommand(command: string, args: any): GmodControlCommand | undefined {
+    if (command === 'gmod.control') {
+      const nested = args && typeof args.command === 'string' ? args.command : ''
+      if (GmodDebugSession.CONTROL_COMMANDS.has(nested as GmodControlCommand)) {
+        return nested as GmodControlCommand
+      }
+      return undefined
+    }
+
+    if (GmodDebugSession.CONTROL_COMMANDS.has(command as GmodControlCommand)) {
+      return command as GmodControlCommand
+    }
+    return undefined
+  }
+
+  private getControlService(initialRealm?: GmodRealm, sourceRoot?: string): GmodDebugControlService {
+    const realm = initialRealm != null ? normalizeGmodRealm(initialRealm) : undefined
+    if (!this._controlService) {
+      this._controlService = new GmodDebugControlService(
+        {
+          pauseSoft: () => {
+            if (!this._debug_client) {
+              throw new Error('Debugger is not connected.')
+            }
+            return this._debug_client.pauseSoft()
+          },
+          pauseNow: () => {
+            if (!this._debug_client) {
+              throw new Error('Debugger is not connected.')
+            }
+            return this._debug_client.pauseNow()
+          },
+          resume: () => {
+            if (!this._debug_client) {
+              throw new Error('Debugger is not connected.')
+            }
+            return this._debug_client.continue()
+          },
+          runCommand: (command: string) => {
+            if (!this._debug_client) {
+              throw new Error('Debugger is not connected.')
+            }
+            return this._debug_client.command(command)
+          },
+        },
+        realm ?? 'server',
+        sourceRoot ?? this._sourceRoot
+      )
+    } else {
+      if (realm) {
+        this._controlService.setRealm(realm)
+      }
+      this._controlService.setWorkspaceRoot(sourceRoot ?? this._sourceRoot)
+    }
+    return this._controlService
+  }
+
+  private emitControlResult(result: GmodControlResult): void {
+    const header = `[control:${result.correlationId}] ${result.command} realm=${result.realm}`
+    this.sendEvent(new OutputEvent(`${header}\n`, 'console'))
+    if (result.request) {
+      this.sendEvent(new OutputEvent(`[control:${result.correlationId}] request: ${result.request}\n`, 'console'))
+    }
+    for (const diagnostic of result.diagnostics) {
+      const category = diagnostic.level === 'error' ? 'stderr' : 'console'
+      this.sendEvent(
+        new OutputEvent(
+          `[control:${result.correlationId}] ${diagnostic.level.toUpperCase()}: ${diagnostic.message}\n`,
+          category
+        )
+      )
     }
   }
 
