@@ -179,6 +179,8 @@ When dev mode is disabled, the bundled server comes from local source first (if 
 - **EmmyLua Attach**: Attach to running processes (requires exported Lua symbols)
 - **EmmyLua Launch**: Direct launch debugging
 - **GMod Remote Debug**: gm_rdb-compatible attach/launch debugging with conditional and hit-count breakpoints
+  - Includes control commands: `pauseSoft`, `pauseNow`, `resume`, `breakHere`, `waitIDE`, `runLua`, `runFile`, `runCommand`, `setRealm`
+  - Console output is streamed with timestamps, source/channel tags, and correlation IDs for control/file execution flows
 
 ## ❓ Frequently Asked Questions
 

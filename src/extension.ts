@@ -18,6 +18,7 @@ import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { insertEmmyDebugCode, registerDebuggers } from './debugger';
 import * as LuaRocks from './luarocks';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
+import { GMOD_REALMS, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 
 /**
  * Command registration entry
@@ -88,6 +89,16 @@ function registerCommands(context: vscode.ExtensionContext): void {
         // GMod annotations commands
         { id: 'emmy.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'emmy.gmod.removeAnnotations', handler: removeGmodAnnotations },
+        // GMod debug control commands
+        { id: 'emmy.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
+        { id: 'emmy.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
+        { id: 'emmy.gmod.resume', handler: () => runGmodControlCommand('resume') },
+        { id: 'emmy.gmod.breakHere', handler: () => runGmodControlCommand('breakHere') },
+        { id: 'emmy.gmod.waitIDE', handler: () => runGmodControlCommand('waitIDE') },
+        { id: 'emmy.gmod.runLua', handler: runGmodRunLua },
+        { id: 'emmy.gmod.runFile', handler: runGmodRunFile },
+        { id: 'emmy.gmod.runCommand', handler: runGmodRunCommand },
+        { id: 'emmy.gmod.setRealm', handler: setGmodRealm },
         // LuaRocks commands
         { id: 'emmylua.luarocks.searchPackages', handler: LuaRocks.searchPackages },
         { id: 'emmylua.luarocks.installPackage', handler: LuaRocks.installPackage },
@@ -481,5 +492,125 @@ async function removeGmodAnnotations(): Promise<void> {
         return;
     }
     await gmodAnnotationManager.removeAnnotations();
+}
+
+type GmodControlCommand =
+    | 'pauseSoft'
+    | 'pauseNow'
+    | 'resume'
+    | 'breakHere'
+    | 'waitIDE'
+    | 'runLua'
+    | 'runFile'
+    | 'runCommand'
+    | 'setRealm';
+
+function getActiveGmodDebugSession(): vscode.DebugSession | undefined {
+    const session = vscode.debug.activeDebugSession;
+    if (session?.type === 'emmylua_gmod') {
+        return session;
+    }
+    return undefined;
+}
+
+function getGmodRealmScope(): vscode.ConfigurationScope | undefined {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+        const folder = vscode.workspace.getWorkspaceFolder(activeEditor.document.uri);
+        if (folder) {
+            return folder;
+        }
+    }
+    return vscode.workspace.workspaceFolders?.[0];
+}
+
+function getPersistedGmodRealm(): GmodRealm {
+    const scope = getGmodRealmScope();
+    const configured = vscode.workspace
+        .getConfiguration('emmylua.gmod', scope)
+        .get<string>('debugRealm');
+    return normalizeGmodRealm(configured);
+}
+
+async function runGmodControlCommand(command: GmodControlCommand, args: Record<string, unknown> = {}): Promise<void> {
+    const session = getActiveGmodDebugSession();
+    if (!session) {
+        vscode.window.showWarningMessage('No active GMod debug session.');
+        return;
+    }
+
+    const realmAwareCommands: GmodControlCommand[] = ['breakHere', 'waitIDE', 'runLua', 'runFile', 'setRealm'];
+    const payload = realmAwareCommands.includes(command)
+        ? { realm: getPersistedGmodRealm(), ...args }
+        : args;
+
+    try {
+        await session.customRequest(command, payload);
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`GMod debug command "${command}" failed: ${errorMessage}`);
+    }
+}
+
+async function runGmodRunLua(): Promise<void> {
+    const lua = await vscode.window.showInputBox({
+        title: 'Run Lua in Garry\'s Mod',
+        prompt: 'Enter Lua code to execute',
+        ignoreFocusOut: true
+    });
+    if (!lua) {
+        return;
+    }
+
+    await runGmodControlCommand('runLua', { lua });
+}
+
+async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
+    const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
+    if (!targetUri?.fsPath) {
+        vscode.window.showWarningMessage('No Lua file selected.');
+        return;
+    }
+    await runGmodControlCommand('runFile', { path: targetUri.fsPath });
+}
+
+async function runGmodRunCommand(): Promise<void> {
+    const command = await vscode.window.showInputBox({
+        title: 'Run Garry\'s Mod Console Command',
+        prompt: 'Enter console command',
+        ignoreFocusOut: true
+    });
+    if (!command) {
+        return;
+    }
+
+    await runGmodControlCommand('runCommand', { command });
+}
+
+async function setGmodRealm(realm?: string): Promise<void> {
+    const pickedRealm = realm ?? await vscode.window.showQuickPick(
+        [...GMOD_REALMS],
+        {
+            title: 'Select Garry\'s Mod Debug Realm',
+            placeHolder: `Current: ${getPersistedGmodRealm()}`
+        }
+    );
+    if (!pickedRealm) {
+        return;
+    }
+    const selectedRealm = normalizeGmodRealm(pickedRealm);
+    const scope = getGmodRealmScope();
+    const target = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 1
+        ? vscode.ConfigurationTarget.WorkspaceFolder
+        : vscode.ConfigurationTarget.Workspace;
+    await vscode.workspace
+        .getConfiguration('emmylua.gmod', scope)
+        .update('debugRealm', selectedRealm, target);
+
+    const session = getActiveGmodDebugSession();
+    if (session) {
+        await session.customRequest('setRealm', { realm: selectedRealm });
+    }
+    vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
 }
 

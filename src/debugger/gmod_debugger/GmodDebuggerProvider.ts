@@ -2,6 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { DebugConfigurationBase } from "../base/DebugConfigurationBase";
 import { DebuggerProvider } from "../base/DebuggerProvider";
+import { GmodRealm, normalizeGmodRealm } from "./GmodDebugControlService";
 
 export interface GmodDebugConfiguration extends DebugConfigurationBase {
     request: "attach" | "launch";
@@ -10,6 +11,7 @@ export interface GmodDebugConfiguration extends DebugConfigurationBase {
     sourceRoot?: string;
     sourceFileMap?: Record<string, string>;
     stopOnEntry?: boolean;
+    realm?: GmodRealm;
     program?: string;
     cwd?: string;
     args?: string[];
@@ -27,6 +29,10 @@ export class GmodDebuggerProvider extends DebuggerProvider {
         configuration.host = configuration.host || "127.0.0.1";
         configuration.port = configuration.port || 21111;
         configuration.stopOnEntry = configuration.stopOnEntry ?? true;
+        const configuredRealm = vscode.workspace
+            .getConfiguration("emmylua.gmod", folder)
+            .get<string>("debugRealm");
+        configuration.realm = normalizeGmodRealm(configuration.realm ?? configuredRealm);
 
         if (configuration.request === "launch") {
             configuration.cwd = configuration.cwd || (configuration.program ? path.dirname(configuration.program) : workspaceRoot);

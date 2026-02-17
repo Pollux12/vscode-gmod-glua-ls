@@ -58,6 +58,51 @@
                 "category": "EmmyLua"
             },
             {
+                "command": "emmy.gmod.pauseSoft",
+                "title": "GMod Debug: Pause (Soft)",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.pauseNow",
+                "title": "GMod Debug: Pause (Immediate)",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.resume",
+                "title": "GMod Debug: Resume",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.breakHere",
+                "title": "GMod Debug: Break Here",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.waitIDE",
+                "title": "GMod Debug: Wait IDE",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.runLua",
+                "title": "GMod Debug: Run Lua",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.runFile",
+                "title": "GMod Debug: Run File",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.runCommand",
+                "title": "GMod Debug: Run Command",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.setRealm",
+                "title": "GMod Debug: Set Realm",
+                "category": "EmmyLua"
+            },
+            {
                 "command": "emmylua.luarocks.searchPackages",
                 "title": "Search Packages",
                 "category": "LuaRocks",
@@ -366,6 +411,16 @@
                                 "type": "boolean",
                                 "description": "%debug.gmod.stopOnEntry%",
                                 "default": true
+                            },
+                            "realm": {
+                                "type": "string",
+                                "description": "Runtime realm for debugger control commands",
+                                "enum": [
+                                    "server",
+                                    "client",
+                                    "menu"
+                                ],
+                                "default": "server"
                             }
                         }
                     },
@@ -413,6 +468,16 @@
                                 "type": "boolean",
                                 "description": "%debug.gmod.stopOnEntry%",
                                 "default": true
+                            },
+                            "realm": {
+                                "type": "string",
+                                "description": "Runtime realm for debugger control commands",
+                                "enum": [
+                                    "server",
+                                    "client",
+                                    "menu"
+                                ],
+                                "default": "server"
                             }
                         }
                     }
@@ -428,7 +493,8 @@
                         "sourceFileMap": {
                             "${workspaceFolder}": "."
                         },
-                        "stopOnEntry": true
+                        "stopOnEntry": true,
+                        "realm": "${config:emmylua.gmod.debugRealm}"
                     }
                 ],
                 "configurationSnippets": [
@@ -445,7 +511,8 @@
                             "sourceFileMap": {
                                 "${workspaceFolder}": "."
                             },
-                            "stopOnEntry": true
+                            "stopOnEntry": true,
+                            "realm": "${config:emmylua.gmod.debugRealm}"
                         }
                     },
                     {
@@ -464,7 +531,8 @@
                             "sourceFileMap": {
                                 "${workspaceFolder}": "."
                             },
-                            "stopOnEntry": true
+                            "stopOnEntry": true,
+                            "realm": "${config:emmylua.gmod.debugRealm}"
                         }
                     }
                 ],
@@ -1190,6 +1258,17 @@
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "Automatically download and load Garry's Mod EmmyLua annotations as a core library. Annotations are downloaded from the `emmylua-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
+                    },
+                    "emmylua.gmod.debugRealm": {
+                        "type": "string",
+                        "enum": [
+                            "server",
+                            "client",
+                            "menu"
+                        ],
+                        "default": "server",
+                        "scope": "resource",
+                        "markdownDescription": "Default realm used for GMod debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
                     }
                 }
             },
