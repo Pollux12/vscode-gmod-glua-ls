@@ -1,0 +1,20 @@
+{
+    "debuggerType": "emmylua_gmod",
+    "protocolVersion": "gmod-1",
+    "dapMappings": {
+        "setBreakpoints": {
+            "request": "add_breakpoint",
+            "fields": ["file", "line", "condition", "hit_condition"]
+        },
+        "continue": "continue",
+        "pause": "pause",
+        "next": "step",
+        "stepIn": "step_in",
+        "stepOut": "step_out",
+        "stackTrace": "get_stacktrace",
+        "locals": "get_local_variable",
+        "upvalues": "get_upvalues",
+        "globals": "get_global",
+        "evaluate": "eval"
+    }
+}

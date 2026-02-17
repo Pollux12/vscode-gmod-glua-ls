@@ -3,6 +3,7 @@ import { ProviderResult } from 'vscode';
 import { EmmyNewDebugSession } from './new_debugger/EmmyNewDebugSession';
 import { EmmyAttachDebugSession } from './attach/EmmyAttachDebugSession';
 import { EmmyLaunchDebugSession } from './launch/EmmyLaunchDebugSession';
+import { GmodDebugSession } from "./gmod_debugger/GmodDebugSession";
 
 export class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 
@@ -16,6 +17,9 @@ export class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorF
             }
             case 'emmylua_new': {
                 return new vscode.DebugAdapterInlineImplementation(new EmmyNewDebugSession());
+            }
+            case "emmylua_gmod": {
+                return new vscode.DebugAdapterInlineImplementation(new GmodDebugSession());
             }
         }
         

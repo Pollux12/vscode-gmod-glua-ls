@@ -5,6 +5,7 @@ import { EmmyNewDebuggerProvider } from "./new_debugger/EmmyNewDebuggerProvider"
 import { EmmyAttachDebuggerProvider } from "./attach/EmmyAttachDebuggerProvider";
 import { EmmyLaunchDebuggerProvider } from "./launch/EmmyLaunchDebuggerProvider";
 import { InlineDebugAdapterFactory } from "./DebugFactory";
+import { GmodDebuggerProvider } from "./gmod_debugger/GmodDebuggerProvider";
 
 
 /**
@@ -74,6 +75,7 @@ export function registerDebuggers(): void {
         { type: 'emmylua_new', provider: new EmmyNewDebuggerProvider('emmylua_new', context) },
         { type: 'emmylua_attach', provider: new EmmyAttachDebuggerProvider('emmylua_attach', context) },
         { type: 'emmylua_launch', provider: new EmmyLaunchDebuggerProvider('emmylua_launch', context) },
+        { type: "emmylua_gmod", provider: new GmodDebuggerProvider("emmylua_gmod", context) },
     ];
 
     debuggerConfigs.forEach(({ type, provider }) => {
