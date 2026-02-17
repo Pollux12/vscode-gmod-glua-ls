@@ -103,6 +103,26 @@
                 "category": "EmmyLua"
             },
             {
+                "command": "emmy.gmod.mcp.startHost",
+                "title": "GMod MCP: Start Host",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.mcp.stopHost",
+                "title": "GMod MCP: Stop Host",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.mcp.restartHost",
+                "title": "GMod MCP: Restart Host",
+                "category": "EmmyLua"
+            },
+            {
+                "command": "emmy.gmod.mcp.healthCheck",
+                "title": "GMod MCP: Health Check",
+                "category": "EmmyLua"
+            },
+            {
                 "command": "emmylua.luarocks.searchPackages",
                 "title": "Search Packages",
                 "category": "LuaRocks",
@@ -1269,6 +1289,34 @@
                         "default": "server",
                         "scope": "resource",
                         "markdownDescription": "Default realm used for GMod debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
+                    },
+                    "emmylua.gmod.mcp.enabled": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "machine",
+                        "markdownDescription": "Enable the local authenticated MCP host for GMod debug tool execution."
+                    },
+                    "emmylua.gmod.mcp.port": {
+                        "type": "integer",
+                        "default": 0,
+                        "minimum": 0,
+                        "maximum": 65535,
+                        "scope": "machine",
+                        "markdownDescription": "Port for the local MCP host (`0` chooses a random ephemeral port)."
+                    },
+                    "emmylua.gmod.mcp.authToken": {
+                        "type": "string",
+                        "default": "",
+                        "scope": "machine",
+                        "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure local token automatically."
+                    },
+                    "emmylua.gmod.mcp.rateLimitPerMinute": {
+                        "type": "integer",
+                        "default": 60,
+                        "minimum": 1,
+                        "maximum": 600,
+                        "scope": "machine",
+                        "markdownDescription": "Maximum authenticated MCP requests accepted per minute per client address."
                     }
                 }
             },

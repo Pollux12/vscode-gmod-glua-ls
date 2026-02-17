@@ -18,7 +18,8 @@ import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { insertEmmyDebugCode, registerDebuggers } from './debugger';
 import * as LuaRocks from './luarocks';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
-import { GMOD_REALMS, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
+import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
+import { GmodMcpHost } from './gmodMcpHost';
 
 /**
  * Command registration entry
@@ -34,6 +35,7 @@ let activeEditor: vscode.TextEditor | undefined;
 
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
+let gmodMcpHost: GmodMcpHost | undefined;
 
 /**
  * Extension activation entry point
@@ -68,7 +70,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 /**
  * Extension deactivation
  */
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
+    if (gmodMcpHost) {
+        await gmodMcpHost.stop();
+        gmodMcpHost.dispose();
+        gmodMcpHost = undefined;
+    }
     extensionContext?.dispose();
     Annotator.dispose();
 }
@@ -99,6 +106,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'emmy.gmod.runFile', handler: runGmodRunFile },
         { id: 'emmy.gmod.runCommand', handler: runGmodRunCommand },
         { id: 'emmy.gmod.setRealm', handler: setGmodRealm },
+        { id: 'emmy.gmod.mcp.startHost', handler: startGmodMcpHost },
+        { id: 'emmy.gmod.mcp.stopHost', handler: stopGmodMcpHost },
+        { id: 'emmy.gmod.mcp.restartHost', handler: restartGmodMcpHost },
+        { id: 'emmy.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
         // LuaRocks commands
         { id: 'emmylua.luarocks.searchPackages', handler: LuaRocks.searchPackages },
         { id: 'emmylua.luarocks.installPackage', handler: LuaRocks.installPackage },
@@ -127,6 +138,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         vscode.window.onDidChangeActiveTextEditor(onDidChangeActiveTextEditor),
         vscode.workspace.onDidChangeConfiguration(onConfigurationChanged),
         vscode.workspace.onDidChangeWorkspaceFolders(onWorkspaceFoldersChanged),
+        vscode.debug.onDidReceiveDebugSessionCustomEvent(onDidReceiveDebugSessionCustomEvent),
     ];
 
     context.subscriptions.push(...eventListeners);
@@ -163,12 +175,17 @@ async function initializeExtension(): Promise<void> {
 
     await startServer();
     registerDebuggers();
+    initializeGmodMcpHost(extensionContext.vscodeContext);
+    await startGmodMcpHost(false);
     await LuaRocks.initializeLuaRocks();
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
     if (e.affectsConfiguration('emmylua')) {
         onDidChangeConfiguration();
+    }
+    if (e.affectsConfiguration('emmylua.gmod.mcp')) {
+        void restartGmodMcpHost(false);
     }
 }
 
@@ -533,23 +550,26 @@ function getPersistedGmodRealm(): GmodRealm {
 }
 
 async function runGmodControlCommand(command: GmodControlCommand, args: Record<string, unknown> = {}): Promise<void> {
+    try {
+        await executeGmodControlCommand(command, args);
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`GMod debug command "${command}" failed: ${errorMessage}`);
+    }
+}
+
+async function executeGmodControlCommand(command: GmodControlCommand, args: Record<string, unknown> = {}): Promise<GmodControlResult> {
     const session = getActiveGmodDebugSession();
     if (!session) {
-        vscode.window.showWarningMessage('No active GMod debug session.');
-        return;
+        throw new Error('No active GMod debug session.');
     }
 
     const realmAwareCommands: GmodControlCommand[] = ['breakHere', 'waitIDE', 'runLua', 'runFile', 'setRealm'];
     const payload = realmAwareCommands.includes(command)
         ? { realm: getPersistedGmodRealm(), ...args }
         : args;
-
-    try {
-        await session.customRequest(command, payload);
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`GMod debug command "${command}" failed: ${errorMessage}`);
-    }
+    const response = await session.customRequest('gmod.control', { command, ...payload });
+    return response as GmodControlResult;
 }
 
 async function runGmodRunLua(): Promise<void> {
@@ -612,5 +632,118 @@ async function setGmodRealm(realm?: string): Promise<void> {
         await session.customRequest('setRealm', { realm: selectedRealm });
     }
     vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
+}
+
+function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
+    if (gmodMcpHost) {
+        return;
+    }
+
+    gmodMcpHost = new GmodMcpHost({
+        executeControlCommand: executeGmodControlCommand,
+        getDebugState: getGmodDebugState,
+        getCurrentRealm: getPersistedGmodRealm,
+    });
+    context.subscriptions.push(gmodMcpHost);
+}
+
+async function startGmodMcpHost(showNotification: boolean = true): Promise<void> {
+    if (!gmodMcpHost) {
+        initializeGmodMcpHost(extensionContext.vscodeContext);
+    }
+    if (!gmodMcpHost) {
+        return;
+    }
+
+    try {
+        await gmodMcpHost.start();
+        if (showNotification) {
+            const health = gmodMcpHost.getHealth();
+            vscode.window.showInformationMessage(`GMod MCP host listening on ${health.host}:${health.port}.`);
+        }
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to start GMod MCP host: ${errorMessage}`);
+    }
+}
+
+async function stopGmodMcpHost(showNotification: boolean = true): Promise<void> {
+    if (!gmodMcpHost) {
+        return;
+    }
+
+    try {
+        await gmodMcpHost.stop();
+        if (showNotification) {
+            vscode.window.showInformationMessage('GMod MCP host stopped.');
+        }
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to stop GMod MCP host: ${errorMessage}`);
+    }
+}
+
+async function restartGmodMcpHost(showNotification: boolean = true): Promise<void> {
+    if (!gmodMcpHost) {
+        initializeGmodMcpHost(extensionContext.vscodeContext);
+    }
+    if (!gmodMcpHost) {
+        return;
+    }
+
+    try {
+        await gmodMcpHost.restart();
+        if (showNotification) {
+            const health = gmodMcpHost.getHealth();
+            vscode.window.showInformationMessage(`GMod MCP host restarted on ${health.host}:${health.port}.`);
+        }
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to restart GMod MCP host: ${errorMessage}`);
+    }
+}
+
+function healthCheckGmodMcpHost(): void {
+    if (!gmodMcpHost) {
+        vscode.window.showWarningMessage('GMod MCP host is not initialized.');
+        return;
+    }
+
+    const health = gmodMcpHost.getHealth();
+    vscode.window.showInformationMessage(`GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`);
+}
+
+function getGmodDebugState(): Record<string, unknown> {
+    const session = getActiveGmodDebugSession();
+    return {
+        hasActiveSession: !!session,
+        sessionId: session?.id ?? null,
+        sessionName: session?.name ?? null,
+        sessionType: session?.type ?? null,
+        realm: getPersistedGmodRealm(),
+        serverState: extensionContext.serverStatus.state,
+    };
+}
+
+function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEvent): void {
+    if (event.session.type !== 'emmylua_gmod' || !gmodMcpHost) {
+        return;
+    }
+
+    if (event.event === 'gmod.output' && event.body && typeof event.body === 'object') {
+        gmodMcpHost.recordDebugOutput(event.body as Record<string, unknown>);
+        return;
+    }
+
+    if (event.event === 'gmod.controlResult' && event.body && typeof event.body === 'object') {
+        gmodMcpHost.recordControlResult(event.body as GmodControlResult);
+        return;
+    }
+
+    if (event.event === 'gmod.controlError') {
+        const body = event.body as { message?: unknown; details?: unknown } | undefined;
+        const message = typeof body?.message === 'string' ? body.message : 'Unknown control error';
+        gmodMcpHost.recordBackendError(message, body?.details);
+    }
 }
 
