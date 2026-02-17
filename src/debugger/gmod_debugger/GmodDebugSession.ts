@@ -253,14 +253,16 @@ export class GmodDebugSession extends DebugSession {
       delete this._debug_client
     }
 
-    if (response.body) {
-      response.body.supportsConfigurationDoneRequest = true
-      response.body.supportsFunctionBreakpoints = true
-      response.body.supportsConditionalBreakpoints = true
-      response.body.supportsHitConditionalBreakpoints = true
-      response.body.supportsEvaluateForHovers = true
-      response.body.supportsSetVariable = false
-    }
+    response.body = response.body ?? {}
+    response.body.supportsConfigurationDoneRequest = true
+    response.body.supportsFunctionBreakpoints = true
+    response.body.supportsConditionalBreakpoints = true
+    response.body.supportsHitConditionalBreakpoints = true
+    response.body.supportsEvaluateForHovers = true
+    response.body.supportsSetVariable = true
+    response.body.supportsSetExpression = false
+    response.body.supportTerminateDebuggee = false
+    response.body.supportsLogPoints = false
 
     this.sendResponse(response)
   }
@@ -507,14 +509,17 @@ export class GmodDebugSession extends DebugSession {
         for (const souceBreakpoint of args.breakpoints) {
           let l = this.convertClientLineToDebugger(souceBreakpoint.line)
           let verified = false
-          while (l <= lines.length) {
-            const line = lines[l - 1].trim()
-            // if a line is empty or starts with '--' we don't allow to set a breakpoint but move the breakpoint down
-            if (line.length == 0 || line.startsWith('--')) {
-              l++
-            } else {
-              verified = true // this breakpoint has been validated
-              break
+          const isLogPoint = !!souceBreakpoint.logMessage
+          if (!isLogPoint) {
+            while (l <= lines.length) {
+              const line = lines[l - 1].trim()
+              // if a line is empty or starts with '--' we don't allow to set a breakpoint but move the breakpoint down
+              if (line.length == 0 || line.startsWith('--')) {
+                l++
+              } else {
+                verified = true // this breakpoint has been validated
+                break
+              }
             }
           }
 
@@ -523,6 +528,9 @@ export class GmodDebugSession extends DebugSession {
             this.convertDebuggerLineToClient(l)
           )
           bp.id = this._breakPointID++
+          if (isLogPoint) {
+            bp.message = 'Logpoints are not supported by emmylua_gmod; use a conditional breakpoint or evaluate instead.'
+          }
           breakpoints.push(bp)
           if (verified) {
             const sendbreakpoint = {
@@ -981,9 +989,18 @@ export class GmodDebugSession extends DebugSession {
 
   protected disconnectRequest(
     response: DebugProtocol.DisconnectResponse,
-    _args: DebugProtocol.DisconnectArguments
+    args: DebugProtocol.DisconnectArguments
   ): void {
     try {
+      if (args.terminateDebuggee) {
+        this.sendEvent(
+          new OutputEvent(
+            'terminateDebuggee is not supported by emmylua_gmod; disconnecting debugger transport only.\n',
+            'stderr'
+          )
+        )
+      }
+
       if (this._debug_server_process) {
         if (this._debug_server_process.pid) {
           killProcess(this._debug_server_process.pid)
@@ -1008,6 +1025,21 @@ export class GmodDebugSession extends DebugSession {
       this.sendEvent(new OutputEvent(response.message + "\n"))
       this.sendResponse(response)
     }
+  }
+
+  protected setExpressionRequest(
+    response: DebugProtocol.SetExpressionResponse,
+    args: DebugProtocol.SetExpressionArguments
+  ): void {
+    response.success = false
+    response.message =
+      'setExpression is not supported by emmylua_gmod because the LRDB protocol has no assignment/eval-set request.'
+    response.body = {
+      value: args.value,
+      type: 'string',
+      variablesReference: 0,
+    }
+    this.sendResponse(response)
   }
 
   protected evaluateRequest(

@@ -1,6 +1,24 @@
 {
     "debuggerType": "emmylua_gmod",
     "protocolVersion": "gmod-1",
+    "capabilities": {
+        "supportsSetVariable": true,
+        "supportsSetExpression": false,
+        "supportTerminateDebuggee": false,
+        "supportsLogPoints": false
+    },
+    "unsupportedRationale": {
+        "setExpression": "LRDB protocol has no assignment/eval-set request.",
+        "terminateDebuggee": "Adapter can only disconnect its transport and helper process, not terminate the Garry's Mod runtime.",
+        "logpoints": "LRDB add_breakpoint does not accept log message payloads."
+    },
+    "mandatoryParityScenarios": [
+        "initializeCapabilities",
+        "setExpressionUnsupported",
+        "terminateDebuggeeUnsupported",
+        "logpointUnsupported",
+        "setVariableRoundTrip"
+    ],
     "dapMappings": {
         "setBreakpoints": {
             "request": "add_breakpoint",
