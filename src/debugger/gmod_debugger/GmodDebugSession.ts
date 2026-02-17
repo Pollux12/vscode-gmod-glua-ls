@@ -337,6 +337,10 @@ export class GmodDebugSession extends DebugSession {
         this.sendEvent(new InitializedEvent())
       })
 
+      this._debug_client.onError.on((err) => {
+        this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
+      })
+
       this._debug_server_process.on('error', (msg: string) => {
         this.sendEvent(new OutputEvent(msg, 'error'))
       })
@@ -392,6 +396,10 @@ export class GmodDebugSession extends DebugSession {
         }
         this._debug_client?.init(data)
         this.sendEvent(new InitializedEvent())
+      })
+
+      this._debug_client.onError.on((err) => {
+        this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
       })
 
       this.sendResponse(response)
@@ -1095,10 +1103,10 @@ export class GmodDebugSession extends DebugSession {
       let value: string | number | boolean = args.value;
       if(value === 'true') {
         value = true
-      } else if(value === 'true') {
+      } else if(value === 'false') {
         value = false
       }
-      if(String(Number(value)) == value) {
+      if(typeof value === 'string' && String(Number(value)) === value) {
         value = Number(value)
       }
 

@@ -28,9 +28,16 @@ export class TcpAdapter implements DebugClientAdapter {
     })
 
     rl.on('line', (input: string) => {
-      const message = JSON.parse(input)
-      if (isJsonRpcMessage(message)) {
-        this.onMessage.emit(message)
+      try {
+        const message = JSON.parse(input)
+        if (isJsonRpcMessage(message)) {
+          this.onMessage.emit(message)
+        } else {
+          this.onError.emit(new Error(`Invalid JSON-RPC message: ${input}`))
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        this.onError.emit(new Error(`Failed to parse JSON-RPC message: ${message}`))
       }
     })
   }
