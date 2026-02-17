@@ -37,6 +37,8 @@ let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
+const gmodSessionRealms = new Map<string, GmodRealm>();
+const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'emmylua.gmod.realm.workspace.';
 
 /**
  * Extension activation entry point
@@ -133,6 +135,8 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         vscode.window.onDidChangeActiveTextEditor(onDidChangeActiveTextEditor),
         vscode.workspace.onDidChangeConfiguration(onConfigurationChanged),
         vscode.workspace.onDidChangeWorkspaceFolders(onWorkspaceFoldersChanged),
+        vscode.debug.onDidStartDebugSession(onDidStartDebugSession),
+        vscode.debug.onDidTerminateDebugSession(onDidTerminateDebugSession),
         vscode.debug.onDidReceiveDebugSessionCustomEvent(onDidReceiveDebugSessionCustomEvent),
     ];
 
@@ -525,7 +529,11 @@ function getActiveGmodDebugSession(): vscode.DebugSession | undefined {
     return undefined;
 }
 
-function getGmodRealmScope(): vscode.ConfigurationScope | undefined {
+function getGmodRealmWorkspaceFolder(session?: vscode.DebugSession): vscode.WorkspaceFolder | undefined {
+    const activeSession = session?.type === 'emmylua_gmod' ? session : getActiveGmodDebugSession();
+    if (activeSession?.workspaceFolder) {
+        return activeSession.workspaceFolder;
+    }
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
         const folder = vscode.workspace.getWorkspaceFolder(activeEditor.document.uri);
@@ -536,10 +544,27 @@ function getGmodRealmScope(): vscode.ConfigurationScope | undefined {
     return vscode.workspace.workspaceFolders?.[0];
 }
 
-function getPersistedGmodRealm(): GmodRealm {
-    const scope = getGmodRealmScope();
+function getGmodRealmWorkspaceStateKey(folder: vscode.WorkspaceFolder): string {
+    return `${GMOD_REALM_WORKSPACE_KEY_PREFIX}${folder.uri.toString()}`;
+}
+
+function getPersistedGmodRealm(session?: vscode.DebugSession): GmodRealm {
+    const activeSession = session?.type === 'emmylua_gmod' ? session : getActiveGmodDebugSession();
+    if (activeSession) {
+        const sessionRealm = gmodSessionRealms.get(activeSession.id);
+        if (sessionRealm) {
+            return sessionRealm;
+        }
+    }
+    const folder = getGmodRealmWorkspaceFolder(activeSession);
+    if (folder) {
+        const storedRealm = extensionContext.vscodeContext.workspaceState.get<string>(getGmodRealmWorkspaceStateKey(folder));
+        if (storedRealm) {
+            return normalizeGmodRealm(storedRealm);
+        }
+    }
     const configured = vscode.workspace
-        .getConfiguration('emmylua.gmod', scope)
+        .getConfiguration('emmylua.gmod', folder)
         .get<string>('debugRealm');
     return normalizeGmodRealm(configured);
 }
@@ -561,7 +586,7 @@ async function executeGmodControlCommand(command: GmodControlCommand, args: Reco
 
     const realmAwareCommands: GmodControlCommand[] = ['breakHere', 'waitIDE', 'runLua', 'runFile', 'setRealm'];
     const payload = realmAwareCommands.includes(command)
-        ? { realm: getPersistedGmodRealm(), ...args }
+        ? { realm: getPersistedGmodRealm(session), ...args }
         : args;
     const response = await session.customRequest('gmod.control', { command, ...payload });
     return response as GmodControlResult;
@@ -614,19 +639,39 @@ async function setGmodRealm(realm?: string): Promise<void> {
         return;
     }
     const selectedRealm = normalizeGmodRealm(pickedRealm);
-    const scope = getGmodRealmScope();
+    const session = getActiveGmodDebugSession();
+    const folder = getGmodRealmWorkspaceFolder(session);
     const target = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 1
         ? vscode.ConfigurationTarget.WorkspaceFolder
         : vscode.ConfigurationTarget.Workspace;
     await vscode.workspace
-        .getConfiguration('emmylua.gmod', scope)
+        .getConfiguration('emmylua.gmod', folder)
         .update('debugRealm', selectedRealm, target);
+    if (folder) {
+        await extensionContext.vscodeContext.workspaceState.update(getGmodRealmWorkspaceStateKey(folder), selectedRealm);
+    }
+    if (session) {
+        gmodSessionRealms.set(session.id, selectedRealm);
+    }
 
-    const session = getActiveGmodDebugSession();
     if (session) {
         await session.customRequest('setRealm', { realm: selectedRealm });
     }
     vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
+}
+
+function onDidStartDebugSession(session: vscode.DebugSession): void {
+    if (session.type !== 'emmylua_gmod') {
+        return;
+    }
+    gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
+}
+
+function onDidTerminateDebugSession(session: vscode.DebugSession): void {
+    if (session.type !== 'emmylua_gmod') {
+        return;
+    }
+    gmodSessionRealms.delete(session.id);
 }
 
 function initializeGmodExplorer(context: vscode.ExtensionContext): void {
@@ -961,21 +1006,31 @@ function getGmodDebugState(): Record<string, unknown> {
 }
 
 function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEvent): void {
-    if (event.session.type !== 'emmylua_gmod' || !gmodMcpHost) {
+    if (event.session.type !== 'emmylua_gmod') {
         return;
     }
 
     if (event.event === 'gmod.output' && event.body && typeof event.body === 'object') {
+        if (!gmodMcpHost) {
+            return;
+        }
         gmodMcpHost.recordDebugOutput(event.body as Record<string, unknown>);
         return;
     }
 
     if (event.event === 'gmod.controlResult' && event.body && typeof event.body === 'object') {
-        gmodMcpHost.recordControlResult(event.body as GmodControlResult);
+        const result = event.body as GmodControlResult;
+        if (result.command === 'setRealm') {
+            gmodSessionRealms.set(event.session.id, normalizeGmodRealm(result.realm));
+        }
+        gmodMcpHost?.recordControlResult(result);
         return;
     }
 
     if (event.event === 'gmod.controlError') {
+        if (!gmodMcpHost) {
+            return;
+        }
         const body = event.body as { message?: unknown; details?: unknown } | undefined;
         const message = typeof body?.message === 'string' ? body.message : 'Unknown control error';
         gmodMcpHost.recordBackendError(message, body?.details);

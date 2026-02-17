@@ -228,11 +228,19 @@ export class GmodMcpHost implements vscode.Disposable {
     }
 
     public recordControlResult(result: GmodControlResult): void {
+        const runFilePath = result.command === 'runFile'
+            ? result.diagnostics
+                .find((diagnostic) => diagnostic.message.startsWith('File dispatched: '))
+                ?.message.slice('File dispatched: '.length)
+            : undefined;
+        const summary = runFilePath
+            ? `command=${result.command} correlationId=${result.correlationId} file=${runFilePath}`
+            : `command=${result.command} correlationId=${result.correlationId}`;
         this.pushOutputEntry(this.outputEntries, {
             timestamp: new Date().toISOString(),
             source: 'control',
             level: result.ok ? 'info' : 'error',
-            message: `command=${result.command} correlationId=${result.correlationId}`,
+            message: summary,
             metadata: {
                 realm: result.realm,
                 request: result.request,
