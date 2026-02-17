@@ -330,6 +330,147 @@
                 "languages": [
                     "lua"
                 ]
+            },
+            {
+                "type": "emmylua_gmod",
+                "label": "GMod Remote Debug",
+                "program": "./out/debugger/gmod_debugger/GmodDebugAdapter.js",
+                "runtime": "node",
+                "configurationAttributes": {
+                    "attach": {
+                        "required": [
+                            "sourceRoot"
+                        ],
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "description": "%debug.gmod.host%",
+                                "default": "127.0.0.1"
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "%debug.gmod.port%",
+                                "default": 21111
+                            },
+                            "sourceRoot": {
+                                "type": "string",
+                                "description": "%debug.gmod.sourceRoot%",
+                                "default": "${workspaceFolder}"
+                            },
+                            "sourceFileMap": {
+                                "type": "object",
+                                "description": "%debug.gmod.sourceFileMap%",
+                                "default": {}
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnEntry%",
+                                "default": true
+                            }
+                        }
+                    },
+                    "launch": {
+                        "required": [
+                            "program"
+                        ],
+                        "properties": {
+                            "program": {
+                                "type": "string",
+                                "description": "%debug.gmod.program%",
+                                "default": ""
+                            },
+                            "cwd": {
+                                "type": "string",
+                                "description": "%debug.gmod.cwd%",
+                                "default": "${workspaceFolder}"
+                            },
+                            "args": {
+                                "type": "array",
+                                "description": "%debug.gmod.args%",
+                                "default": []
+                            },
+                            "host": {
+                                "type": "string",
+                                "description": "%debug.gmod.host%",
+                                "default": "127.0.0.1"
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "%debug.gmod.port%",
+                                "default": 21111
+                            },
+                            "sourceRoot": {
+                                "type": "string",
+                                "description": "%debug.gmod.sourceRoot%",
+                                "default": "${workspaceFolder}"
+                            },
+                            "sourceFileMap": {
+                                "type": "object",
+                                "description": "%debug.gmod.sourceFileMap%",
+                                "default": {}
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnEntry%",
+                                "default": true
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "emmylua_gmod",
+                        "request": "attach",
+                        "name": "%debug.gmod.attach.name%",
+                        "host": "127.0.0.1",
+                        "port": 21111,
+                        "sourceRoot": "${workspaceFolder}",
+                        "sourceFileMap": {
+                            "${workspaceFolder}": "."
+                        },
+                        "stopOnEntry": true
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "%debug.gmod.attach.label%",
+                        "description": "%debug.gmod.attach.desc%",
+                        "body": {
+                            "type": "emmylua_gmod",
+                            "request": "attach",
+                            "name": "%debug.gmod.attach.name%",
+                            "host": "127.0.0.1",
+                            "port": 21111,
+                            "sourceRoot": "${workspaceFolder}",
+                            "sourceFileMap": {
+                                "${workspaceFolder}": "."
+                            },
+                            "stopOnEntry": true
+                        }
+                    },
+                    {
+                        "label": "%debug.gmod.launch.label%",
+                        "description": "%debug.gmod.launch.desc%",
+                        "body": {
+                            "type": "emmylua_gmod",
+                            "request": "launch",
+                            "name": "%debug.gmod.launch.name%",
+                            "program": "",
+                            "cwd": "${workspaceFolder}",
+                            "args": [],
+                            "host": "127.0.0.1",
+                            "port": 21111,
+                            "sourceRoot": "${workspaceFolder}",
+                            "sourceFileMap": {
+                                "${workspaceFolder}": "."
+                            },
+                            "stopOnEntry": true
+                        }
+                    }
+                ],
+                "languages": [
+                    "lua"
+                ]
             }
         ],
         "views": {

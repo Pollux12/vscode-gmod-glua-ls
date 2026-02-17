@@ -49,5 +49,19 @@
     "debug.launch.name": "Attach by launch program",
     "debug.launch.newWindow": "create new windows",
     "debug.launch.program": "Launch program and debug executable file",
-    "debug.launch.workingDir": "working directory"
+    "debug.launch.workingDir": "working directory",
+    "debug.gmod.host": "Debugger host to connect to",
+    "debug.gmod.port": "Debugger port to connect to",
+    "debug.gmod.sourceRoot": "Lua source root directory",
+    "debug.gmod.sourceFileMap": "Optional source file mappings from local path to remote Lua path",
+    "debug.gmod.stopOnEntry": "Stop when the debuggee emits entry pause",
+    "debug.gmod.program": "Program to launch before connecting to gm_rdb",
+    "debug.gmod.cwd": "Working directory for launched program",
+    "debug.gmod.args": "Arguments passed to launched program",
+    "debug.gmod.attach.name": "GMod: Attach",
+    "debug.gmod.attach.label": "GMod: Attach to gm_rdb",
+    "debug.gmod.attach.desc": "Attach to a running Garry's Mod remote debugger",
+    "debug.gmod.launch.name": "GMod: Launch and Attach",
+    "debug.gmod.launch.label": "GMod: Launch and Attach",
+    "debug.gmod.launch.desc": "Launch a program and attach to gm_rdb over TCP"
 }

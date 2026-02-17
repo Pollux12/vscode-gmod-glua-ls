@@ -178,6 +178,7 @@ When dev mode is disabled, the bundled server comes from local source first (if 
 - **EmmyLua New Debug**: Modern debugging with better performance
 - **EmmyLua Attach**: Attach to running processes (requires exported Lua symbols)
 - **EmmyLua Launch**: Direct launch debugging
+- **GMod Remote Debug**: gm_rdb-compatible attach/launch debugging with conditional and hit-count breakpoints
 
 ## ❓ Frequently Asked Questions
 
