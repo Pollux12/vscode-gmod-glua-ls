@@ -182,6 +182,8 @@ When dev mode is disabled, the bundled server comes from local source first (if 
   - Includes control commands: `pauseSoft`, `pauseNow`, `resume`, `breakHere`, `waitIDE`, `runLua`, `runFile`, `runCommand`, `setRealm`
   - Console output is streamed with timestamps, source/channel tags, and correlation IDs for control/file execution flows
   - Includes a local authenticated MCP host with allow-listed tools: `run_lua`, `run_command`, `run_file`, `get_output`, `get_errors`, `get_debug_state`, `list_realms`
+  - Includes a **GMod Toolkit** explorer surface (runtime targets, entity scripts, resources)
+  - Includes **GMod: Run Setup Wizard** and **GMod: Run Diagnostics and Repair** for debugger/runtime mapping and MCP health checks
 
 ## ❓ Frequently Asked Questions
 
