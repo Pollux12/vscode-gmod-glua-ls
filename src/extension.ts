@@ -16,10 +16,10 @@ import { EmmyrcSchemaContentProvider } from './emmyrcSchemaContentProvider';
 import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
 import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { insertEmmyDebugCode, registerDebuggers } from './debugger';
-import * as LuaRocks from './luarocks';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
+import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 
 /**
  * Command registration entry
@@ -36,6 +36,7 @@ let activeEditor: vscode.TextEditor | undefined;
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
+let gmodExplorerProvider: GmodExplorerProvider | undefined;
 
 /**
  * Extension activation entry point
@@ -106,19 +107,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'emmy.gmod.runFile', handler: runGmodRunFile },
         { id: 'emmy.gmod.runCommand', handler: runGmodRunCommand },
         { id: 'emmy.gmod.setRealm', handler: setGmodRealm },
+        { id: 'emmy.gmod.explorer.refresh', handler: refreshGmodExplorer },
+        { id: 'emmy.gmod.onboarding.start', handler: runGmodOnboarding },
+        { id: 'emmy.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
         { id: 'emmy.gmod.mcp.startHost', handler: startGmodMcpHost },
         { id: 'emmy.gmod.mcp.stopHost', handler: stopGmodMcpHost },
         { id: 'emmy.gmod.mcp.restartHost', handler: restartGmodMcpHost },
         { id: 'emmy.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
-        // LuaRocks commands
-        { id: 'emmylua.luarocks.searchPackages', handler: LuaRocks.searchPackages },
-        { id: 'emmylua.luarocks.installPackage', handler: LuaRocks.installPackage },
-        { id: 'emmylua.luarocks.uninstallPackage', handler: LuaRocks.uninstallPackage },
-        { id: 'emmylua.luarocks.showPackageInfo', handler: LuaRocks.showPackageInfo },
-        { id: 'emmylua.luarocks.refreshPackages', handler: LuaRocks.refreshPackages },
-        { id: 'emmylua.luarocks.showPackages', handler: LuaRocks.showPackagesView },
-        { id: 'emmylua.luarocks.clearSearch', handler: LuaRocks.clearSearch },
-        { id: 'emmylua.luarocks.checkInstallation', handler: LuaRocks.checkLuaRocksInstallation },
     ];
 
     // Register all commands
@@ -175,9 +170,9 @@ async function initializeExtension(): Promise<void> {
 
     await startServer();
     registerDebuggers();
+    initializeGmodExplorer(extensionContext.vscodeContext);
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
-    await LuaRocks.initializeLuaRocks();
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -634,6 +629,236 @@ async function setGmodRealm(realm?: string): Promise<void> {
     vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
 }
 
+function initializeGmodExplorer(context: vscode.ExtensionContext): void {
+    if (gmodExplorerProvider) {
+        return;
+    }
+
+    gmodExplorerProvider = registerGmodExplorer(context);
+}
+
+function refreshGmodExplorer(): void {
+    gmodExplorerProvider?.refresh();
+}
+
+interface GmodSetupIssue {
+    readonly id: string;
+    readonly severity: 'warning' | 'error';
+    readonly message: string;
+    readonly repairLabel: string;
+    readonly repair: () => Promise<void>;
+}
+
+function getBundledServerExecutablePath(): string {
+    const executableName = os.platform() === 'win32' ? 'emmylua_ls.exe' : 'emmylua_ls';
+    return path.join(extensionContext.vscodeContext.extensionPath, 'server', executableName);
+}
+
+async function readLaunchConfigurations(): Promise<Record<string, unknown>[]> {
+    const launchFiles = await vscode.workspace.findFiles('**/.vscode/launch.json', '**/node_modules/**', 1);
+    if (launchFiles.length === 0) {
+        return [];
+    }
+
+    try {
+        const raw = await vscode.workspace.fs.readFile(launchFiles[0]);
+        const parsed = JSON.parse(Buffer.from(raw).toString('utf8')) as Record<string, unknown>;
+        const configurations = parsed['configurations'];
+        if (Array.isArray(configurations)) {
+            return configurations.filter((entry): entry is Record<string, unknown> =>
+                !!entry && typeof entry === 'object' && !Array.isArray(entry)
+            );
+        }
+    } catch {
+        return [];
+    }
+
+    return [];
+}
+
+function getGmodMcpHealth(): ReturnType<GmodMcpHost['getHealth']> | undefined {
+    return gmodMcpHost?.getHealth();
+}
+
+async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
+    const issues: GmodSetupIssue[] = [];
+    const lsConfig = vscode.workspace.getConfiguration('emmylua.ls', getConfigurationScope());
+    const configuredExecutable = (lsConfig.get<string>('executablePath') ?? '').trim();
+    if (configuredExecutable.length > 0 && !fs.existsSync(configuredExecutable)) {
+        issues.push({
+            id: 'missing-configured-binary',
+            severity: 'error',
+            message: `Configured language server binary is missing: ${configuredExecutable}`,
+            repairLabel: 'Open EmmyLua Binary Setting',
+            repair: async () => {
+                await vscode.commands.executeCommand('workbench.action.openSettings', 'emmylua.ls.executablePath');
+            }
+        });
+    }
+
+    if (configuredExecutable.length === 0 && !fs.existsSync(getBundledServerExecutablePath())) {
+        issues.push({
+            id: 'missing-bundled-binary',
+            severity: 'error',
+            message: 'Bundled EmmyLua language server binary is missing from the extension server folder.',
+            repairLabel: 'Open EmmyLua Binary Setting',
+            repair: async () => {
+                await vscode.commands.executeCommand('workbench.action.openSettings', 'emmylua.ls.executablePath');
+            }
+        });
+    }
+
+    const launchConfigs = await readLaunchConfigurations();
+    const gmodConfigs = launchConfigs.filter((entry) => entry['type'] === 'emmylua_gmod');
+    if (gmodConfigs.length === 0) {
+        issues.push({
+            id: 'missing-gmod-launch-config',
+            severity: 'warning',
+            message: 'No `emmylua_gmod` debug configuration found in `.vscode/launch.json`.',
+            repairLabel: 'Open launch.json',
+            repair: async () => {
+                await vscode.commands.executeCommand('workbench.action.openLaunchJson');
+            }
+        });
+    } else {
+        const hasValidSourceMap = gmodConfigs.some((config) => {
+            const sourceMap = config['sourceFileMap'];
+            if (!sourceMap || typeof sourceMap !== 'object' || Array.isArray(sourceMap)) {
+                return false;
+            }
+            return Object.keys(sourceMap).some((key) => key.includes('${workspaceFolder}') || key.includes('${workspaceRoot}'));
+        });
+        if (!hasValidSourceMap) {
+            issues.push({
+                id: 'bad-source-file-map',
+                severity: 'error',
+                message: 'GMod debug configuration is missing a workspace `sourceFileMap` mapping.',
+                repairLabel: 'Open launch.json',
+                repair: async () => {
+                    await vscode.commands.executeCommand('workbench.action.openLaunchJson');
+                }
+            });
+        }
+    }
+
+    const health = getGmodMcpHealth();
+    const mcpConfig = vscode.workspace.getConfiguration('emmylua.gmod.mcp');
+    const mcpEnabled = mcpConfig.get<boolean>('enabled', true);
+    const configuredToken = (mcpConfig.get<string>('authToken', '') ?? '').trim();
+
+    if (!mcpEnabled) {
+        issues.push({
+            id: 'mcp-disabled',
+            severity: 'error',
+            message: 'GMod MCP host is disabled.',
+            repairLabel: 'Enable MCP Host',
+            repair: async () => {
+                await mcpConfig.update('enabled', true, vscode.ConfigurationTarget.Global);
+                await startGmodMcpHost(false);
+            }
+        });
+    }
+
+    if (mcpEnabled && health && !health.running) {
+        issues.push({
+            id: 'mcp-stopped',
+            severity: 'warning',
+            message: 'GMod MCP host is enabled but not running.',
+            repairLabel: 'Start MCP Host',
+            repair: async () => {
+                await startGmodMcpHost(false);
+            }
+        });
+    }
+
+    if (mcpEnabled && health?.running && !getActiveGmodDebugSession()) {
+        issues.push({
+            id: 'stale-session',
+            severity: 'warning',
+            message: 'MCP host is running without an active GMod debug session (possible stale runtime target).',
+            repairLabel: 'Restart MCP Host',
+            repair: async () => {
+                await restartGmodMcpHost(false);
+            }
+        });
+    }
+
+    if (configuredToken.length > 0 && configuredToken.length < 12) {
+        issues.push({
+            id: 'weak-mcp-token',
+            severity: 'warning',
+            message: 'Configured MCP auth token is short and easy to mistype for external clients.',
+            repairLabel: 'Reset MCP Token',
+            repair: async () => {
+                await mcpConfig.update('authToken', '', vscode.ConfigurationTarget.Global);
+                await restartGmodMcpHost(false);
+            }
+        });
+    }
+
+    return issues;
+}
+
+async function runGmodOnboarding(): Promise<void> {
+    const start = await vscode.window.showInformationMessage(
+        'GMod setup wizard will verify debugger mapping, runtime realm, and MCP health.',
+        'Start',
+        'Cancel'
+    );
+    if (start !== 'Start') {
+        return;
+    }
+
+    await setGmodRealm();
+    const issues = await collectGmodSetupIssues();
+    if (issues.length === 0) {
+        vscode.window.showInformationMessage('GMod setup complete. Diagnostics found no common issues.');
+        return;
+    }
+
+    const action = await vscode.window.showWarningMessage(
+        `GMod setup found ${issues.length} issue(s).`,
+        'Repair All',
+        'Review'
+    );
+    if (action === 'Repair All') {
+        for (const issue of issues) {
+            await issue.repair();
+        }
+        vscode.window.showInformationMessage('GMod setup repairs completed.');
+        return;
+    }
+
+    if (action === 'Review') {
+        await runGmodDiagnosticsRepair();
+    }
+}
+
+async function runGmodDiagnosticsRepair(): Promise<void> {
+    const issues = await collectGmodSetupIssues();
+    if (issues.length === 0) {
+        vscode.window.showInformationMessage('GMod diagnostics: no issues detected.');
+        return;
+    }
+
+    const picks = issues.map((issue) => ({
+        label: issue.severity === 'error' ? `$(error) ${issue.message}` : `$(warning) ${issue.message}`,
+        description: issue.repairLabel,
+        issue
+    }));
+    const selected = await vscode.window.showQuickPick(picks, {
+        title: 'GMod Diagnostics & Repair',
+        placeHolder: 'Select an issue to repair',
+        ignoreFocusOut: true
+    });
+    if (!selected) {
+        return;
+    }
+
+    await selected.issue.repair();
+    vscode.window.showInformationMessage(`GMod diagnostics repair applied: ${selected.issue.id}`);
+}
+
 function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
     if (gmodMcpHost) {
         return;
@@ -710,7 +935,17 @@ function healthCheckGmodMcpHost(): void {
     }
 
     const health = gmodMcpHost.getHealth();
-    vscode.window.showInformationMessage(`GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`);
+    vscode.window.showInformationMessage(
+        `GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`,
+        'Run Diagnostics',
+        'Setup Wizard'
+    ).then((action) => {
+        if (action === 'Run Diagnostics') {
+            void runGmodDiagnosticsRepair();
+        } else if (action === 'Setup Wizard') {
+            void runGmodOnboarding();
+        }
+    });
 }
 
 function getGmodDebugState(): Record<string, unknown> {
