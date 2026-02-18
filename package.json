@@ -16,6 +16,10 @@
         "onDebug",
         "onLanguage:lua",
         "onView:gluals.gmodExplorer",
+        "onView:gluals.gmodRealmSelector",
+        "onCommand:gluals.gmod.openSettings",
+        "onCommand:gluals.gmod.createSettings",
+        "onCommand:gluals.gmod.editSettings",
         "onCommand:gluals.gmod.onboarding.start",
         "onCommand:gluals.gmod.diagnostics.repair"
     ],
@@ -60,6 +64,24 @@
                 "command": "gluals.gmod.removeAnnotations",
                 "title": "GMod: Remove GLuaLS Annotations",
                 "category": "GLuaLS"
+            },
+            {
+                "command": "gluals.gmod.openSettings",
+                "title": "GMod: Open GLua Settings",
+                "category": "GLuaLS",
+                "icon": "$(settings-gear)"
+            },
+            {
+                "command": "gluals.gmod.createSettings",
+                "title": "Create GLua Settings",
+                "category": "GLuaLS",
+                "icon": "$(settings-gear)"
+            },
+            {
+                "command": "gluals.gmod.editSettings",
+                "title": "Edit GLua Settings",
+                "category": "GLuaLS",
+                "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.pauseSoft",
@@ -143,6 +165,12 @@
                 "title": "GMod: Run Diagnostics and Repair",
                 "category": "GLuaLS",
                 "icon": "$(tools)"
+            },
+            {
+                "command": "gluals.gmod.configureDebugger",
+                "title": "GMod: Configure Debugger",
+                "category": "GLuaLS",
+                "icon": "$(debug-configure)"
             }
         ],
         "languages": [
@@ -172,6 +200,14 @@
             },
             {
                 "fileMatch": ".emmyrc.json",
+                "url": "./syntaxes/schema.json"
+            },
+            {
+                "fileMatch": ".gluarc.json",
+                "url": "emmyrc-schema://schemas/emmyrc"
+            },
+            {
+                "fileMatch": ".gluarc.json",
                 "url": "./syntaxes/schema.json"
             }
         ],
@@ -541,6 +577,14 @@
             }
         ],
         "views": {
+            "debug": [
+                {
+                    "id": "gluals.gmodRealmSelector",
+                    "name": "GMod Debugger",
+                    "when": "workspaceFolderCount > 0",
+                    "icon": "$(broadcast)"
+                }
+            ],
             "explorer": [
                 {
                     "id": "gluals.gmodExplorer",
@@ -552,6 +596,11 @@
         },
         "menus": {
             "view/title": [
+                {
+                    "command": "gluals.gmod.configureDebugger",
+                    "when": "view == gluals.gmodRealmSelector && gluals.gmod.hasDebugConfig",
+                    "group": "navigation@1"
+                },
                 {
                     "command": "gluals.gmod.explorer.refresh",
                     "when": "view == gluals.gmodExplorer",
@@ -566,6 +615,11 @@
                     "command": "gluals.gmod.diagnostics.repair",
                     "when": "view == gluals.gmodExplorer",
                     "group": "navigation@3"
+                },
+                {
+                    "command": "gluals.gmod.configureDebugger",
+                    "when": "view == gluals.gmodExplorer",
+                    "group": "navigation@4"
                 }
             ],
             "commandPalette": [
@@ -580,6 +634,18 @@
                 {
                     "command": "gluals.gmod.mcp.healthCheck",
                     "when": "resourceExtname == .lua"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "gluals.gmod.createSettings",
+                    "when": "explorerResourceIsFolder",
+                    "group": "2_workspace@99"
+                },
+                {
+                    "command": "gluals.gmod.editSettings",
+                    "when": "resourceFilename == .gluarc.json",
+                    "group": "1_modification@1"
                 }
             ]
         },
