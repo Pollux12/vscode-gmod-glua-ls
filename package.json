@@ -203,6 +203,140 @@
                         "query"
                     ]
                 }
+            },
+            {
+                "name": "gmod_run_lua",
+                "displayName": "Run Lua In GMod",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodRunLua",
+                "icon": "$(terminal)",
+                "userDescription": "Execute a Lua chunk in the active Garry's Mod debug session.",
+                "modelDescription": "Runs arbitrary Lua code in the currently active Garry's Mod debug session using the selected runtime realm (server, client, or menu). Use this when the user asks to test Lua behavior live in-game, query runtime state, or perform controlled debugger-side execution. This tool requires an active GMod debug session and returns a formatted summary including realm, success status, and diagnostics.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "lua": {
+                            "type": "string",
+                            "description": "Lua source code to execute in Garry's Mod."
+                        },
+                        "realm": {
+                            "type": "string",
+                            "enum": [
+                                "server",
+                                "client",
+                                "menu"
+                            ],
+                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
+                        }
+                    },
+                    "required": [
+                        "lua"
+                    ]
+                }
+            },
+            {
+                "name": "gmod_run_command",
+                "displayName": "Run GMod Console Command",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodRunCommand",
+                "icon": "$(terminal)",
+                "userDescription": "Run a Garry's Mod console command in the active debug session.",
+                "modelDescription": "Executes a Garry's Mod console command through the active debugger transport. Use this when the user explicitly asks to run a console command (for example, convars, debug helpers, or command-driven runtime checks). Requires an active GMod debug session and returns a formatted result with realm context, status, and diagnostics.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Console command text to execute in Garry's Mod."
+                        }
+                    },
+                    "required": [
+                        "command"
+                    ]
+                }
+            },
+            {
+                "name": "gmod_run_file",
+                "displayName": "Run Lua File In GMod",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodRunFile",
+                "icon": "$(terminal)",
+                "userDescription": "Dispatch a Lua file path to be include()'d in Garry's Mod.",
+                "modelDescription": "Dispatches a Lua file path for execution in Garry's Mod via debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/menu realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "File path to dispatch for execution in Garry's Mod."
+                        },
+                        "realm": {
+                            "type": "string",
+                            "enum": [
+                                "server",
+                                "client",
+                                "menu"
+                            ],
+                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
+                        }
+                    },
+                    "required": [
+                        "path"
+                    ]
+                }
+            },
+            {
+                "name": "gmod_get_output",
+                "displayName": "Get GMod Output Log",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodGetOutput",
+                "icon": "$(output)",
+                "userDescription": "Return recent buffered Garry's Mod output entries.",
+                "modelDescription": "Returns recent buffered Garry's Mod output log entries captured by the extension's debugger event stream. Use this when the user asks for runtime output, recent command activity, or non-error console logs. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "description": "Maximum number of recent output entries to return. Default 50."
+                        }
+                    }
+                }
+            },
+            {
+                "name": "gmod_get_errors",
+                "displayName": "Get GMod Error Log",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodGetErrors",
+                "icon": "$(output)",
+                "userDescription": "Return recent buffered Garry's Mod error entries.",
+                "modelDescription": "Returns recent buffered Garry's Mod error log entries captured by the extension's debugger event stream and command-rejection handling. Use this when the user asks for failures, backend errors, rejected control commands, or recent runtime error output. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "description": "Maximum number of recent error entries to return. Default 50."
+                        }
+                    }
+                }
+            },
+            {
+                "name": "gmod_get_debug_state",
+                "displayName": "Get GMod Debug State",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gmodGetDebugState",
+                "icon": "$(debug)",
+                "userDescription": "Return the current Garry's Mod debugger state snapshot.",
+                "modelDescription": "Returns the full debugger state snapshot, including active session presence, session metadata, selected realm, language server state, MCP host health, and buffered output/error counts. Use this tool to diagnose debugger connectivity and runtime state before attempting command execution. Does not require an active debug session and returns the state as JSON.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         ],
         "languages": [
