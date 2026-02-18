@@ -63,3 +63,20 @@ export interface SyntaxTreeResponse {
     /** The syntax tree as text */
     content: string;
 }
+
+export interface GluaDocSearchParams {
+    query: string;
+    limit?: number;
+}
+
+export interface GluaDocItem {
+    name: string;
+    fullName: string;
+    kind: 'function' | 'class' | 'enum' | 'alias' | 'variable' | 'constant';
+    documentation: string;
+    deprecated: boolean;
+}
+
+export interface GluaDocSearchResponse {
+    items: GluaDocItem[];
+}
