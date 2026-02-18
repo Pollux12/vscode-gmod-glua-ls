@@ -20,6 +20,13 @@ import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
+import { GmodRealmProvider, registerGmodRealmView } from './gmodRealmView';
+import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import {
+    hasAnyGmodDebugConfiguration,
+    readAllWorkspaceLaunchConfigurations,
+    runGmodDebugSetupWizard,
+} from './debugger/gmod_debugger/GmodDebugSetupWizard';
 
 /**
  * Command registration entry
@@ -37,8 +44,12 @@ let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
+let gmodRealmProvider: GmodRealmProvider | undefined;
+let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
+const GMOD_DEBUG_CONFIG_CONTEXT_KEY = 'gluals.gmod.hasDebugConfig';
+const GMOD_DEBUG_SETUP_CONTEXT_KEY = 'gluals.gmod.needsDebugSetup';
 
 /**
  * Extension activation entry point
@@ -99,6 +110,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
+        { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
+        { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
+        { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         // GMod debug control commands
         { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
         { id: 'gluals.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
@@ -116,6 +130,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.mcp.stopHost', handler: stopGmodMcpHost },
         { id: 'gluals.gmod.mcp.restartHost', handler: restartGmodMcpHost },
         { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
+        { id: 'gluals.gmod.configureDebugger', handler: configureGmodDebugger },
     ];
 
     // Register all commands
@@ -139,6 +154,18 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         vscode.debug.onDidTerminateDebugSession(onDidTerminateDebugSession),
         vscode.debug.onDidReceiveDebugSessionCustomEvent(onDidReceiveDebugSessionCustomEvent),
     ];
+
+    const launchConfigWatcher = vscode.workspace.createFileSystemWatcher('**/.vscode/launch.json');
+    const refreshDebuggerSetupState = () => {
+        void refreshGmodDebugConfigContext();
+    };
+
+    context.subscriptions.push(
+        launchConfigWatcher,
+        launchConfigWatcher.onDidCreate(refreshDebuggerSetupState),
+        launchConfigWatcher.onDidChange(refreshDebuggerSetupState),
+        launchConfigWatcher.onDidDelete(refreshDebuggerSetupState)
+    );
 
     context.subscriptions.push(...eventListeners);
 }
@@ -175,6 +202,8 @@ async function initializeExtension(): Promise<void> {
     await startServer();
     registerDebuggers();
     initializeGmodExplorer(extensionContext.vscodeContext);
+    initializeGmodRealmView(extensionContext.vscodeContext);
+    await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
 }
@@ -190,6 +219,7 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
 
 function onWorkspaceFoldersChanged(): void {
     onDidChangeConfiguration();
+    void refreshGmodDebugConfigContext();
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -657,6 +687,7 @@ async function setGmodRealm(realm?: string): Promise<void> {
     if (session) {
         await session.customRequest('setRealm', { realm: selectedRealm });
     }
+    gmodRealmProvider?.refresh();
     vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
 }
 
@@ -665,6 +696,7 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
         return;
     }
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
+    gmodRealmProvider?.refresh();
 }
 
 function onDidTerminateDebugSession(session: vscode.DebugSession): void {
@@ -672,6 +704,7 @@ function onDidTerminateDebugSession(session: vscode.DebugSession): void {
         return;
     }
     gmodSessionRealms.delete(session.id);
+    gmodRealmProvider?.refresh();
 }
 
 function initializeGmodExplorer(context: vscode.ExtensionContext): void {
@@ -682,8 +715,32 @@ function initializeGmodExplorer(context: vscode.ExtensionContext): void {
     gmodExplorerProvider = registerGmodExplorer(context);
 }
 
+function initializeGmodRealmView(context: vscode.ExtensionContext): void {
+    if (gmodRealmProvider) {
+        return;
+    }
+    gmodRealmProvider = registerGmodRealmView(context, getPersistedGmodRealm, () => hasGmodDebugConfiguration);
+}
+
 function refreshGmodExplorer(): void {
     gmodExplorerProvider?.refresh();
+}
+
+async function configureGmodDebugger(): Promise<void> {
+    await runGmodDebugSetupWizard(extensionContext.vscodeContext);
+    await refreshGmodDebugConfigContext();
+}
+
+async function refreshGmodDebugConfigContext(): Promise<void> {
+    try {
+        hasGmodDebugConfiguration = await hasAnyGmodDebugConfiguration();
+    } catch {
+        hasGmodDebugConfiguration = false;
+    }
+
+    await vscode.commands.executeCommand('setContext', GMOD_DEBUG_CONFIG_CONTEXT_KEY, hasGmodDebugConfiguration);
+    await vscode.commands.executeCommand('setContext', GMOD_DEBUG_SETUP_CONTEXT_KEY, !hasGmodDebugConfiguration);
+    gmodRealmProvider?.refresh();
 }
 
 interface GmodSetupIssue {
@@ -700,25 +757,7 @@ function getBundledServerExecutablePath(): string {
 }
 
 async function readLaunchConfigurations(): Promise<Record<string, unknown>[]> {
-    const launchFiles = await vscode.workspace.findFiles('**/.vscode/launch.json', '**/node_modules/**', 1);
-    if (launchFiles.length === 0) {
-        return [];
-    }
-
-    try {
-        const raw = await vscode.workspace.fs.readFile(launchFiles[0]);
-        const parsed = JSON.parse(Buffer.from(raw).toString('utf8')) as Record<string, unknown>;
-        const configurations = parsed['configurations'];
-        if (Array.isArray(configurations)) {
-            return configurations.filter((entry): entry is Record<string, unknown> =>
-                !!entry && typeof entry === 'object' && !Array.isArray(entry)
-            );
-        }
-    } catch {
-        return [];
-    }
-
-    return [];
+    return readAllWorkspaceLaunchConfigurations();
 }
 
 function getGmodMcpHealth(): ReturnType<GmodMcpHost['getHealth']> | undefined {
@@ -759,10 +798,10 @@ async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
         issues.push({
             id: 'missing-gmod-launch-config',
             severity: 'warning',
-            message: 'No `gluals_gmod` debug configuration found in `.vscode/launch.json`.',
-            repairLabel: 'Open launch.json',
+            message: 'No `gluals_gmod` debug configuration found in workspace launch.json files.',
+            repairLabel: 'Run GMod Debugger Setup',
             repair: async () => {
-                await vscode.commands.executeCommand('workbench.action.openLaunchJson');
+                await configureGmodDebugger();
             }
         });
     } else {
