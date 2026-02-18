@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { extensionContext } from './extension';
 
-type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools';
+type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins';
 type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
 type GmodExplorerItemType =
     | 'category'
@@ -27,6 +28,52 @@ interface ItemData {
     uri?: vscode.Uri;
 }
 
+interface LsScriptedClassEntry {
+    uri: string;
+    classType: string;
+    className: string;
+}
+
+function mapLsClassTypeToScriptedClassType(classType: string): ScriptedClassType | undefined {
+    switch (classType) {
+        case 'ENT':
+            return 'entities';
+        case 'SWEP':
+            return 'weapons';
+        case 'EFFECT':
+            return 'effects';
+        case 'TOOL':
+            return 'stools';
+        case 'PLUGIN':
+            return 'plugins';
+        default:
+            return undefined;
+    }
+}
+
+function parseLsUri(uri: string): vscode.Uri | undefined {
+    try {
+        return vscode.Uri.parse(uri);
+    } catch {
+        return undefined;
+    }
+}
+
+async function fetchLsScriptedClasses(): Promise<LsScriptedClassEntry[]> {
+    const client = extensionContext?.client;
+    if (!client) {
+        return [];
+    }
+
+    try {
+        const result = await client.sendRequest<LsScriptedClassEntry[] | null>('gluals/gmodScriptedClasses', {});
+        return result ?? [];
+    } catch (error) {
+        console.warn('Failed to fetch scripted classes from language server:', error);
+        return [];
+    }
+}
+
 class GmodExplorerItem extends vscode.TreeItem {
     constructor(public readonly data: ItemData) {
         super(data.label, data.collapsible);
@@ -41,10 +88,10 @@ class GmodExplorerItem extends vscode.TreeItem {
                 this.iconPath = new vscode.ThemeIcon('list-tree');
                 break;
             case 'scriptedClassType':
-                this.iconPath = new vscode.ThemeIcon('folder-library');
+                this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('folder-library');
                 break;
             case 'scriptedClass':
-                this.iconPath = new vscode.ThemeIcon('symbol-class');
+                this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('symbol-class');
                 break;
             case 'resourceCategory':
                 this.iconPath = new vscode.ThemeIcon('folder');
@@ -70,26 +117,31 @@ class GmodExplorerItem extends vscode.TreeItem {
 }
 
 // Extract class name for scripted class types.
-// Patterns:
-//   entities  → ...lua/entities/CLASSNAME/file.lua
-//   weapons   → ...lua/weapons/CLASSNAME/file.lua  (gmod_tool excluded)
-//   effects   → ...lua/effects/CLASSNAME/file.lua
-//   stools    → ...lua/weapons/gmod_tool/stools/CLASSNAME/file.lua
+// Handles both multi-file folders and single-file classes by finding the
+// innermost matching type directory segment.
 function extractClassName(uri: vscode.Uri, scType: ScriptedClassType): string | undefined {
     const parts = uri.fsPath.replace(/\\/g, '/').split('/');
-    if (scType === 'stools') {
-        const idx = parts.lastIndexOf('stools');
-        if (idx >= 0 && idx + 2 <= parts.length - 1) {
-            return parts[idx + 1];
-        }
-    } else {
-        const folderName = scType === 'entities' ? 'entities' : scType === 'weapons' ? 'weapons' : 'effects';
-        const idx = parts.lastIndexOf(folderName);
-        if (idx >= 0 && idx + 2 <= parts.length - 1) {
-            return parts[idx + 1];
-        }
+    const idx = parts.lastIndexOf(scType);
+    if (idx < 0 || idx + 1 >= parts.length) {
+        return undefined;
     }
-    return undefined;
+
+    const next = parts[idx + 1];
+    if (!next) {
+        return undefined;
+    }
+
+    // Extra safety so an unexpected gmod_tool file never appears as a SWEP class.
+    if (scType === 'weapons' && next === 'gmod_tool') {
+        return undefined;
+    }
+
+    if (next.toLowerCase().endsWith('.lua')) {
+        const className = next.slice(0, -4);
+        return className.length > 0 ? className : undefined;
+    }
+
+    return next;
 }
 
 // Extract the first subdirectory relative to the resource category folder.
@@ -140,9 +192,9 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 case 'Scripted Classes':
                     return [
                         new GmodExplorerItem({ type: 'scriptedClassType', label: 'Entities', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'entities' }),
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'Weapons (SWEPs)', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'weapons' }),
+                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'SWEPs', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'weapons' }),
                         new GmodExplorerItem({ type: 'scriptedClassType', label: 'Effects', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'effects' }),
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'STools', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'stools' }),
+                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'Plugins', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'plugins' }),
                     ];
                 case 'Resources':
                     return [
@@ -157,15 +209,26 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         if (d.type === 'scriptedClassType' && d.scType) {
             const cache = await this.getScriptedClassCache();
             const classMap = cache.get(d.scType) ?? new Map<string, vscode.Uri[]>();
-            return [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) =>
+            const classItems = [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className]) =>
                 new GmodExplorerItem({
                     type: 'scriptedClass',
                     label: className,
-                    collapsible: files.length === 1 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Collapsed,
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
                     scType: d.scType,
                     className,
                 })
             );
+
+            if (d.scType === 'weapons') {
+                classItems.push(new GmodExplorerItem({
+                    type: 'scriptedClassType',
+                    label: 'STools',
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    scType: 'stools',
+                }));
+            }
+
+            return classItems;
         }
 
         if (d.type === 'scriptedClass' && d.scType && d.className) {
@@ -232,11 +295,30 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         };
 
         await Promise.all([
-            scanType('entities', '**/lua/entities/*/*.lua'),
-            scanType('weapons', '**/lua/weapons/*/*.lua', '{**/node_modules/**,**/lua/weapons/gmod_tool/**}'),
-            scanType('effects', '**/lua/effects/*/*.lua'),
-            scanType('stools', '**/lua/weapons/gmod_tool/stools/*/*.lua'),
+            scanType('entities', '{**/entities/*/*.lua,**/entities/*.lua}', '{**/node_modules/**,**/effects/**,**/weapons/**}'),
+            scanType('weapons', '{**/weapons/*/*.lua,**/weapons/*.lua}', '{**/node_modules/**,**/gmod_tool/**}'),
+            scanType('effects', '{**/effects/*/*.lua,**/effects/*.lua}', '**/node_modules/**'),
+            scanType('stools', '{**/stools/*/*.lua,**/stools/*.lua}', '**/node_modules/**'),
+            scanType('plugins', '{**/plugins/*/*.lua,**/plugins/*.lua}', '**/node_modules/**'),
         ]);
+
+        // Glob scan remains authoritative; LS entries only fill in classes missed by globs.
+        const lsEntries = await fetchLsScriptedClasses();
+        for (const lsEntry of lsEntries) {
+            const scriptedClassType = mapLsClassTypeToScriptedClassType(lsEntry.classType);
+            if (!scriptedClassType || !lsEntry.className) {
+                continue;
+            }
+
+            const classMap = cache.get(scriptedClassType) ?? new Map<string, vscode.Uri[]>();
+            if (classMap.has(lsEntry.className)) {
+                continue;
+            }
+
+            const uri = parseLsUri(lsEntry.uri);
+            classMap.set(lsEntry.className, uri ? [uri] : []);
+            cache.set(scriptedClassType, classMap);
+        }
 
         this.scriptedClassCache = cache;
         return cache;
