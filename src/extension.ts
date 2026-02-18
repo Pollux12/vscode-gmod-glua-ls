@@ -22,6 +22,8 @@ import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmProvider, registerGmodRealmView } from './gmodRealmView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import { scaffoldNewScriptedClass } from './gmodScaffolding';
+import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
 import {
     hasAnyGmodDebugConfiguration,
     readAllWorkspaceLaunchConfigurations,
@@ -75,6 +77,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerCommands(context);
     registerEventListeners(context);
     registerLanguageConfiguration(context);
+    registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
 
     // Initialize features
@@ -124,6 +127,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.runCommand', handler: runGmodRunCommand },
         { id: 'gluals.gmod.setRealm', handler: setGmodRealm },
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
+        { id: 'gluals.gmod.scaffold.new', handler: (treeItemOrUri?: any) => scaffoldNewScriptedClass(treeItemOrUri, context) },
         { id: 'gluals.gmod.onboarding.start', handler: runGmodOnboarding },
         { id: 'gluals.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
         { id: 'gluals.gmod.mcp.startHost', handler: startGmodMcpHost },
@@ -182,6 +186,20 @@ function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
     context.subscriptions.push(languageConfig);
 }
 
+function registerDebugConfigurationProviders(context: vscode.ExtensionContext): void {
+    context.subscriptions.push(
+        vscode.debug.registerDebugConfigurationProvider(
+            'gluals_gmod',
+            {
+                provideDebugConfigurations(): vscode.DebugConfiguration[] {
+                    return [];
+                }
+            },
+            vscode.DebugConfigurationProviderTriggerKind.Initial
+        )
+    );
+}
+
 /**
  * Initialize all extension features
  */
@@ -200,6 +218,16 @@ async function initializeExtension(): Promise<void> {
     setClientGetter(() => extensionContext.client);
 
     await startServer();
+    if (typeof vscode.lm.registerTool === 'function') {
+        extensionContext.vscodeContext.subscriptions.push(
+            vscode.lm.registerTool(
+                'search_glua_docs',
+                new GluaDocSearchTool(() => extensionContext.client)
+            )
+        );
+    } else {
+        console.warn('vscode.lm.registerTool is unavailable; skipping GLua docs tool registration.');
+    }
     registerDebuggers();
     initializeGmodExplorer(extensionContext.vscodeContext);
     initializeGmodRealmView(extensionContext.vscodeContext);

@@ -6,7 +6,7 @@
     "icon": "",
     "publisher": "Pollux",
     "engines": {
-        "vscode": "^1.89.0"
+        "vscode": "^1.95.0"
     },
     "categories": [
         "Programming Languages",
@@ -155,6 +155,11 @@
                 "icon": "$(refresh)"
             },
             {
+                "command": "gluals.gmod.scaffold.new",
+                "title": "New Scripted Entity...",
+                "category": "GLua"
+            },
+            {
                 "command": "gluals.gmod.onboarding.start",
                 "title": "GMod: Run Setup Wizard",
                 "category": "GLuaLS",
@@ -171,6 +176,33 @@
                 "title": "GMod: Configure Debugger",
                 "category": "GLuaLS",
                 "icon": "$(debug-configure)"
+            }
+        ],
+        "languageModelTools": [
+            {
+                "name": "search_glua_docs",
+                "displayName": "Search GLua API Documentation",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "gluaDocs",
+                "icon": "$(book)",
+                "userDescription": "Search Garry's Mod GLua API documentation for functions, classes, and other symbols.",
+                "modelDescription": "Search the Garry's Mod GLua API documentation index. Given a query such as 'Entity:GetPos', 'hook.Add', 'ents.Create', 'Player', or a concept like 'physics', returns full documentation for the top-matching API symbols including function signatures, parameter names and types, return types, and description text. Use this tool when writing, reviewing, or explaining GLua/Garry's Mod Lua code to understand what functions are available, what arguments they take, and what they return. Results are returned as Markdown. Do not use this tool for general Lua language questions - only for Garry's Mod specific API.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The API symbol or concept to search for. Examples: 'Entity:GetPos', 'hook.Add', 'ents', 'Player:GetName', 'physics'"
+                        },
+                        "limit": {
+                            "type": "number",
+                            "description": "Maximum number of results to return. Default is 10, maximum is 20."
+                        }
+                    },
+                    "required": [
+                        "query"
+                    ]
+                }
             }
         ],
         "languages": [
@@ -598,7 +630,7 @@
             "view/title": [
                 {
                     "command": "gluals.gmod.configureDebugger",
-                    "when": "view == gluals.gmodRealmSelector && gluals.gmod.hasDebugConfig",
+                    "when": "view == gluals.gmodRealmSelector",
                     "group": "navigation@1"
                 },
                 {
@@ -615,11 +647,6 @@
                     "command": "gluals.gmod.diagnostics.repair",
                     "when": "view == gluals.gmodExplorer",
                     "group": "navigation@3"
-                },
-                {
-                    "command": "gluals.gmod.configureDebugger",
-                    "when": "view == gluals.gmodExplorer",
-                    "group": "navigation@4"
                 }
             ],
             "commandPalette": [
@@ -636,11 +663,23 @@
                     "when": "resourceExtname == .lua"
                 }
             ],
+            "view/item/context": [
+                {
+                    "command": "gluals.gmod.scaffold.new",
+                    "when": "view == gluals.gmodExplorer && (viewItem == scriptedClassType || viewItem == scriptedClass)",
+                    "group": "inline"
+                }
+            ],
             "explorer/context": [
                 {
                     "command": "gluals.gmod.createSettings",
                     "when": "explorerResourceIsFolder",
                     "group": "2_workspace@99"
+                },
+                {
+                    "command": "gluals.gmod.scaffold.new",
+                    "when": "explorerResourceIsFolder",
+                    "group": "gluals@1"
                 },
                 {
                     "command": "gluals.gmod.editSettings",
@@ -1298,6 +1337,11 @@
                         "default": true,
                         "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
                     },
+                    "gluals.gmod.templatePath": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Path to a folder containing custom GLua scaffolding templates (.lua files). Built-in templates are used when custom ones are not found."
+                    },
                     "gluals.gmod.debugRealm": {
                         "type": "string",
                         "enum": [
@@ -1534,7 +1578,7 @@
     "devDependencies": {
         "@types/mocha": "^9.1.0",
         "@types/node": "^17.0.21",
-        "@types/vscode": "1.89.0",
+        "@types/vscode": "1.95.0",
         "@vscode/vsce": "2.26.1",
         "download": "^7.1.0",
         "eslint": "^8.11.0",
