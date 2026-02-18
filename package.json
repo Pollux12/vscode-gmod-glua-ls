@@ -156,7 +156,7 @@
             },
             {
                 "command": "gluals.gmod.scaffold.new",
-                "title": "New Scripted Entity...",
+                "title": "New",
                 "category": "GLua"
             },
             {
@@ -666,7 +666,7 @@
             "view/item/context": [
                 {
                     "command": "gluals.gmod.scaffold.new",
-                    "when": "view == gluals.gmodExplorer && (viewItem == scriptedClassType || viewItem == scriptedClass)",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
                     "group": "inline"
                 }
             ],
