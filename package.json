@@ -186,7 +186,7 @@
                 "toolReferenceName": "gluaDocs",
                 "icon": "$(book)",
                 "userDescription": "Search Garry's Mod GLua API documentation for functions, classes, and other symbols.",
-                "modelDescription": "Search the Garry's Mod GLua API documentation index. Given a query such as 'Entity:GetPos', 'hook.Add', 'ents.Create', 'Player', or a concept like 'physics', returns full documentation for the top-matching API symbols including function signatures, parameter names and types, return types, and description text. Use this tool when writing, reviewing, or explaining GLua/Garry's Mod Lua code to understand what functions are available, what arguments they take, and what they return. Results are returned as Markdown. Do not use this tool for general Lua language questions - only for Garry's Mod specific API.",
+                "modelDescription": "Search the Garry's Mod GLua API documentation and local codebase index for functions, methods, classes, and constants. \n\nQuery syntax:\n- Type:method (e.g. \"Entity:GetPos\", \"Player:GetName\") searches for a specific method on a class\n- type.field (e.g. \"hook.Add\", \"math.max\") searches for global table members or static methods\n- Plain word (e.g. \"Player\", \"GetPos\", \"hook\") searches class names, globals, and all class methods with that name\n\nReturns full documentation including signatures, parameter names and types, return types, and description text - the same information shown when hovering over a symbol in the editor.\n\nUse this tool when: writing or reviewing GLua code and you need to know what arguments a function takes, what it returns, or whether it exists. Always prefer using this tool over guessing API signatures.\n\nDo not use for: general Lua language questions (only for Garry's Mod specific API and the current workspace's code).",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -292,7 +292,7 @@
                 "toolReferenceName": "gmodGetOutput",
                 "icon": "$(output)",
                 "userDescription": "Return recent buffered Garry's Mod output entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod output log entries captured by the extension's debugger event stream. Use this when the user asks for runtime output, recent command activity, or non-error console logs. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
+                "modelDescription": "Returns recent buffered Garry's Mod output log entries captured by the extension's debugger event stream, including runtime output and control-command summaries. Use this when the user asks for runtime output or recent command activity. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -312,7 +312,7 @@
                 "toolReferenceName": "gmodGetErrors",
                 "icon": "$(output)",
                 "userDescription": "Return recent buffered Garry's Mod error entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod error log entries captured by the extension's debugger event stream and command-rejection handling. Use this when the user asks for failures, backend errors, rejected control commands, or recent runtime error output. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
+                "modelDescription": "Returns recent buffered Garry's Mod error log entries captured by backend/control error handling and command-rejection tracking. Use this when the user asks for failures, backend errors, or rejected control commands. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
