@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { extensionContext } from './extension';
 
-type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins';
+export type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins';
 type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
 type GmodExplorerItemType =
     | 'category'

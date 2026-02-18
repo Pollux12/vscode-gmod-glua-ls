@@ -2,11 +2,11 @@ import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify, TextEncoder } from 'util';
 import * as vscode from 'vscode';
+import type { ScriptedClassType } from './gmodExplorer';
 
 const execFileAsync = promisify(execFile);
 const CLASS_NAME_PATTERN = /^[a-zA-Z0-9_]+$/;
 
-export type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins';
 export type ScaffoldKind = 'entity' | 'swep' | 'effect' | 'stool' | 'plugin';
 
 export interface ScaffoldingTreeItemData {
