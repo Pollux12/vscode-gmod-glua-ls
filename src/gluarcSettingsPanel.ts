@@ -120,6 +120,11 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 }
 
                 const message = msg as { type?: unknown; path?: unknown; value?: unknown };
+                if (message.type === 'reloadServer') {
+                    await vscode.commands.executeCommand('gluals.restartServer');
+                    return;
+                }
+
                 if (message.type !== 'change') {
                     return;
                 }

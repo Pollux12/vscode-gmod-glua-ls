@@ -125,6 +125,26 @@
             height: 1.2em; /* fixed height to avoid layout jump */
         }
 
+        .reload-server-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: 1px solid transparent;
+            border-radius: 3px;
+            min-height: 28px;
+            padding: 0 12px;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .reload-server-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .reload-server-btn:focus-visible {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: 1px;
+        }
+
         .settings-body {
             flex-grow: 1;
             overflow-y: auto;
@@ -578,6 +598,9 @@
     <div class="content">
         <div class="header">
             <h1 style="margin: 0 0 10px 0; font-size: 1.5em; font-weight: normal;">GLua Settings</h1>
+            <div style="margin: 0 0 12px 0;">
+                <button class="reload-server-btn" onclick="reloadServer()">↺ Reload Language Server</button>
+            </div>
             <div class="search-wrapper">
                 <input type="text" id="searchInput" class="search-input" placeholder="Search settings...">
                 <span class="search-clear" id="searchClear">✕</span>
@@ -671,6 +694,7 @@
         ];
 
         const DIAGNOSTIC_SEVERITY_VALUES = ['error', 'warning', 'information', 'hint'];
+        const DIAGNOSTIC_STATE_CODES = DIAGNOSTIC_CODES.filter((code) => code !== 'none');
         const DIAGNOSTIC_DEFAULT_SEVERITY = {
             'syntax-error': 'error',
             'doc-syntax-error': 'error',
@@ -689,16 +713,38 @@
             'gmod-duplicate-system-registration': 'hint'
         };
 
+        const DIAGNOSTIC_DEFAULT_ENABLE = {
+            'missing-return': false,
+            'unused-self': false,
+            'iter-variable-reassign': false,
+            'duplicate-type': false,
+            'code-style-check': false,
+            'return-type-mismatch': false,
+            'redundant-return-value': false,
+            'unknown-doc-tag': false,
+            'inject-field': false,
+            'incomplete-signature-doc': false,
+            'missing-global-doc': false,
+            'unnecessary-if': false,
+            'unnecessary-assert': false,
+            'duplicate-set-field': false,
+            'global-in-non-module': false,
+            'call-non-callable': false,
+            'invert-if': false,
+            'non-literal-expressions-in-assert': false,
+        };
+
         const HIDDEN_SETTINGS = new Set([
             'runtime.version',
             'doc.rstDefaultRole',
             'doc.rstPrimaryDomain',
+            'diagnostics.disable',
         ]);
 
         const DESCRIPTION_OVERRIDES = {
             'resource.paths': 'File paths used for document link resolution (ctrl+click on string literals). Not used for module indexing.',
             'runtime.special': 'Maps special function names to their semantic behavior (e.g., marks `require` as a module loader, `type` as a type-check function). Affects how the analyzer treats calls to these functions.',
-            'diagnostics.enables': 'Force-enables specific diagnostic codes. Note: if a code is in both this list and the `disable` list, `disable` takes precedence.',
+            'diagnostics.enables': "Override the enabled/disabled state for individual diagnostic codes. 'Force Enable' adds the code to the enables list; 'Force Disable' adds it to the disable list. If a code is in both lists, disable takes precedence.",
             'diagnostics.globals': 'Suppresses "undefined-global" diagnostics for these specific variable names. Use this for globals injected by the GMod runtime that the analyzer cannot detect automatically.',
             'diagnostics.globalsRegex': 'Like `globals`, but uses regex patterns to match global variable names. Invalid regex patterns are silently ignored.',
             'completion.autoRequireSeparator': 'The path separator used when generating require() paths in auto-import completions. Also used when rewriting require paths on file relocation.',
@@ -713,6 +759,10 @@
             'doc.privateName': 'Field name patterns treated as private (e.g., `m_*` marks `obj.m_id` as private). Private fields can only be accessed within the defining class.',
             'semanticTokens.renderDocumentationMarkup': 'When enabled, Markdown in documentation comments is rendered in hover popups and tooltips instead of shown as raw text.',
             'doc.syntax': 'Documentation comment syntax style. Use `EmmyLua` (default) for EmmyLua/LuaCATS annotations — the standard for GMod. Myst and RST are for non-GMod documentation workflows.',
+        };
+
+        const LABEL_OVERRIDES = {
+            'diagnostics.enables': 'Diagnostic State Overrides',
         };
 
         const PATH_FIELD_KEYWORDS = ['library', 'root', 'path', 'dir', 'ignore', 'resource', 'package'];
@@ -873,11 +923,26 @@
             vscode.postMessage({ type: 'change', path, value });
         }
 
+        function reloadServer() {
+            vscode.postMessage({ type: 'reloadServer' });
+        }
+
+        function isDiagnosticsStateField(field) {
+            return Array.isArray(field.path)
+                && field.path.length === 2
+                && field.path[0] === 'diagnostics'
+                && field.path[1] === 'enables';
+        }
+
         function isSeverityField(field) {
             return Array.isArray(field.path)
                 && field.path.length >= 2
                 && field.path[0] === 'diagnostics'
                 && field.path[1] === 'severity';
+        }
+
+        function getDiagnosticDefaultEnable(code) {
+            return DIAGNOSTIC_DEFAULT_ENABLE[code] !== false;
         }
 
         function getDiagnosticDefaultSeverity(code) {
@@ -924,7 +989,20 @@
             return field.description;
         }
 
+        function getFieldLabel(field) {
+            const fieldPathKey = getFieldPathKey(field);
+            if (fieldPathKey && typeof LABEL_OVERRIDES[fieldPathKey] === 'string') {
+                return LABEL_OVERRIDES[fieldPathKey];
+            }
+
+            return field.label;
+        }
+
         function isSingleLineControlField(field) {
+            if (isDiagnosticsStateField(field)) {
+                return false;
+            }
+
             if (isSeverityField(field)) {
                 return false;
             }
@@ -1064,6 +1142,175 @@
             });
 
             renderRows();
+            return container;
+        }
+
+        function renderDiagnosticsStateTable(field) {
+            const enablesRaw = getValue(['diagnostics', 'enables']) || [];
+            const disableRaw = getValue(['diagnostics', 'disable']) || [];
+
+            const enables = Array.isArray(enablesRaw)
+                ? enablesRaw.filter((code) => typeof code === 'string')
+                : [];
+            const disable = Array.isArray(disableRaw)
+                ? disableRaw.filter((code) => typeof code === 'string')
+                : [];
+
+            const validCodeSet = new Set(DIAGNOSTIC_STATE_CODES);
+            const stateMap = {};
+
+            enables.forEach((code) => {
+                if (validCodeSet.has(code)) {
+                    stateMap[code] = 'enable';
+                }
+            });
+
+            disable.forEach((code) => {
+                if (validCodeSet.has(code)) {
+                    stateMap[code] = 'disable';
+                }
+            });
+
+            const container = document.createElement('div');
+            container.className = 'severity-table-container';
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'severity-table-toolbar';
+
+            const overridesCount = document.createElement('div');
+            overridesCount.className = 'severity-overrides-count';
+            toolbar.appendChild(overridesCount);
+
+            const filterInput = document.createElement('input');
+            filterInput.type = 'text';
+            filterInput.className = 'severity-filter';
+            filterInput.placeholder = 'Filter codes...';
+            toolbar.appendChild(filterInput);
+
+            container.appendChild(toolbar);
+
+            const scroll = document.createElement('div');
+            scroll.className = 'severity-table-scroll';
+
+            const table = document.createElement('table');
+            table.className = 'severity-table';
+
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+
+            const codeHeader = document.createElement('th');
+            codeHeader.textContent = 'Diagnostic Code';
+            headerRow.appendChild(codeHeader);
+
+            const defaultHeader = document.createElement('th');
+            defaultHeader.textContent = 'Default';
+            headerRow.appendChild(defaultHeader);
+
+            const overrideHeader = document.createElement('th');
+            overrideHeader.textContent = 'Override';
+            headerRow.appendChild(overrideHeader);
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+            scroll.appendChild(table);
+            container.appendChild(scroll);
+
+            const updateOverridesCount = () => {
+                const count = DIAGNOSTIC_STATE_CODES.reduce((acc, code) => {
+                    const state = stateMap[code];
+                    return state === 'enable' || state === 'disable' ? acc + 1 : acc;
+                }, 0);
+                overridesCount.textContent = `${count} overrides active`;
+            };
+
+            const commitStateToConfig = () => {
+                const nextEnables = [];
+                const nextDisable = [];
+
+                DIAGNOSTIC_STATE_CODES.forEach((code) => {
+                    const state = stateMap[code];
+                    if (state === 'enable') {
+                        nextEnables.push(code);
+                    } else if (state === 'disable') {
+                        nextDisable.push(code);
+                    }
+                });
+
+                sendChange(['diagnostics', 'enables'], nextEnables.length > 0 ? nextEnables : null);
+                sendChange(['diagnostics', 'disable'], nextDisable.length > 0 ? nextDisable : null);
+            };
+
+            const rows = [];
+
+            DIAGNOSTIC_STATE_CODES.forEach((code) => {
+                const row = document.createElement('tr');
+                row.dataset.code = code;
+
+                const codeCell = document.createElement('td');
+                codeCell.className = 'severity-code';
+                codeCell.textContent = code;
+                row.appendChild(codeCell);
+
+                const defaultCell = document.createElement('td');
+                defaultCell.textContent = getDiagnosticDefaultEnable(code) ? 'Enabled' : 'Disabled';
+                defaultCell.style.color = 'var(--vscode-descriptionForeground)';
+                row.appendChild(defaultCell);
+
+                const overrideCell = document.createElement('td');
+                const select = document.createElement('select');
+
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Default';
+                select.appendChild(defaultOption);
+
+                const enableOption = document.createElement('option');
+                enableOption.value = 'enable';
+                enableOption.textContent = 'Force Enable';
+                select.appendChild(enableOption);
+
+                const disableOption = document.createElement('option');
+                disableOption.value = 'disable';
+                disableOption.textContent = 'Force Disable';
+                select.appendChild(disableOption);
+
+                const currentValue = stateMap[code];
+                select.value = currentValue === 'enable' || currentValue === 'disable' ? currentValue : '';
+
+                select.onchange = () => {
+                    const selectedValue = select.value;
+                    if (selectedValue === 'enable' || selectedValue === 'disable') {
+                        stateMap[code] = selectedValue;
+                    } else {
+                        delete stateMap[code];
+                    }
+
+                    updateOverridesCount();
+                    commitStateToConfig();
+                };
+
+                overrideCell.appendChild(select);
+                row.appendChild(overrideCell);
+
+                tbody.appendChild(row);
+                rows.push({ row, code });
+            });
+
+            const updateRowFilter = () => {
+                const query = filterInput.value.trim().toLowerCase();
+                rows.forEach(({ row, code }) => {
+                    row.style.display = !query || code.toLowerCase().includes(query) ? '' : 'none';
+                });
+            };
+
+            filterInput.addEventListener('input', updateRowFilter);
+
+            updateOverridesCount();
+            updateRowFilter();
+
             return container;
         }
 
@@ -1260,7 +1507,7 @@
             labelRow.className = 'setting-label-row';
             const label = document.createElement('span');
             label.className = 'setting-label';
-            label.textContent = field.label;
+            label.textContent = getFieldLabel(field);
             labelRow.appendChild(label);
             textContainer.appendChild(labelRow);
 
@@ -1279,7 +1526,9 @@
             const currentValue = getValue(field.path);
 
             let widget;
-            if (isSeverityField(field)) {
+            if (isDiagnosticsStateField(field)) {
+                widget = renderDiagnosticsStateTable(field);
+            } else if (isSeverityField(field)) {
                 widget = renderSeverityTable(field, currentValue);
             } else {
                 widget = generateInput(field, currentValue, (newValue) => {
@@ -1657,19 +1906,6 @@
 
         // --- Updates ---
         function updateAllWidgetValues() {
-            // Re-rendering everything is safer/easier to keep sync with deeply nested structures
-            // But we requested "update values without re-rendering".
-            // Implementation: Find all .setting-row, get path, re-generate input area.
-            // A full re-render is actually smoother for layout changes, but let's try to update in place.
-
-            const rows = document.querySelectorAll('.setting-row');
-            rows.forEach(row => {
-                const path = JSON.parse(row.dataset.path);
-                const newVal = getValue(path);
-                // We actually need field descriptor to rebuild widget :|
-                // Since we don't have easy map to field desc in DOM, let's just re-render fully for correctness.
-                // It's fast enough for settings pages.
-            });
             renderSettings();
         }
 
