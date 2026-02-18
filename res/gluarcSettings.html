@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" 
+    <meta http-equiv="Content-Security-Policy"
           content="default-src 'none'; style-src {{cspSource}} 'nonce-{{nonce}}'; script-src 'nonce-{{nonce}}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GLua Settings</title>
@@ -468,7 +468,7 @@
             border: 1px solid var(--vscode-widget-border);
             padding: 8px;
         }
-        
+
         summary {
             cursor: pointer;
             font-weight: bold;
@@ -488,7 +488,7 @@
             pointer-events: none;
             z-index: 1000;
         }
-        
+
         .toast.show {
             opacity: 1;
         }
@@ -574,7 +574,7 @@
             <!-- Generated Items -->
         </ul>
     </div>
-    
+
     <div class="content">
         <div class="header">
             <h1 style="margin: 0 0 10px 0; font-size: 1.5em; font-weight: normal;">GLua Settings</h1>
@@ -600,7 +600,7 @@
 
     <script nonce="{{nonce}}">
         const vscode = acquireVsCodeApi();
-        
+
         let currentState = {
             categories: [],
             config: {}
@@ -690,12 +690,7 @@
         };
 
         const HIDDEN_SETTINGS = new Set([
-            'workspace.preloadFileSize',
-            'runtime.frameworkVersions',
             'runtime.version',
-            'hint.enable',
-            'signature.detailSignatureHelper',
-            'strict.typeCall',
             'doc.rstDefaultRole',
             'doc.rstPrimaryDomain',
         ]);
@@ -772,13 +767,13 @@
             const items = document.querySelectorAll('.category-item');
             const info = document.getElementById('searchResultsInfo');
             const noResultsState = document.getElementById('noResultsState');
-            
+
             let totalMatches = 0;
 
             sections.forEach((section, index) => {
                 let sectionVisibleCount = 0;
                 const rows = section.querySelectorAll('.setting-row');
-                
+
                 rows.forEach(row => {
                     const labelEl = row.querySelector('.setting-label');
                     const descEl = row.querySelector('.setting-description');
@@ -791,11 +786,11 @@
                     const labelText = labelEl ? labelEl.textContent : "";
                     const descText = descEl ? descEl.textContent : "";
 
-                    const match = !cleanQuery || 
-                                  labelText.toLowerCase().includes(cleanQuery) || 
-                                  descText.toLowerCase().includes(cleanQuery) || 
+                    const match = !cleanQuery ||
+                                  labelText.toLowerCase().includes(cleanQuery) ||
+                                  descText.toLowerCase().includes(cleanQuery) ||
                                   pathText.toLowerCase().includes(cleanQuery);
-                    
+
                     if (match) {
                         setRowVisibility(row, true);
                         sectionVisibleCount++;
@@ -1189,7 +1184,7 @@
         function renderSettings() {
             const catList = document.getElementById('categoryList');
             const sectionsContent = document.getElementById('settingsSections');
-            
+
             catList.innerHTML = '';
             sectionsContent.innerHTML = '';
 
@@ -1221,7 +1216,7 @@
                 // Main Section
                 const section = document.createElement('section');
                 section.id = categoryId;
-                
+
                 const h2 = document.createElement('h2');
                 h2.textContent = cat.label;
                 section.appendChild(h2);
@@ -1300,7 +1295,7 @@
 
         function generateInput(field, value, onChange) {
             const { type, nullable, enumValues, items } = field;
-            
+
             // 1. Boolean
             if (type === 'boolean') {
                 if (nullable) {
@@ -1319,7 +1314,7 @@
                     disabledOption.value = 'false';
                     disabledOption.textContent = 'Disabled';
                     select.appendChild(disabledOption);
-                    
+
                     // Set initial
                     if (value === true) select.value = 'true';
                     else if (value === false) select.value = 'false';
@@ -1348,7 +1343,7 @@
                         ? field.default === true
                         : value === true;
                     cb.checked = resolvedValue;
-                    
+
                     cb.onchange = () => onChange(cb.checked);
 
                     toggle.appendChild(cb);
@@ -1358,7 +1353,7 @@
                     const label = document.createElement('span');
                     label.textContent = cb.checked ? 'Enabled' : 'Disabled';
                     cb.addEventListener('change', () => label.textContent = cb.checked ? 'Enabled' : 'Disabled');
-                    
+
                     wrapper.appendChild(label);
                     return wrapper;
                 }
@@ -1368,7 +1363,7 @@
             if (type === 'string' || type === 'enum') {
                 if (enumValues && enumValues.length > 0) {
                     const select = document.createElement('select');
-                    
+
                     if (nullable) {
                         const def = document.createElement('option');
                         def.value = "";
@@ -1394,7 +1389,7 @@
                     input.type = 'text';
                     input.value = value !== undefined && value !== null ? value : '';
                     input.placeholder = field.default !== undefined ? field.default : '';
-                    
+
                     input.onchange = () => {
                         const val = input.value.trim();
                         onChange(val === "" ? null : val);
@@ -1431,7 +1426,7 @@
                 const container = document.createElement('div');
                 const tagList = document.createElement('div');
                 tagList.className = 'tags-container';
-                
+
                 let currentArr = Array.isArray(value)
                     ? [...value]
                     : (Array.isArray(field.default) ? [...field.default] : []);
@@ -1475,7 +1470,7 @@
                 // Add Row
                 const addRow = document.createElement('div');
                 addRow.className = 'add-tag-row';
-                
+
                 let inputEl;
                 if (items.enumValues) {
                     inputEl = document.createElement('select');
@@ -1524,7 +1519,7 @@
                 const container = document.createElement('div');
                 container.style.marginLeft = "10px";
                 container.style.marginTop = "10px";
-                
+
                 // If value is null/undefined, treat as empty object for rendering children
                 // (Though strictly config might be missing it)
                 const objValue = value || {};
@@ -1541,15 +1536,15 @@
                      // We need to pass the "virtual" path or sub-value
                      // Ideally we reuse createFieldWidget but we need to intercept the onChange
                      // Let's manually build standard field style here
-                     
+
                      const row = document.createElement('div');
                      row.className = 'setting-row';
-                     
+
                      const label = document.createElement('div');
                      label.className = 'setting-label';
                      label.textContent = subField.label;
                      row.appendChild(label);
-                     
+
                      const subFieldDescription = getFieldDescription(subField);
                      if (subFieldDescription) {
                          const desc = document.createElement('div');
@@ -1557,10 +1552,10 @@
                          desc.textContent = subFieldDescription;
                          row.appendChild(desc);
                      }
-                     
+
                      const subWidget = generateInput(subField, objValue[subField.key], subOnChange);
                      row.appendChild(subWidget);
-                     
+
                      container.appendChild(row);
                 });
 
@@ -1572,22 +1567,22 @@
             if (type === 'array' && items && items.type === 'object') {
                 const container = document.createElement('div');
                 let currentArr = Array.isArray(value) ? [...value] : [];
-                
+
                 const list = document.createElement('div');
-                
+
                 const renderList = () => {
                     list.innerHTML = '';
                     currentArr.forEach((item, idx) => {
                         const row = document.createElement('div');
                         row.className = 'object-list-item';
-                        
+
                         // Header
                         const header = document.createElement('div');
                         header.style.display = 'flex';
                         header.style.justifyContent = 'space-between';
                         header.style.marginBottom = '8px';
                         header.innerHTML = `<strong>Item ${idx + 1}</strong>`;
-                        
+
                         const delBtn = document.createElement('button');
                         delBtn.className = 'delete-btn';
                         delBtn.textContent = 'Remove';
@@ -1604,31 +1599,31 @@
                              items.properties.forEach(subField => {
                                  const subRow = document.createElement('div');
                                  subRow.style.marginBottom = '8px';
-                                 
+
                                  const lbl = document.createElement('div');
                                  lbl.className = 'setting-description'; // smaller font
                                  lbl.textContent = subField.label;
                                  subRow.appendChild(lbl);
-                                 
+
                                  const subOnChange = (newVal) => {
                                      const newItem = { ...item };
                                      newItem[subField.key] = newVal;
                                      currentArr[idx] = newItem;
                                      onChange(currentArr);
                                  };
-                                 
+
                                  subRow.appendChild(generateInput(subField, item[subField.key], subOnChange));
                                  row.appendChild(subRow);
                              });
                         }
-                        
+
                         list.appendChild(row);
                     });
                 };
-                
+
                 renderList();
                 container.appendChild(list);
-                
+
                 const addBtn = document.createElement('button');
                 addBtn.className = 'add-btn';
                 addBtn.textContent = 'Add Item';
@@ -1638,7 +1633,7 @@
                     renderList();
                 };
                 container.appendChild(addBtn);
-                
+
                 return container;
             }
 
@@ -1647,7 +1642,7 @@
             ta.className = 'json-input';
             ta.value = value ? JSON.stringify(value, null, 2) : '';
             ta.placeholder = field.default ? JSON.stringify(field.default) : '{}';
-            
+
             ta.onchange = () => {
                 try {
                     const parsed = ta.value ? JSON.parse(ta.value) : null;
@@ -1666,12 +1661,12 @@
             // But we requested "update values without re-rendering".
             // Implementation: Find all .setting-row, get path, re-generate input area.
             // A full re-render is actually smoother for layout changes, but let's try to update in place.
-            
+
             const rows = document.querySelectorAll('.setting-row');
             rows.forEach(row => {
                 const path = JSON.parse(row.dataset.path);
                 const newVal = getValue(path);
-                // We actually need field descriptor to rebuild widget :| 
+                // We actually need field descriptor to rebuild widget :|
                 // Since we don't have easy map to field desc in DOM, let's just re-render fully for correctness.
                 // It's fast enough for settings pages.
             });

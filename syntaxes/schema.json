@@ -68,10 +68,32 @@
         "useDiff": false
       }
     },
+    "gmod": {
+      "$ref": "#/$defs/EmmyrcGmod",
+      "default": {
+        "autoLoadAnnotations": null,
+        "defaultRealm": "shared",
+        "enabled": true,
+        "hookMappings": {
+          "emitterToHook": {},
+          "methodPrefixes": [],
+          "methodToHook": {}
+        },
+        "inferDynamicFields": true,
+        "scriptedClassScopes": {
+          "exclude": [],
+          "include": [
+            "entities/**",
+            "weapons/**",
+            "effects/**",
+            "weapons/gmod_tool/stools/**"
+          ]
+        }
+      }
+    },
     "hint": {
       "$ref": "#/$defs/EmmyrcInlayHint",
       "default": {
-        "enable": true,
         "enumParamHint": false,
         "indexHint": true,
         "localHint": true,
@@ -111,12 +133,19 @@
       "$ref": "#/$defs/EmmyrcRuntime",
       "default": {
         "extensions": [],
-        "frameworkVersions": [],
-        "nonstandardSymbol": [],
+        "nonstandardSymbol": [
+          "//",
+          "/**/",
+          "continue",
+          "!=",
+          "||",
+          "&&",
+          "!"
+        ],
         "requireLikeFunction": [],
         "requirePattern": [],
         "special": {},
-        "version": "LuaLatest"
+        "version": "LuaJIT"
       }
     },
     "semanticTokens": {
@@ -126,12 +155,6 @@
         "renderDocumentationMarkup": true
       }
     },
-    "signature": {
-      "$ref": "#/$defs/EmmyrcSignature",
-      "default": {
-        "detailSignatureHelper": true
-      }
-    },
     "strict": {
       "$ref": "#/$defs/EmmyrcStrict",
       "default": {
@@ -139,8 +162,7 @@
         "docBaseConstMatchBaseType": true,
         "metaOverrideFileDefine": true,
         "requireExportGlobal": false,
-        "requirePath": false,
-        "typeCall": false
+        "requirePath": false
       }
     },
     "workspace": {
@@ -153,7 +175,6 @@
         "library": [],
         "moduleMap": [],
         "packageDirs": [],
-        "preloadFileSize": 0,
         "reindexDuration": 5000,
         "workspaceRoots": []
       }
@@ -212,6 +233,11 @@
           "description": "Unused",
           "type": "string",
           "const": "unused"
+        },
+        {
+          "description": "Unused implicit self parameter",
+          "type": "string",
+          "const": "unused-self"
         },
         {
           "description": "Undefined global",
@@ -432,6 +458,36 @@
           "description": "invert-if",
           "type": "string",
           "const": "invert-if"
+        },
+        {
+          "description": "Call to a non-callable value",
+          "type": "string",
+          "const": "call-non-callable"
+        },
+        {
+          "description": "gmod-invalid-hook-name",
+          "type": "string",
+          "const": "gmod-invalid-hook-name"
+        },
+        {
+          "description": "gmod-realm-misuse",
+          "type": "string",
+          "const": "gmod-realm-misuse"
+        },
+        {
+          "description": "gmod-realm-misuse-risky",
+          "type": "string",
+          "const": "gmod-realm-misuse-risky"
+        },
+        {
+          "description": "gmod-unknown-net-message",
+          "type": "string",
+          "const": "gmod-unknown-net-message"
+        },
+        {
+          "description": "gmod-duplicate-system-registration",
+          "type": "string",
+          "const": "gmod-duplicate-system-registration"
         }
       ]
     },
@@ -764,6 +820,129 @@
         }
       ]
     },
+    "EmmyrcGmod": {
+      "type": "object",
+      "properties": {
+        "annotationsPath": {
+          "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "autoLoadAnnotations": {
+          "description": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "defaultRealm": {
+          "$ref": "#/$defs/EmmyrcGmodRealm",
+          "default": "shared"
+        },
+        "detectRealmFromCalls": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "detectRealmFromFilename": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "hookMappings": {
+          "$ref": "#/$defs/EmmyrcGmodHookMappings",
+          "default": {
+            "emitterToHook": {},
+            "methodPrefixes": [],
+            "methodToHook": {}
+          }
+        },
+        "inferDynamicFields": {
+          "type": "boolean",
+          "default": true
+        },
+        "scriptedClassScopes": {
+          "$ref": "#/$defs/EmmyrcGmodScriptedClassScopes",
+          "default": {
+            "exclude": [],
+            "include": [
+              "entities/**",
+              "weapons/**",
+              "effects/**",
+              "weapons/gmod_tool/stools/**"
+            ]
+          }
+        }
+      }
+    },
+    "EmmyrcGmodHookMappings": {
+      "type": "object",
+      "properties": {
+        "emitterToHook": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "methodPrefixes": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "methodToHook": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
+    "EmmyrcGmodRealm": {
+      "type": "string",
+      "enum": [
+        "client",
+        "server",
+        "shared",
+        "menu"
+      ]
+    },
+    "EmmyrcGmodScriptedClassScopes": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "type": "array",
+          "default": [
+            "entities/**",
+            "weapons/**",
+            "effects/**",
+            "weapons/gmod_tool/stools/**"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "EmmyrcHover": {
       "type": "object",
       "properties": {
@@ -789,12 +968,6 @@
     "EmmyrcInlayHint": {
       "type": "object",
       "properties": {
-        "enable": {
-          "description": "Enable inlay hints.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
         "enumParamHint": {
           "description": "Show name of enumerator when passing a literal value to a function\nthat expects an enum.\n\nExample:\n\n```lua\n--- @enum Level\nlocal Foo = {\n   Info = 1,\n   Error = 2,\n}\n\n--- @param l Level\nfunction print_level(l) end\n\nprint_level(1 --[[ Hint: Level.Info ]])\n```",
           "type": "boolean",
@@ -987,14 +1160,6 @@
             "type": "string"
           }
         },
-        "frameworkVersions": {
-          "description": "Framework versions.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
         "nonstandardSymbol": {
           "description": "Non-standard symbols.",
           "type": "array",
@@ -1028,9 +1193,9 @@
           "default": {}
         },
         "version": {
-          "description": "Lua version.",
+          "description": "Deprecated: GMod-only server always uses LuaJIT. Kept for config compatibility.",
           "$ref": "#/$defs/EmmyrcLuaVersion",
-          "default": "LuaLatest"
+          "default": "LuaJIT"
         }
       }
     },
@@ -1048,16 +1213,6 @@
           "type": "boolean",
           "default": false,
           "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcSignature": {
-      "type": "object",
-      "properties": {
-        "detailSignatureHelper": {
-          "description": "Whether to enable signature help.",
-          "type": "boolean",
-          "default": true
         }
       }
     },
@@ -1097,10 +1252,6 @@
         },
         "requirePath": {
           "description": "Whether to enable strict mode require path.",
-          "type": "boolean",
-          "default": false
-        },
-        "typeCall": {
           "type": "boolean",
           "default": false
         }
@@ -1159,11 +1310,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "preloadFileSize": {
-          "type": "integer",
-          "format": "int32",
-          "default": 0
         },
         "reindexDuration": {
           "description": "Delay between changing a file and full project reindex, in milliseconds.",
