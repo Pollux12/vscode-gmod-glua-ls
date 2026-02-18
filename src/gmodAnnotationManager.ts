@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { spawnSync } from 'child_process';
+import * as https from 'https';
+import { spawn } from 'child_process';
 
 /**
  * Manages Garry's Mod EmmyLua annotations
@@ -10,9 +11,14 @@ import { spawnSync } from 'child_process';
 export class GmodAnnotationManager {
     private readonly REPO_URL = 'https://github.com/Pollux12/gmod-luals-addon.git';
     private readonly BRANCH = 'emmylua-annotations';
+    private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/emmylua-annotations/__metadata.json';
+    private readonly UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    private readonly UPDATE_CHECK_STATE_KEY = 'gmodAnnotations.lastUpdateCheck';
+    private readonly context: vscode.ExtensionContext;
     private readonly annotationsPath: string;
 
     constructor(context: vscode.ExtensionContext) {
+        this.context = context;
         // Store annotations in extension's global storage
         this.annotationsPath = path.join(
             context.globalStorageUri.fsPath,
@@ -20,20 +26,35 @@ export class GmodAnnotationManager {
         );
     }
 
-    private runGit(args: string[], cwd?: string): void {
-        const result = spawnSync('git', args, {
-            cwd,
-            stdio: 'inherit',
-            shell: false,
+    /**
+     * Run a git command with all I/O piped (no terminal windows).
+     * Rejects with a message that includes captured stderr on failure.
+     */
+    private runGit(args: string[], cwd?: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const proc = spawn('git', args, {
+                cwd,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: false,
+                windowsHide: true,
+            });
+
+            let stderr = '';
+            proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+            proc.on('error', reject);
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    const detail = stderr.trim();
+                    reject(new Error(
+                        `git ${args.join(' ')} failed with exit code ${code}` +
+                        (detail ? `\n${detail}` : '')
+                    ));
+                }
+            });
         });
-
-        if (result.error) {
-            throw result.error;
-        }
-
-        if (result.status !== 0) {
-            throw new Error(`git ${args.join(' ')} failed with exit code ${result.status}`);
-        }
     }
 
     /**
@@ -76,12 +97,90 @@ export class GmodAnnotationManager {
 
         if (this.annotationsExist()) {
             console.log('GMod annotations already exist at', this.annotationsPath);
-            // Could optionally check for updates here
+            // Fire-and-forget: check for updates in the background without blocking startup
+            void this.checkForUpdates();
             return;
         }
 
         console.log('GMod annotations not found, downloading...');
         await this.downloadAnnotations();
+    }
+
+    /**
+     * Fetch JSON from a URL using Node's https module with a timeout.
+     * Returns undefined on any error (network failure, bad status, parse error).
+     */
+    private fetchJson<T>(url: string, timeoutMs: number): Promise<T | undefined> {
+        return new Promise((resolve) => {
+            const req = https.get(url, (res) => {
+                if (res.statusCode !== 200) {
+                    res.resume();
+                    resolve(undefined);
+                    return;
+                }
+                let data = '';
+                res.on('data', (chunk: string) => { data += chunk; });
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data) as T);
+                    } catch {
+                        resolve(undefined);
+                    }
+                });
+            });
+            req.setTimeout(timeoutMs, () => { req.destroy(); resolve(undefined); });
+            req.on('error', () => resolve(undefined));
+        });
+    }
+
+    /**
+     * Check if a newer version of annotations is available on the remote branch.
+     * Rate-limited to once per 24 hours. Runs as a background task.
+     */
+    private async checkForUpdates(): Promise<void> {
+        const lastCheck = this.context.globalState.get<number>(this.UPDATE_CHECK_STATE_KEY, 0);
+        if (Date.now() - lastCheck < this.UPDATE_CHECK_INTERVAL_MS) {
+            return;
+        }
+
+        // Update the timestamp before the network call so concurrent activations don't all fire
+        await this.context.globalState.update(this.UPDATE_CHECK_STATE_KEY, Date.now());
+
+        try {
+            const localMetadataPath = path.join(this.annotationsPath, '__metadata.json');
+            if (!fs.existsSync(localMetadataPath)) {
+                return;
+            }
+
+            const localMetadata = JSON.parse(
+                fs.readFileSync(localMetadataPath, 'utf-8')
+            ) as { lastUpdate?: string };
+
+            const remoteMetadata = await this.fetchJson<{ lastUpdate?: string }>(
+                this.REMOTE_METADATA_URL,
+                10_000
+            );
+            if (!remoteMetadata) {
+                return;
+            }
+
+            if (!localMetadata.lastUpdate || !remoteMetadata.lastUpdate) {
+                return;
+            }
+
+            if (new Date(remoteMetadata.lastUpdate) > new Date(localMetadata.lastUpdate)) {
+                const action = await vscode.window.showInformationMessage(
+                    'GMod EmmyLua annotations update available.',
+                    'Update Now',
+                    'Later'
+                );
+                if (action === 'Update Now') {
+                    await this.updateAnnotations();
+                }
+            }
+        } catch {
+            // Silently ignore network failures or parse errors — this is best-effort
+        }
     }
 
     /**
@@ -111,7 +210,7 @@ export class GmodAnnotationManager {
                         fs.rmSync(this.annotationsPath, { recursive: true, force: true });
                     }
 
-                    this.runGit(['clone', '--depth', '1', '--branch', this.BRANCH, this.REPO_URL, this.annotationsPath]);
+                    await this.runGit(['clone', '--depth', '1', '--branch', this.BRANCH, this.REPO_URL, this.annotationsPath]);
 
                     progress.report({ message: 'Download complete!' });
                 }
@@ -148,9 +247,10 @@ export class GmodAnnotationManager {
                 async (progress) => {
                     progress.report({ message: 'Fetching updates...' });
 
-                    this.runGit(['fetch', 'origin'], this.annotationsPath);
-                    this.runGit(['checkout', this.BRANCH], this.annotationsPath);
-                    this.runGit(['pull', '--ff-only', 'origin', this.BRANCH], this.annotationsPath);
+                    // For a shallow clone, fetch the latest then hard-reset to it.
+                    // fetch+checkout+pull --ff-only fails on shallow repos (exit 128).
+                    await this.runGit(['fetch', '--depth', '1', 'origin', this.BRANCH], this.annotationsPath);
+                    await this.runGit(['reset', '--hard', `origin/${this.BRANCH}`], this.annotationsPath);
 
                     progress.report({ message: 'Update complete!' });
                 }
