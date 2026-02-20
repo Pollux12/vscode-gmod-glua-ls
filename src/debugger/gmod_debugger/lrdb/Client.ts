@@ -224,7 +224,10 @@ export interface PausedNotify extends JsonRpcNotify {
 }
 export interface ConnectedNotify extends JsonRpcNotify {
   method: 'connected'
-  params?: never
+  params?: {
+    protocol_version?: string
+    module_version?: string
+  }
 }
 export interface ExitNotify extends JsonRpcNotify {
   method: 'exit'

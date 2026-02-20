@@ -95,6 +95,7 @@ export interface ConnectedNotify extends JsonRpcNotify {
     },
     working_directory?: string,
     protocol_version?: string
+    module_version?: string
   }
 }
 
@@ -217,6 +218,7 @@ export class GmodDebugSession extends DebugSession {
   private _stopOnEntry?: boolean
 
   private _debuggee_protocol_version?: string
+  private _debuggee_module_version?: string
   private _controlService?: GmodDebugControlService
   private _sourceRoot?: string
 
@@ -252,6 +254,9 @@ export class GmodDebugSession extends DebugSession {
       this._debug_client.end()
       delete this._debug_client
     }
+
+    this._debuggee_protocol_version = undefined
+    this._debuggee_module_version = undefined
 
     response.body = response.body ?? {}
     response.body.supportsConfigurationDoneRequest = true
@@ -1140,6 +1145,12 @@ export class GmodDebugSession extends DebugSession {
 
         case 'connected':
           this._debuggee_protocol_version = event.params.protocol_version
+          this._debuggee_module_version = event.params.module_version
+          this.sendEvent(
+            new OutputEvent(
+              `Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
+            )
+          )
           break
 
         case 'output':

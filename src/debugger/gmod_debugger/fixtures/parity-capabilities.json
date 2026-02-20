@@ -1,6 +1,10 @@
 {
     "debuggerType": "gluals_gmod",
     "protocolVersion": "gmod-1",
+    "connectedPayload": {
+        "protocol_version": "gmod-2",
+        "module_version": "X.Y.Z"
+    },
     "capabilities": {
         "supportsSetVariable": true,
         "supportsSetExpression": false,

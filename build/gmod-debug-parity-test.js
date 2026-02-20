@@ -68,6 +68,8 @@ async function run() {
     'setVariableRoundTrip',
   ]
   assert.deepStrictEqual(fixture.mandatoryParityScenarios, expectedScenarios)
+  assert.strictEqual(fixture.connectedPayload.protocol_version, 'gmod-2')
+  assert.match(fixture.connectedPayload.module_version, /^\d+\.\d+\.\d+$|^X\.Y\.Z$/)
 
   const session = new HarnessSession()
 
@@ -78,6 +80,18 @@ async function run() {
   assert.strictEqual(initializeResult.body.supportsSetExpression, fixture.capabilities.supportsSetExpression)
   assert.strictEqual(initializeResult.body.supportTerminateDebuggee, fixture.capabilities.supportTerminateDebuggee)
   assert.strictEqual(initializeResult.body.supportsLogPoints, fixture.capabilities.supportsLogPoints)
+
+  session.handleServerEvents({
+    method: 'connected',
+    jsonrpc: '2.0',
+    params: fixture.connectedPayload,
+  })
+  assert.strictEqual(session._debuggee_protocol_version, fixture.connectedPayload.protocol_version)
+  assert.strictEqual(session._debuggee_module_version, fixture.connectedPayload.module_version)
+  assert(
+    session.outputs.some((output) => output.includes('Debugger metadata: protocol=gmod-2')),
+    'Expected connected metadata output with gmod-2 protocol'
+  )
 
   const setExpressionResponse = makeResponse('setExpression')
   session.setExpressionRequest(setExpressionResponse, {
