@@ -21,6 +21,12 @@ import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from '.
 import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmProvider, registerGmodRealmView } from './gmodRealmView';
+import {
+    GmodErrorNotificationParams,
+    GmodErrorStore,
+    GmodErrorViewProvider,
+    registerGmodErrorView,
+} from './gmodErrorView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
@@ -55,6 +61,8 @@ let gmodRdbUpdater: GmodRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmProvider | undefined;
+let gmodErrorStore: GmodErrorStore | undefined;
+let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
@@ -156,6 +164,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.mcp.restartHost', handler: restartGmodMcpHost },
         { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
         { id: 'gluals.gmod.configureDebugger', handler: configureGmodDebugger },
+        { id: 'gmodErrors.clear', handler: clearGmodErrors },
     ];
 
     // Register all commands
@@ -286,6 +295,7 @@ async function initializeExtension(): Promise<void> {
     registerDebuggers();
     initializeGmodExplorer(extensionContext.vscodeContext);
     initializeGmodRealmView(extensionContext.vscodeContext);
+    initializeGmodErrorView(extensionContext.vscodeContext);
     await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
@@ -787,6 +797,7 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
     if (session.type !== 'gluals_gmod') {
         return;
     }
+    gmodErrorStore?.clear();
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
     gmodRealmProvider?.refresh();
 }
@@ -814,8 +825,22 @@ function initializeGmodRealmView(context: vscode.ExtensionContext): void {
     gmodRealmProvider = registerGmodRealmView(context, getPersistedGmodRealm, () => hasGmodDebugConfiguration);
 }
 
+function initializeGmodErrorView(context: vscode.ExtensionContext): void {
+    if (gmodErrorStore && gmodErrorViewProvider) {
+        return;
+    }
+
+    const registered = registerGmodErrorView(context);
+    gmodErrorStore = registered.store;
+    gmodErrorViewProvider = registered.provider;
+}
+
 function refreshGmodExplorer(): void {
     gmodExplorerProvider?.refresh();
+}
+
+function clearGmodErrors(): void {
+    gmodErrorViewProvider?.clear();
 }
 
 async function configureGmodDebugger(): Promise<void> {
@@ -1277,6 +1302,29 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
         return;
     }
 
+    if (event.event === 'gmod.errors.clear') {
+        gmodErrorStore?.clear();
+        return;
+    }
+
+    if (event.event === 'gmod.error') {
+        const params = coerceGmodErrorNotificationParams(event.body);
+        if (params) {
+            gmodErrorStore?.addError(params);
+            pushGmodToolEntry(gmodToolErrorEntries, {
+                timestamp: new Date().toISOString(),
+                source: params.source,
+                level: 'error',
+                message: params.message,
+                metadata: {
+                    fingerprint: params.fingerprint,
+                    count: params.count,
+                },
+            });
+        }
+        return;
+    }
+
     if (event.event === 'gmod.controlResult' && event.body && typeof event.body === 'object') {
         const result = event.body as GmodControlResult;
         if (result.command === 'setRealm') {
@@ -1293,5 +1341,31 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
         recordGmodToolBackendError(message, body?.details);
         gmodMcpHost?.recordBackendError(message, body?.details);
     }
+}
+
+function coerceGmodErrorNotificationParams(body: unknown): GmodErrorNotificationParams | undefined {
+    if (!body || typeof body !== 'object') {
+        return undefined;
+    }
+
+    const raw = body as Record<string, unknown>;
+    const message = typeof raw.message === 'string' ? raw.message.trim() : '';
+    if (message.length === 0) {
+        return undefined;
+    }
+
+    const rawFingerprint = typeof raw.fingerprint === 'string' ? raw.fingerprint.trim() : '';
+    const fingerprint = rawFingerprint.length > 0 ? rawFingerprint : `error:${message}`;
+    const source = raw.source === 'console' ? 'console' : 'lua';
+    const count = typeof raw.count === 'number' && Number.isFinite(raw.count)
+        ? Math.max(1, Math.floor(raw.count))
+        : 1;
+
+    return {
+        message,
+        fingerprint,
+        count,
+        source,
+    };
 }
 

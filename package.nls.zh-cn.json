@@ -55,6 +55,7 @@
     "debug.gmod.sourceRoot": "Lua 源码根目录",
     "debug.gmod.sourceFileMap": "可选的源码路径映射（本地路径到远端 Lua 路径）",
     "debug.gmod.stopOnEntry": "当调试目标在入口处暂停时停止",
+    "debug.gmod.stopOnError": "当 gm_rdb 报告 Lua 运行时错误时暂停执行",
     "debug.gmod.program": "连接 gm_rdb 前要启动的程序",
     "debug.gmod.cwd": "启动程序的工作目录",
     "debug.gmod.args": "传递给启动程序的参数",
@@ -63,5 +64,8 @@
     "debug.gmod.attach.desc": "附加到正在运行的 Garry's Mod 远程调试器",
     "debug.gmod.launch.name": "GMod: 启动并附加",
     "debug.gmod.launch.label": "GMod: 启动并附加",
-    "debug.gmod.launch.desc": "启动程序并通过 TCP 附加到 gm_rdb"
+    "debug.gmod.launch.desc": "启动程序并通过 TCP 附加到 gm_rdb",
+    "command.gmodErrors.clear.title": "清除",
+    "view.gmodErrors.title": "GMod 错误",
+    "view.gmodErrors.welcome": "当前调试会话没有检测到错误。"
 }

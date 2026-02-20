@@ -29,6 +29,7 @@ interface DebugConfig {
     sourceRoot: string;
     sourceFileMap: Record<string, string>;
     stopOnEntry: boolean;
+    stopOnError: boolean;
     realm: string;
     program?: string;
     cwd?: string;
@@ -685,6 +686,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
         sourceRoot,
         sourceFileMap,
         stopOnEntry: false,
+        stopOnError: false,
         realm: '${config:gluals.gmod.debugRealm}',
     };
 

@@ -182,6 +182,12 @@
                 "title": "%command.gmodRdb.checkForUpdates.title%",
                 "category": "GLuaLS",
                 "icon": "$(cloud-download)"
+            },
+            {
+                "command": "gmodErrors.clear",
+                "title": "%command.gmodErrors.clear.title%",
+                "category": "GLuaLS",
+                "icon": "$(trash)"
             }
         ],
         "languageModelTools": [
@@ -619,6 +625,11 @@
                                 "description": "%debug.gmod.stopOnEntry%",
                                 "default": true
                             },
+                            "stopOnError": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnError%",
+                                "default": false
+                            },
                             "realm": {
                                 "type": "string",
                                 "description": "Runtime realm for debugger control commands",
@@ -676,6 +687,11 @@
                                 "description": "%debug.gmod.stopOnEntry%",
                                 "default": true
                             },
+                            "stopOnError": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnError%",
+                                "default": false
+                            },
                             "realm": {
                                 "type": "string",
                                 "description": "Runtime realm for debugger control commands",
@@ -701,6 +717,7 @@
                             "${workspaceFolder}": "."
                         },
                         "stopOnEntry": true,
+                        "stopOnError": false,
                         "realm": "${config:gluals.gmod.debugRealm}"
                     }
                 ],
@@ -719,6 +736,7 @@
                                 "${workspaceFolder}": "."
                             },
                             "stopOnEntry": true,
+                            "stopOnError": false,
                             "realm": "${config:gluals.gmod.debugRealm}"
                         }
                     },
@@ -739,6 +757,7 @@
                                 "${workspaceFolder}": "."
                             },
                             "stopOnEntry": true,
+                            "stopOnError": false,
                             "realm": "${config:gluals.gmod.debugRealm}"
                         }
                     }
@@ -755,6 +774,12 @@
                     "name": "GMod Debugger",
                     "when": "workspaceFolderCount > 0",
                     "icon": "$(broadcast)"
+                },
+                {
+                    "id": "gmodErrors",
+                    "name": "%view.gmodErrors.title%",
+                    "when": "workspaceFolderCount > 0",
+                    "icon": "$(warning)"
                 }
             ],
             "explorer": [
@@ -787,6 +812,11 @@
                     "command": "gluals.gmod.diagnostics.repair",
                     "when": "view == gluals.gmodExplorer",
                     "group": "navigation@3"
+                },
+                {
+                    "command": "gmodErrors.clear",
+                    "when": "view == gmodErrors",
+                    "group": "navigation@1"
                 }
             ],
             "commandPalette": [
@@ -828,6 +858,12 @@
                 }
             ]
         },
+        "viewsWelcome": [
+            {
+                "view": "gmodErrors",
+                "contents": "%view.gmodErrors.welcome%"
+            }
+        ],
         "configuration": [
             {
                 "title": "Code Action",

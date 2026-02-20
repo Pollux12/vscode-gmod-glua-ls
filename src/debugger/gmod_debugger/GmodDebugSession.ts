@@ -23,6 +23,7 @@ import {
   EvalRequest,
   ExitNotify,
   GetGlobalRequest,
+  GmodErrorNotify,
   GetLocalVariableRequest,
   GetUpvaluesRequest,
   PausedNotify,
@@ -47,6 +48,7 @@ export interface LaunchRequestArguments
   sourceRoot?: string
   sourceFileMap?: Record<string, string>
   stopOnEntry?: boolean
+  stopOnError?: boolean
   realm?: GmodRealm
 }
 
@@ -57,6 +59,7 @@ export interface AttachRequestArguments
   sourceRoot: string
   sourceFileMap?: Record<string, string>
   stopOnEntry?: boolean
+  stopOnError?: boolean
   realm?: GmodRealm
 }
 
@@ -127,6 +130,7 @@ declare type DebuggerNotify =
   | ExitNotify
   | RunningNotify
   | OutputNotify
+  | GmodErrorNotify
 
 function getStringifiableObject(value: any): any {
   if (value == null) {
@@ -217,6 +221,7 @@ export class GmodDebugSession extends DebugSession {
   private _sourceHandles = new Handles<string>()
 
   private _stopOnEntry?: boolean
+  private _stopOnError = false
 
   private _debuggee_protocol_version?: string
   private _debuggee_module_version?: string
@@ -258,6 +263,8 @@ export class GmodDebugSession extends DebugSession {
 
     this._debuggee_protocol_version = undefined
     this._debuggee_module_version = undefined
+    this._stopOnError = false
+    this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
     response.body = response.body ?? {}
     response.body.supportsConfigurationDoneRequest = true
@@ -333,6 +340,8 @@ export class GmodDebugSession extends DebugSession {
   ): void {
     try {
       this._stopOnEntry = args.stopOnEntry
+      this._stopOnError = args.stopOnError ?? false
+      this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
       const cwd = args.cwd ? args.cwd : process.cwd()
       const sourceRoot = args.sourceRoot ? args.sourceRoot : cwd
@@ -357,7 +366,15 @@ export class GmodDebugSession extends DebugSession {
       )
 
       this._debug_client.onNotify.on((event) => {
-        this.handleServerEvents(event as DebuggerNotify)
+        const notify = event as DebuggerNotify
+        if (notify.method === 'error') {
+          return
+        }
+        this.handleServerEvents(notify)
+      })
+
+      this._debug_client.onError((notify) => {
+        this.handleServerEvents(notify)
       })
 
       this._debug_client.onOpen.on(() => {
@@ -368,7 +385,7 @@ export class GmodDebugSession extends DebugSession {
         this.sendEvent(new InitializedEvent())
       })
 
-      this._debug_client.onError.on((err) => {
+      this._debug_client.onTransportError.on((err) => {
         this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
       })
 
@@ -400,6 +417,8 @@ export class GmodDebugSession extends DebugSession {
   ): void {
     try {
       this._stopOnEntry = args.stopOnEntry
+      this._stopOnError = args.stopOnError ?? false
+      this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
       this.setupSourceEnv(args.sourceRoot, args.sourceFileMap)
       this._sourceRoot = args.sourceRoot
@@ -414,7 +433,15 @@ export class GmodDebugSession extends DebugSession {
       )
 
       this._debug_client.onNotify.on((event) => {
-        this.handleServerEvents(event as DebuggerNotify)
+        const notify = event as DebuggerNotify
+        if (notify.method === 'error') {
+          return
+        }
+        this.handleServerEvents(notify)
+      })
+
+      this._debug_client.onError((notify) => {
+        this.handleServerEvents(notify)
       })
 
       this._debug_client.onClose.on(() => {
@@ -431,7 +458,7 @@ export class GmodDebugSession extends DebugSession {
         this.sendEvent(new InitializedEvent())
       })
 
-      this._debug_client.onError.on((err) => {
+      this._debug_client.onTransportError.on((err) => {
         this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
       })
 
@@ -1178,6 +1205,36 @@ export class GmodDebugSession extends DebugSession {
             timestamp: event.params.timestamp,
             realm: this._controlService?.getRealm() ?? 'server',
           }))
+          break
+
+        case 'error':
+          const message = typeof event.params.message === 'string' && event.params.message.trim().length > 0
+            ? event.params.message
+            : 'Unknown Lua error'
+          const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
+            ? event.params.fingerprint
+            : `error:${message}`
+          const source = event.params.source === 'console' ? 'console' : 'lua'
+          const count = Number.isFinite(event.params.count) ? Math.max(1, Math.floor(event.params.count)) : 1
+
+          this.sendEvent(new OutputEvent(`[${source} error ${count}x] ${message}\n`, 'stderr'))
+          this.sendEvent(new DebugEvent('gmod.error', {
+            message,
+            fingerprint,
+            count,
+            source,
+          }))
+
+          if (this._stopOnError) {
+            this._debug_client?.pauseNow().catch((error) => {
+              this.sendEvent(
+                new OutputEvent(
+                  `Failed to stop on error: ${error instanceof Error ? error.message : String(error)}\n`,
+                  'stderr'
+                )
+              )
+            })
+          }
           break
       }
     } catch(e) {

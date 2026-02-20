@@ -50,7 +50,7 @@ export class Client {
 
     this.onClose = adapter.onClose
     this.onOpen = adapter.onOpen
-    this.onError = adapter.onError
+    this.onTransportError = adapter.onError
   }
   get currentStatus(): RunningStatus | undefined {
     return this.currentStatus_
@@ -201,10 +201,21 @@ export class Client {
     this.adapter.end()
   }
 
+  onError(callback: (notify: GmodErrorNotify) => void): () => void {
+    const notifyHandler = (notify: DebuggerNotify) => {
+      if (notify.method === 'error') {
+        callback(notify)
+      }
+    }
+
+    this.onNotify.on(notifyHandler)
+    return () => this.onNotify.off(notifyHandler)
+  }
+
   onNotify: TypedEventEmitter<DebuggerNotify> = new TypedEventEmitter<DebuggerNotify>()
   onClose: TypedEventTarget<void>
   onOpen: TypedEventTarget<void>
-  onError: TypedEventTarget<Error>
+  onTransportError: TypedEventTarget<Error>
 }
 
 export type DebugResponse = JsonRpcResponse
@@ -213,6 +224,7 @@ export type DebuggerNotify =
   | ConnectedNotify
   | ExitNotify
   | RunningNotify
+  | GmodErrorNotify
 
 export type RunningStatus = DebuggerNotify['method']
 
@@ -236,6 +248,16 @@ export interface ExitNotify extends JsonRpcNotify {
 export interface RunningNotify extends JsonRpcNotify {
   method: 'running'
   params?: never
+}
+
+export interface GmodErrorNotify extends JsonRpcNotify {
+  method: 'error'
+  params: {
+    message: string
+    fingerprint: string
+    count: number
+    source: 'lua' | 'console'
+  }
 }
 
 export interface InitRequest extends JsonRpcRequest {

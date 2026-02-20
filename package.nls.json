@@ -55,6 +55,7 @@
     "debug.gmod.sourceRoot": "Lua source root directory",
     "debug.gmod.sourceFileMap": "Optional source file mappings from local path to remote Lua path",
     "debug.gmod.stopOnEntry": "Stop when the debuggee emits entry pause",
+    "debug.gmod.stopOnError": "Pause execution when gm_rdb reports a Lua runtime error",
     "debug.gmod.program": "Program to launch before connecting to gm_rdb",
     "debug.gmod.cwd": "Working directory for launched program",
     "debug.gmod.args": "Arguments passed to launched program",
@@ -65,5 +66,8 @@
     "debug.gmod.launch.label": "GMod: Launch and Attach",
     "debug.gmod.launch.desc": "Launch a program and attach to gm_rdb over TCP",
     "command.gmodRdb.checkForUpdates.title": "GMod RDB: Check for Updates",
+    "command.gmodErrors.clear.title": "Clear",
+    "view.gmodErrors.title": "GMod Errors",
+    "view.gmodErrors.welcome": "No errors detected in this debug session.",
     "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update gm_rdb when the connected module version does not match the extension's expected debugger module version."
 }
