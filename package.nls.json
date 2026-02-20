@@ -63,5 +63,7 @@
     "debug.gmod.attach.desc": "Attach to a running Garry's Mod remote debugger",
     "debug.gmod.launch.name": "GMod: Launch and Attach",
     "debug.gmod.launch.label": "GMod: Launch and Attach",
-    "debug.gmod.launch.desc": "Launch a program and attach to gm_rdb over TCP"
+    "debug.gmod.launch.desc": "Launch a program and attach to gm_rdb over TCP",
+    "command.gmodRdb.checkForUpdates.title": "GMod RDB: Check for Updates",
+    "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update gm_rdb when the connected module version does not match the extension's expected debugger module version."
 }

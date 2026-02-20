@@ -176,6 +176,12 @@
                 "title": "GMod: Configure Debugger",
                 "category": "GLuaLS",
                 "icon": "$(debug-configure)"
+            },
+            {
+                "command": "gmodRdb.checkForUpdates",
+                "title": "%command.gmodRdb.checkForUpdates.title%",
+                "category": "GLuaLS",
+                "icon": "$(cloud-download)"
             }
         ],
         "languageModelTools": [
@@ -1486,6 +1492,11 @@
                         "default": "server",
                         "scope": "resource",
                         "markdownDescription": "Default realm used for GMod debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
+                    },
+                    "gluals.gmod.debugger.autoUpdateRdb": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%config.gmod.debugger.autoUpdateRdb.description%"
                     },
                     "gluals.gmod.mcp.enabled": {
                         "type": "boolean",

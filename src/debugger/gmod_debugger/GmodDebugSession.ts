@@ -193,6 +193,7 @@ export class GmodDebugSession extends DebugSession {
   private static THREAD_ID = 1
 
   private static DEBUGGER_PROTOCOL_VERSION = 'gmod-1'
+  private static EXPECTED_GM_RDB_MODULE_VERSION = '1.2.0'
   private static CONTROL_COMMANDS: ReadonlySet<GmodControlCommand> = new Set([
     'pauseSoft',
     'pauseNow',
@@ -1151,6 +1152,14 @@ export class GmodDebugSession extends DebugSession {
               `Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
             )
           )
+
+          if (this._debuggee_module_version && this._debuggee_module_version !== GmodDebugSession.EXPECTED_GM_RDB_MODULE_VERSION) {
+            this.sendEvent(new DebugEvent('gmod.rdb.versionMismatch', {
+              moduleVersion: this._debuggee_module_version,
+              expectedVersion: GmodDebugSession.EXPECTED_GM_RDB_MODULE_VERSION,
+              protocolVersion: this._debuggee_protocol_version,
+            }))
+          }
           break
 
         case 'output':

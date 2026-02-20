@@ -35,12 +35,12 @@ interface DebugConfig {
     args?: string[];
 }
 
-interface ReleaseAsset {
+export interface ReleaseAsset {
     name: string;
     browser_download_url: string;
 }
 
-interface GmRdbRelease {
+export interface GmRdbRelease {
     tag_name: string;
     assets: ReleaseAsset[];
 }
@@ -178,7 +178,7 @@ function detectGmRdb(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
-function fetchLatestRelease(): Promise<GmRdbRelease | null> {
+export function fetchLatestRelease(): Promise<GmRdbRelease | null> {
     return new Promise((resolve) => {
         const request = https.get(
             {
@@ -218,7 +218,7 @@ function fetchLatestRelease(): Promise<GmRdbRelease | null> {
     });
 }
 
-function downloadFile(url: string, destinationPath: string): Promise<void> {
+export function downloadFile(url: string, destinationPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const attempt = (downloadUrl: string, redirectsLeft: number) => {
             const parsedUrl = new URL(downloadUrl);
@@ -524,6 +524,25 @@ async function promptForSrcdsPath(
     }
 
     return resolved;
+}
+
+function getPreferredWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+    const activeEditorUri = vscode.window.activeTextEditor?.document.uri;
+    if (activeEditorUri) {
+        const folder = vscode.workspace.getWorkspaceFolder(activeEditorUri);
+        if (folder) {
+            return folder;
+        }
+    }
+
+    return vscode.workspace.workspaceFolders?.[0];
+}
+
+export async function promptForGarrysmodPath(context: vscode.ExtensionContext): Promise<string | undefined> {
+    const workspaceFolder = getPreferredWorkspaceFolder();
+    const workspaceDetection = workspaceFolder ? detectWorkspaceSrcdsLayout(workspaceFolder) : undefined;
+    const selection = await promptForSrcdsPath(context, workspaceDetection);
+    return selection?.garrysmodPath;
 }
 
 function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {

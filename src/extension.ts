@@ -30,6 +30,7 @@ import { GmodGetOutputTool } from './tools/gmodGetOutputTool';
 import { GmodRunCommandTool } from './tools/gmodRunCommandTool';
 import { GmodRunFileTool } from './tools/gmodRunFileTool';
 import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
+import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import {
     hasAnyGmodDebugConfiguration,
     readAllWorkspaceLaunchConfigurations,
@@ -50,6 +51,7 @@ let activeEditor: vscode.TextEditor | undefined;
 
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
+let gmodRdbUpdater: GmodRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmProvider | undefined;
@@ -131,6 +133,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
+        { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
         { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
@@ -224,6 +227,7 @@ function registerDebugConfigurationProviders(context: vscode.ExtensionContext): 
 async function initializeExtension(): Promise<void> {
     // Initialize GMod annotation manager
     gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
+    gmodRdbUpdater = new GmodRdbUpdater(extensionContext.vscodeContext);
 
     // Initialize annotations before starting server
     await gmodAnnotationManager.initializeAnnotations();
@@ -617,6 +621,15 @@ async function removeGmodAnnotations(): Promise<void> {
         return;
     }
     await gmodAnnotationManager.removeAnnotations();
+}
+
+async function checkForGmodRdbUpdates(): Promise<void> {
+    if (!gmodRdbUpdater) {
+        vscode.window.showErrorMessage('gm_rdb updater is not initialized');
+        return;
+    }
+
+    await gmodRdbUpdater.runManualUpdateCommand();
 }
 
 type GmodControlCommand =
@@ -1239,8 +1252,22 @@ function coerceGmodToolTimestamp(value: unknown): string {
     return new Date().toISOString();
 }
 
+interface GmodRdbVersionMismatchBody {
+    moduleVersion?: unknown;
+}
+
 function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEvent): void {
     if (event.session.type !== 'gluals_gmod') {
+        return;
+    }
+
+    if (event.event === 'gmod.rdb.versionMismatch') {
+        if (event.body && typeof event.body === 'object') {
+            const body = event.body as GmodRdbVersionMismatchBody;
+            if (typeof body.moduleVersion === 'string' && gmodRdbUpdater) {
+                void gmodRdbUpdater.handleVersionMismatch(body.moduleVersion);
+            }
+        }
         return;
     }
 
