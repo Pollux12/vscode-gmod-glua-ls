@@ -27,6 +27,7 @@ import {
     GmodErrorViewProvider,
     registerGmodErrorView,
 } from './gmodErrorView';
+import { EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
@@ -63,6 +64,7 @@ let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmProvider | undefined;
 let gmodErrorStore: GmodErrorStore | undefined;
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
+let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
 let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
@@ -165,6 +167,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
         { id: 'gluals.gmod.configureDebugger', handler: configureGmodDebugger },
         { id: 'gmodErrors.clear', handler: clearGmodErrors },
+        { id: 'gmodEntityExplorer.refresh', handler: refreshGmodEntityExplorer },
+        { id: 'gmodEntityExplorer.search', handler: searchGmodEntityExplorer },
+        { id: 'gmodEntityExplorer.editProperty', handler: editGmodEntityExplorerProperty },
+        { id: 'gmodEntityExplorer.loadMore', handler: loadMoreGmodEntityExplorer },
     ];
 
     // Register all commands
@@ -296,6 +302,7 @@ async function initializeExtension(): Promise<void> {
     initializeGmodExplorer(extensionContext.vscodeContext);
     initializeGmodRealmView(extensionContext.vscodeContext);
     initializeGmodErrorView(extensionContext.vscodeContext);
+    initializeGmodEntityExplorerView(extensionContext.vscodeContext);
     await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
@@ -798,6 +805,8 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
         return;
     }
     gmodErrorStore?.clear();
+    gmodEntityExplorerProvider?.clear();
+    void gmodEntityExplorerProvider?.loadEntities();
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
     gmodRealmProvider?.refresh();
 }
@@ -806,6 +815,7 @@ function onDidTerminateDebugSession(session: vscode.DebugSession): void {
     if (session.type !== 'gluals_gmod') {
         return;
     }
+    gmodEntityExplorerProvider?.clear();
     gmodSessionRealms.delete(session.id);
     gmodRealmProvider?.refresh();
 }
@@ -835,12 +845,75 @@ function initializeGmodErrorView(context: vscode.ExtensionContext): void {
     gmodErrorViewProvider = registered.provider;
 }
 
+function initializeGmodEntityExplorerView(context: vscode.ExtensionContext): void {
+    if (gmodEntityExplorerProvider) {
+        return;
+    }
+
+    gmodEntityExplorerProvider = new GmodEntityExplorerProvider(getActiveGmodDebugSession);
+    const treeView = vscode.window.createTreeView('gmodEntityExplorer', {
+        treeDataProvider: gmodEntityExplorerProvider,
+        showCollapseAll: true,
+    });
+
+    context.subscriptions.push(gmodEntityExplorerProvider, treeView);
+}
+
 function refreshGmodExplorer(): void {
     gmodExplorerProvider?.refresh();
 }
 
 function clearGmodErrors(): void {
     gmodErrorViewProvider?.clear();
+}
+
+async function refreshGmodEntityExplorer(): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    await gmodEntityExplorerProvider.loadEntities();
+}
+
+async function searchGmodEntityExplorer(): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    const text = await vscode.window.showInputBox({
+        title: 'Filter entities',
+        prompt: 'Filter by class name or numeric entity index',
+        placeHolder: 'Example: prop_physics or 42',
+        value: '',
+        ignoreFocusOut: true,
+    });
+
+    if (text === undefined) {
+        return;
+    }
+
+    gmodEntityExplorerProvider.setFilter(text);
+}
+
+async function editGmodEntityExplorerProperty(item?: EntityTreeItem): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    if (!item || item.data.kind !== 'property' || !item.data.editable) {
+        vscode.window.showWarningMessage('Select an editable entity property first.');
+        return;
+    }
+
+    await gmodEntityExplorerProvider.editProperty(item.data.entityIndex, item.data.property, item.data.value);
+}
+
+async function loadMoreGmodEntityExplorer(): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    await gmodEntityExplorerProvider.loadMore();
 }
 
 async function configureGmodDebugger(): Promise<void> {

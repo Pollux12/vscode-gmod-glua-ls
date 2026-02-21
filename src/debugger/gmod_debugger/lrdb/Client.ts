@@ -26,6 +26,9 @@ export type DebugRequest =
   | GetGlobalRequest
   | SetVarRequest
   | CommandRequest
+  | GetEntitiesRequest
+  | GetEntityRequest
+  | SetEntityPropertyRequest
 
 export interface DebugClientAdapter {
   onMessage: TypedEventTarget<JsonRpcMessage>
@@ -197,6 +200,36 @@ export class Client {
       params,
     })
 
+  getEntities = (
+    params: GetEntitiesRequest['params']
+  ): Promise<DebugResponseType<GetEntitiesRequest>> =>
+    this.send({
+      method: 'get_entities',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  getEntity = (
+    params: GetEntityRequest['params']
+  ): Promise<DebugResponseType<GetEntityRequest>> =>
+    this.send({
+      method: 'get_entity',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  setEntityProperty = (
+    params: SetEntityPropertyRequest['params']
+  ): Promise<DebugResponseType<SetEntityPropertyRequest>> =>
+    this.send({
+      method: 'set_entity_property',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
   end(): void {
     this.adapter.end()
   }
@@ -359,6 +392,68 @@ export interface CommandRequest extends JsonRpcRequest {
   params: string
 }
 
+export type Vec3 = [number, number, number]
+
+export interface EntitySummary {
+  index: number
+  class: string
+  model: string
+  valid: boolean
+  pos: Vec3
+  angles: Vec3
+}
+
+export interface EntityDetail {
+  index: number
+  class: string
+  model: string
+  valid: boolean
+  pos: Vec3
+  angles: Vec3
+  parent_index: number | null
+  health: number
+  properties: Record<string, string | number | boolean>
+}
+
+export interface GetEntitiesParams {
+  offset: number
+  limit: number
+  filter_id: number
+  filter_class: string
+}
+
+export interface GetEntitiesResult {
+  entities: EntitySummary[]
+  total: number
+  offset: number
+  limit: number
+}
+
+export type SetEntityPropertyValue = string | number | boolean | Vec3
+
+export interface SetEntityPropertyParams {
+  index: number
+  property: string
+  value: SetEntityPropertyValue
+}
+
+export interface GetEntitiesRequest extends JsonRpcRequest {
+  method: 'get_entities'
+  params: GetEntitiesParams
+}
+
+export interface GetEntityRequest extends JsonRpcRequest {
+  method: 'get_entity'
+  params: {
+    index: number
+  }
+}
+
+export interface SetEntityPropertyRequest extends JsonRpcRequest {
+  method: 'set_entity_property'
+  params: SetEntityPropertyParams
+}
+
 type StackInfo = {
   file: string
   func: string
@@ -392,6 +487,13 @@ type ResponseResultType = {
   clear_breakpoints: never
   set_var: boolean
   command: never
+  get_entities: GetEntitiesResult
+  get_entity: EntityDetail
+  set_entity_property: {
+    ok: boolean
+    index: number
+    property: string
+  }
 }
 
 export type DebugResponseType<T extends DebugRequest> = Pick<T, 'id'> & {

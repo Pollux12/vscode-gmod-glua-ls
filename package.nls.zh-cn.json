@@ -65,7 +65,14 @@
     "debug.gmod.launch.name": "GMod: 启动并附加",
     "debug.gmod.launch.label": "GMod: 启动并附加",
     "debug.gmod.launch.desc": "启动程序并通过 TCP 附加到 gm_rdb",
+    "command.gmodRdb.checkForUpdates.title": "GMod RDB: 检查更新",
     "command.gmodErrors.clear.title": "清除",
+    "command.gmodEntityExplorer.refresh.title": "刷新",
+    "command.gmodEntityExplorer.search.title": "搜索",
+    "command.gmodEntityExplorer.editProperty.title": "编辑属性",
+    "command.gmodEntityExplorer.loadMore.title": "加载更多",
     "view.gmodErrors.title": "GMod 错误",
-    "view.gmodErrors.welcome": "当前调试会话没有检测到错误。"
+    "view.gmodErrors.welcome": "当前调试会话没有检测到错误。",
+    "view.gmodEntityExplorer.title": "实体浏览器",
+    "view.gmodEntityExplorer.welcome": "连接调试器后可查看实体。"
 }

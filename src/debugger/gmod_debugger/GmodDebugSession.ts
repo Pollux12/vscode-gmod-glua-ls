@@ -20,14 +20,18 @@ import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
 import {
+  EntityDetail,
   EvalRequest,
   ExitNotify,
+  GetEntitiesParams,
+  GetEntitiesResult,
   GetGlobalRequest,
   GmodErrorNotify,
   GetLocalVariableRequest,
   GetUpvaluesRequest,
   PausedNotify,
   RunningNotify,
+  SetEntityPropertyParams,
   SetVarRequest,
 } from './lrdb/Client'
 import {
@@ -486,6 +490,21 @@ export class GmodDebugSession extends DebugSession {
     response: DebugProtocol.Response,
     args: any
   ): void {
+    const entityRequest = this.resolveEntityRequest(command, args)
+    if (entityRequest) {
+      entityRequest
+        .then((result) => {
+          response.body = result as Record<string, unknown>
+          this.sendResponse(response)
+        })
+        .catch((err) => {
+          response.success = false
+          response.message = this.toResponseErrorMessage(err)
+          this.sendResponse(response)
+        })
+      return
+    }
+
     const controlCommand = this.resolveControlCommand(command, args)
     if (!controlCommand) {
       super.customRequest(command, response, args)
@@ -1259,6 +1278,115 @@ export class GmodDebugSession extends DebugSession {
       return command as GmodControlCommand
     }
     return undefined
+  }
+
+  private resolveEntityRequest(command: string, args: any): Promise<unknown> | undefined {
+    switch (command) {
+      case 'gmod.entity.getEntities':
+        return this.handleGetEntitiesRequest(args)
+      case 'gmod.entity.getEntity':
+        return this.handleGetEntityRequest(args)
+      case 'gmod.entity.setProperty':
+        return this.handleSetEntityPropertyRequest(args)
+      default:
+        return undefined
+    }
+  }
+
+  private async handleGetEntitiesRequest(args: any): Promise<GetEntitiesResult> {
+    const client = this.requireDebugClient()
+    const response = await client.getEntities(this.coerceGetEntitiesParams(args))
+    return response.result
+  }
+
+  private async handleGetEntityRequest(args: any): Promise<EntityDetail> {
+    const client = this.requireDebugClient()
+    const response = await client.getEntity({ index: this.coerceEntityIndex(args) })
+    return response.result
+  }
+
+  private async handleSetEntityPropertyRequest(
+    args: any
+  ): Promise<{ ok: boolean; index: number; property: string }> {
+    const client = this.requireDebugClient()
+    const response = await client.setEntityProperty(this.coerceEntityPropertyParams(args))
+    return response.result
+  }
+
+  private requireDebugClient(): LRDBClient.Client {
+    if (!this._debug_client) {
+      throw new Error('Debugger is not connected.')
+    }
+    return this._debug_client
+  }
+
+  private coerceGetEntitiesParams(args: any): GetEntitiesParams {
+    const raw = args && typeof args === 'object' ? args as Record<string, unknown> : {}
+
+    return {
+      offset: this.coerceNonNegativeInteger(raw.offset, 0),
+      limit: this.coerceNonNegativeInteger(raw.limit, 50),
+      filter_id: this.coerceNonNegativeInteger(raw.filter_id, 0),
+      filter_class: typeof raw.filter_class === 'string' ? raw.filter_class : '',
+    }
+  }
+
+  private coerceEntityIndex(args: any): number {
+    const raw = args && typeof args === 'object' ? args as Record<string, unknown> : {}
+    const index = typeof raw.index === 'number' && Number.isFinite(raw.index)
+      ? Math.floor(raw.index)
+      : -1
+    if (index < 0) {
+      throw new Error('Entity index must be a non-negative integer.')
+    }
+    return index
+  }
+
+  private coerceEntityPropertyParams(args: any): SetEntityPropertyParams {
+    const raw = args && typeof args === 'object' ? args as Record<string, unknown> : {}
+    const index = typeof raw.index === 'number' && Number.isFinite(raw.index)
+      ? Math.floor(raw.index)
+      : -1
+    if (index < 0) {
+      throw new Error('Entity index must be a non-negative integer.')
+    }
+
+    const property = typeof raw.property === 'string' ? raw.property.trim() : ''
+    if (property.length === 0) {
+      throw new Error('Entity property name is required.')
+    }
+
+    const value = raw.value
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return { index, property, value }
+    }
+
+    if (Array.isArray(value) && value.length === 3) {
+      const vector = value.map((entry) => Number(entry))
+      if (vector.every((entry) => Number.isFinite(entry))) {
+        return {
+          index,
+          property,
+          value: [vector[0], vector[1], vector[2]],
+        }
+      }
+    }
+
+    throw new Error('Entity property value must be a string, number, boolean, or [x, y, z] vector.')
+  }
+
+  private coerceNonNegativeInteger(value: unknown, fallback: number): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return fallback
+    }
+    return Math.max(0, Math.floor(value))
+  }
+
+  private toResponseErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message
+    }
+    return String(error)
   }
 
   private getControlService(initialRealm?: GmodRealm, sourceRoot?: string): GmodDebugControlService {
