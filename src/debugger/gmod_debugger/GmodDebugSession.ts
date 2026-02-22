@@ -200,7 +200,7 @@ export class GmodDebugSession extends DebugSession {
   // Lua
   private static THREAD_ID = 1
 
-  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-1'
+  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-2'
   private static EXPECTED_GM_RDB_MODULE_VERSION = '1.2.0'
   private static CONTROL_COMMANDS: ReadonlySet<GmodControlCommand> = new Set([
     'pauseSoft',
@@ -231,6 +231,9 @@ export class GmodDebugSession extends DebugSession {
   private _debuggee_module_version?: string
   private _controlService?: GmodDebugControlService
   private _sourceRoot?: string
+  private _initializedEventSent = false
+  private _configurationDoneReceived = false
+  private _serverInitCompleted = false
 
   /**
    * Creates a new debug adapter that is used for one debug session.
@@ -267,6 +270,9 @@ export class GmodDebugSession extends DebugSession {
 
     this._debuggee_protocol_version = undefined
     this._debuggee_module_version = undefined
+    this._initializedEventSent = false
+    this._configurationDoneReceived = false
+    this._serverInitCompleted = false
     this._stopOnError = false
     this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
@@ -360,7 +366,7 @@ export class GmodDebugSession extends DebugSession {
       this._debug_server_process = spawn(args.program, programArgs, {
         cwd: cwd,
         shell: true,
-        windowsHide: true,
+        windowsHide: false,
       })
 
       const port = args.port ? args.port : 21111
@@ -382,23 +388,51 @@ export class GmodDebugSession extends DebugSession {
       })
 
       this._debug_client.onOpen.on(() => {
+        this._serverInitCompleted = false
         const data = {
           protocol_version: GmodDebugSession.DEBUGGER_PROTOCOL_VERSION,
+          stop_on_error: this._stopOnError,
         }
         this._debug_client?.init(data)
-        this.sendEvent(new InitializedEvent())
+          .then(() => {
+            this._serverInitCompleted = true
+          })
+          .catch((error) => {
+            this.handleInitError(error)
+          })
+        if (!this._initializedEventSent) {
+          this._initializedEventSent = true
+          this.sendEvent(new InitializedEvent())
+        }
       })
 
       this._debug_client.onTransportError.on((err) => {
-        this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
+        this._serverInitCompleted = false
+        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}. Waiting for server to reconnect...\n`))
       })
 
-      this._debug_server_process.on('error', (msg: string) => {
-        this.sendEvent(new OutputEvent(msg, 'error'))
+      this._debug_server_process.stdout?.on('data', (chunk: Buffer | string) => {
+        const message = chunk.toString()
+        if (message.length > 0) {
+          this.sendEvent(new OutputEvent(message, 'stdout'))
+        }
       })
 
-      this._debug_server_process.on('close', (code: number) => {
-        this.sendEvent(new OutputEvent(`exit status: ${code}\n`))
+      this._debug_server_process.stderr?.on('data', (chunk: Buffer | string) => {
+        const message = chunk.toString()
+        if (message.length > 0) {
+          this.sendEvent(new OutputEvent(message, 'stderr'))
+        }
+      })
+
+      this._debug_server_process.on('error', (error: Error) => {
+        this.sendEvent(new OutputEvent(`${error.message}\n`, 'stderr'))
+      })
+
+      this._debug_server_process.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+        const status = signal ? `signal ${signal}` : `code ${code ?? 'unknown'}`
+        const category: 'stdout' | 'stderr' = code === 0 && !signal ? 'stdout' : 'stderr'
+        this.sendEvent(new OutputEvent(`SRCDS process exited (${status}).\n`, category))
         this.sendEvent(new TerminatedEvent())
       })
 
@@ -454,16 +488,28 @@ export class GmodDebugSession extends DebugSession {
       })
 
       this._debug_client.onOpen.on(() => {
+        this._serverInitCompleted = false
         this.sendEvent(new OutputEvent(`Debugger connected!\n`))
         const data = {
           protocol_version: GmodDebugSession.DEBUGGER_PROTOCOL_VERSION,
+          stop_on_error: this._stopOnError,
         }
         this._debug_client?.init(data)
-        this.sendEvent(new InitializedEvent())
+          .then(() => {
+            this._serverInitCompleted = true
+          })
+          .catch((error) => {
+            this.handleInitError(error)
+          })
+        if (!this._initializedEventSent) {
+          this._initializedEventSent = true
+          this.sendEvent(new InitializedEvent())
+        }
       })
 
       this._debug_client.onTransportError.on((err) => {
-        this.sendEvent(new OutputEvent(`Debugger communication error: ${err.message}\n`))
+        this._serverInitCompleted = false
+        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}. Waiting for server to reconnect...\n`))
       })
 
       this.sendResponse(response)
@@ -482,6 +528,7 @@ export class GmodDebugSession extends DebugSession {
   protected configurationDoneRequest(
     response: DebugProtocol.ConfigurationDoneResponse
   ): void {
+    this._configurationDoneReceived = true
     this.sendResponse(response)
   }
 
@@ -1066,6 +1113,9 @@ export class GmodDebugSession extends DebugSession {
         delete this._debug_client
       }
 
+      this._serverInitCompleted = false
+      this._configurationDoneReceived = false
+
       this.sendResponse(response)
     } catch(e) {
       response.success = false
@@ -1105,14 +1155,107 @@ export class GmodDebugSession extends DebugSession {
         return
       }
 
-      if (args.context === 'repl' && args.expression.startsWith('con ')) {
-        this._debug_client.command(args.expression.substr(4) + '\n')
-        response.success = true
-        this.sendResponse(response)
+      const expression = args.expression.trim()
+
+      if (args.context === 'repl') {
+        const explicitLuaPrefix = /^(lua|eval)\s+/i
+        let command = expression
+        let luaExpression: string | undefined
+
+        if (expression.startsWith('=')) {
+          luaExpression = expression.slice(1).trim()
+        } else if (explicitLuaPrefix.test(expression)) {
+          luaExpression = expression.replace(explicitLuaPrefix, '').trim()
+        } else if (/^con\s+/i.test(expression)) {
+          command = expression.replace(/^con\s+/i, '').trim()
+        }
+
+        if (luaExpression != null) {
+          if (luaExpression.length === 0) {
+            response.success = false
+            response.message = 'Lua expression is empty.'
+            this.sendResponse(response)
+            return
+          }
+
+          const requestParam: EvalRequest['params'] = {
+            stack_no: args.frameId as number,
+            chunk: luaExpression,
+            depth: 0,
+          }
+          this._debug_client.eval(requestParam).then((res) => {
+            if (res.result instanceof Array) {
+              let ret = ''
+              if (this._debuggee_protocol_version === '2') {
+                  ret = res.result.map((v) => stringify_v2(v)).join('\t')
+              } else {
+                  ret = res.result.map((v) => stringify_v3(v)).join('\t')
+              }
+              let varRef = 0
+              if (res.result.length == 1) {
+                const refobj = res.result[0]
+                const typename = typeof refobj
+                if (refobj && typename == 'object') {
+                  varRef = this._variableHandles.create({
+                    type: 'eval',
+                    params: requestParam,
+                  })
+                }
+              }
+
+              response.body = {
+                result: ret,
+                variablesReference: varRef,
+              }
+            } else {
+              response.body = {
+                result: '',
+                variablesReference: 0,
+              }
+
+              response.success = false
+            }
+
+            this.sendResponse(response)
+          })
+          return
+        }
+
+        if (command.length === 0) {
+          response.success = false
+          response.message = 'Console command is empty.'
+          this.sendResponse(response)
+          return
+        }
+
+        const commandReadinessError = this.getConsoleCommandReadinessError()
+        if (commandReadinessError) {
+          response.success = false
+          response.message = commandReadinessError
+          this.sendEvent(new OutputEvent(`${commandReadinessError}\n`, 'console'))
+          this.sendResponse(response)
+          return
+        }
+
+        this.sendConsoleCommand(command)
+          .then(() => {
+            response.body = {
+              result: `command: ${command}`,
+              variablesReference: 0,
+            }
+            response.success = true
+            this.sendResponse(response)
+          })
+          .catch((error) => {
+            response.success = false
+            response.message = error instanceof Error ? error.message : String(error)
+            this.sendEvent(new OutputEvent(`Console command failed: ${response.message}\n`, 'stderr'))
+            this.sendResponse(response)
+          })
         return
       }
 
-      const chunk = args.expression
+      const chunk = expression
       const requestParam: EvalRequest['params'] = {
         stack_no: args.frameId as number,
         chunk: chunk,
@@ -1193,6 +1336,10 @@ export class GmodDebugSession extends DebugSession {
         case 'connected':
           this._debuggee_protocol_version = event.params.protocol_version
           this._debuggee_module_version = event.params.module_version
+          this.sendEvent(new DebugEvent('gmod.connected', {
+            protocolVersion: this._debuggee_protocol_version,
+            moduleVersion: this._debuggee_module_version,
+          }))
           this.sendEvent(
             new OutputEvent(
               `Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
@@ -1235,6 +1382,8 @@ export class GmodDebugSession extends DebugSession {
             : `error:${message}`
           const source = event.params.source === 'console' ? 'console' : 'lua'
           const count = Number.isFinite(event.params.count) ? Math.max(1, Math.floor(event.params.count)) : 1
+          const rawMessage = typeof event.params.raw_message === 'string' ? event.params.raw_message : ''
+          const stackTrace = this.parseGmodErrorStackTrace(rawMessage)
 
           this.sendEvent(new OutputEvent(`[${source} error ${count}x] ${message}\n`, 'stderr'))
           this.sendEvent(new DebugEvent('gmod.error', {
@@ -1242,6 +1391,7 @@ export class GmodDebugSession extends DebugSession {
             fingerprint,
             count,
             source,
+            stackTrace,
           }))
 
           if (this._stopOnError) {
@@ -1389,6 +1539,93 @@ export class GmodDebugSession extends DebugSession {
     return String(error)
   }
 
+  private handleInitError(error: unknown): void {
+    const serverProtocolVersion = this.extractServerProtocolVersion(error)
+    if (serverProtocolVersion) {
+      this.sendEvent(
+        new OutputEvent(
+          `Debugger protocol mismatch: client=${GmodDebugSession.DEBUGGER_PROTOCOL_VERSION}, server=${serverProtocolVersion}. Update gm_rdb or the VS Code extension so versions match.\n`,
+          'stderr'
+        )
+      )
+      return
+    }
+
+    const message = error instanceof Error ? error.message : String(error)
+    this.sendEvent(new OutputEvent(`Debugger init failed: ${message}\n`, 'stderr'))
+  }
+
+  private extractServerProtocolVersion(error: unknown): string | undefined {
+    const candidates: unknown[] = []
+
+    if (error && typeof error === 'object') {
+      candidates.push(error)
+      if ('data' in error) {
+        candidates.push((error as Record<string, unknown>).data)
+      }
+    }
+
+    const errorMessage = (() => {
+      if (typeof error === 'string') {
+        return error
+      }
+      if (error instanceof Error) {
+        return error.message
+      }
+      return undefined
+    })()
+
+    if (typeof errorMessage === 'string') {
+      const trimmed = errorMessage.trim()
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed)
+          candidates.push(parsed)
+          if (parsed && typeof parsed === 'object' && 'data' in parsed) {
+            candidates.push((parsed as Record<string, unknown>).data)
+          }
+        } catch (_error) {
+          // Ignore non-JSON errors and fall through to generic init failure output.
+        }
+      }
+    }
+
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue
+      }
+      const version = (candidate as Record<string, unknown>).server_protocol_version
+      if (typeof version === 'string' && version.trim().length > 0) {
+        return version.trim()
+      }
+    }
+
+    return undefined
+  }
+
+  private parseGmodErrorStackTrace(rawMessage: string): string[] {
+    if (rawMessage.trim().length === 0) {
+      return []
+    }
+
+    const frames: string[] = []
+    const lines = rawMessage.split(/\r?\n/)
+    for (const rawLine of lines) {
+      const line = rawLine.trim()
+      if (line.length === 0) {
+        continue
+      }
+      if (line === '[ERROR]' || /^stack traceback:\s*$/i.test(line)) {
+        continue
+      }
+      if (/^\d+\.\s+/.test(line)) {
+        frames.push(line)
+      }
+    }
+
+    return frames
+  }
+
   private getControlService(initialRealm?: GmodRealm, sourceRoot?: string): GmodDebugControlService {
     const realm = initialRealm != null ? normalizeGmodRealm(initialRealm) : undefined
     if (!this._controlService) {
@@ -1413,10 +1650,7 @@ export class GmodDebugSession extends DebugSession {
             return this._debug_client.continue()
           },
           runCommand: (command: string) => {
-            if (!this._debug_client) {
-              throw new Error('Debugger is not connected.')
-            }
-            return this._debug_client.command(command)
+            return this.sendConsoleCommand(command)
           },
         },
         realm ?? 'server',
@@ -1446,6 +1680,35 @@ export class GmodDebugSession extends DebugSession {
         )
       )
     }
+  }
+
+  private getConsoleCommandReadinessError(): string | undefined {
+    if (!this._debug_client) {
+      return 'Debugger is not connected.'
+    }
+
+    if (!this._configurationDoneReceived) {
+      return 'Debugger setup is not complete yet. Try again in a moment.'
+    }
+
+    if (!this._serverInitCompleted) {
+      return 'Server not ready yet - command will be available after startup.'
+    }
+
+    return undefined
+  }
+
+  private sendConsoleCommand(command: string): Promise<void> {
+    const commandReadinessError = this.getConsoleCommandReadinessError()
+    if (commandReadinessError) {
+      return Promise.reject(new Error(commandReadinessError))
+    }
+
+    if (!this._debug_client) {
+      return Promise.reject(new Error('Debugger is not connected.'))
+    }
+
+    return this._debug_client.command(command).then(() => undefined)
   }
 
   protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {

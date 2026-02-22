@@ -40,6 +40,7 @@ export interface DebugClientAdapter {
 }
 
 export class Client {
+  private static readonly REQUEST_TIMEOUT_MS = 8000
   private seqId = 0
   private currentStatus_?: RunningStatus
   constructor(private adapter: DebugClientAdapter) {
@@ -59,32 +60,59 @@ export class Client {
     return this.currentStatus_
   }
   send<T extends DebugRequest>(request: T): Promise<DebugResponseType<T>> {
-    const { onMessage, onError } = this.adapter
+    const { onMessage, onError, onClose } = this.adapter
     return new Promise<DebugResponseType<T>>((resolve, reject) => {
+      let settled = false
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(
+          Error(
+            `Request timed out (${Client.REQUEST_TIMEOUT_MS}ms): ${request.method}`
+          )
+        )
+      }, Client.REQUEST_TIMEOUT_MS)
+
+      const cleanup = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(timeout)
+        onMessage.off(onReceiveMessage)
+        onError.off(onReceiveError)
+        onClose.off(onReceiveClose)
+      }
+
       const onReceiveMessage = (msg: JsonRpcMessage) => {
         if (isJsonRpcResponse(msg)) {
           if (request.id === msg.id) {
+            cleanup()
             if (msg.error) {
               reject(Error(JSON.stringify(msg.error)))
             } else {
               resolve(msg as DebugResponseType<T>)
             }
-            onMessage.off(onReceiveMessage)
-            onError.off(onReceiveError)
           }
         }
       }
+
       const onReceiveError = (err: Error) => {
+        cleanup()
         reject(err)
-        onMessage.off(onReceiveMessage)
-        onError.off(onReceiveError)
       }
 
+      const onReceiveClose = () => {
+        cleanup()
+        reject(Error(`Connection closed while waiting for response: ${request.method}`))
+      }
+
+      onMessage.on(onReceiveMessage)
+      onError.on(onReceiveError)
+      onClose.on(onReceiveClose)
+
       const ret = this.adapter.send(request)
-      if (ret) {
-        onMessage.on(onReceiveMessage)
-        onError.on(onReceiveError)
-      } else {
+      if (!ret) {
+        cleanup()
         reject(Error('Send error'))
       }
     })
@@ -290,6 +318,7 @@ export interface GmodErrorNotify extends JsonRpcNotify {
     fingerprint: string
     count: number
     source: 'lua' | 'console'
+    raw_message?: string
   }
 }
 
@@ -297,6 +326,7 @@ export interface InitRequest extends JsonRpcRequest {
   method: 'init'
   params: {
     protocol_version: string
+    stop_on_error?: boolean
   }
 }
 interface StepRequest extends JsonRpcRequest {
