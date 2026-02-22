@@ -597,9 +597,9 @@
 
     <div class="content">
         <div class="header">
-            <h1 style="margin: 0 0 10px 0; font-size: 1.5em; font-weight: normal;">GLua Settings</h1>
-            <div style="margin: 0 0 12px 0;">
-                <button class="reload-server-btn" onclick="reloadServer()">↺ Reload Language Server</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h1 style="margin: 0; font-size: 1.5em; font-weight: normal;">GLua Settings</h1>
+                <button id="reloadServerBtn" class="reload-server-btn" title="Restart the language server to apply changes">↺ Restart Server</button>
             </div>
             <div class="search-wrapper">
                 <input type="text" id="searchInput" class="search-input" placeholder="Search settings...">
@@ -785,6 +785,8 @@
                     break;
             }
         });
+
+        document.getElementById('reloadServerBtn').addEventListener('click', reloadServer);
 
         function showToast() {
             const toast = document.getElementById('toast');
@@ -1812,6 +1814,119 @@
                 return details;
             }
 
+            // 6.5 Object (Map / additionalProperties)
+            if (type === 'object' && field.additionalProperties) {
+                const container = document.createElement('div');
+                container.className = 'path-list-container'; // Reuse styling
+
+                const table = document.createElement('div');
+                table.className = 'path-table';
+                container.appendChild(table);
+
+                const addRow = document.createElement('div');
+                addRow.className = 'path-add-row';
+
+                const keyInput = document.createElement('input');
+                keyInput.type = 'text';
+                keyInput.placeholder = 'Key...';
+                addRow.appendChild(keyInput);
+
+                let valInput;
+                if (field.additionalProperties.enumValues) {
+                    valInput = document.createElement('select');
+                    field.additionalProperties.enumValues.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v;
+                        opt.textContent = v;
+                        valInput.appendChild(opt);
+                    });
+                } else {
+                    valInput = document.createElement('input');
+                    valInput.type = 'text';
+                    valInput.placeholder = 'Value...';
+                }
+                addRow.appendChild(valInput);
+
+                const addBtn = document.createElement('button');
+                addBtn.className = 'add-btn';
+                addBtn.textContent = '+ Add';
+                addRow.appendChild(addBtn);
+
+                container.appendChild(addRow);
+
+                let currentObj = value && typeof value === 'object' ? { ...value } : {};
+
+                const save = () => onChange(currentObj);
+
+                const renderRows = () => {
+                    table.innerHTML = '';
+                    const keys = Object.keys(currentObj);
+
+                    if (keys.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.className = 'path-empty';
+                        empty.textContent = 'No entries added';
+                        table.appendChild(empty);
+                        return;
+                    }
+
+                    keys.forEach((k) => {
+                        const row = document.createElement('div');
+                        row.className = 'path-row';
+                        row.style.gridTemplateColumns = '1fr 1fr auto';
+
+                        const keyCell = document.createElement('div');
+                        keyCell.className = 'path-cell';
+                        keyCell.textContent = k;
+                        row.appendChild(keyCell);
+
+                        const valCell = document.createElement('div');
+                        valCell.className = 'path-cell';
+                        valCell.textContent = String(currentObj[k]);
+                        row.appendChild(valCell);
+
+                        const removeBtn = document.createElement('button');
+                        removeBtn.className = 'remove-btn';
+                        removeBtn.textContent = '×';
+                        removeBtn.type = 'button';
+                        removeBtn.onclick = () => {
+                            delete currentObj[k];
+                            save();
+                            renderRows();
+                        };
+
+                        row.appendChild(removeBtn);
+                        table.appendChild(row);
+                    });
+                };
+
+                const addEntry = () => {
+                    const k = keyInput.value.trim();
+                    const v = valInput.value;
+                    if (!k || v === undefined || v === '') {
+                        return;
+                    }
+
+                    currentObj[k] = v;
+                    save();
+                    renderRows();
+                    keyInput.value = '';
+                    if (valInput.tagName === 'INPUT') valInput.value = '';
+                    keyInput.focus();
+                };
+
+                addBtn.onclick = addEntry;
+                keyInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        addEntry();
+                    }
+                });
+
+                renderRows();
+                return container;
+            }
+
             // 7. Array of Objects (Complex)
             if (type === 'array' && items && items.type === 'object') {
                 const container = document.createElement('div');
@@ -1822,6 +1937,7 @@
                 const renderList = () => {
                     list.innerHTML = '';
                     currentArr.forEach((item, idx) => {
+                        const itemObj = typeof item === 'string' ? { path: item } : item;
                         const row = document.createElement('div');
                         row.className = 'object-list-item';
 
@@ -1855,13 +1971,13 @@
                                  subRow.appendChild(lbl);
 
                                  const subOnChange = (newVal) => {
-                                     const newItem = { ...item };
+                                     const newItem = { ...itemObj };
                                      newItem[subField.key] = newVal;
                                      currentArr[idx] = newItem;
                                      onChange(currentArr);
                                  };
 
-                                 subRow.appendChild(generateInput(subField, item[subField.key], subOnChange));
+                                 subRow.appendChild(generateInput(subField, itemObj[subField.key], subOnChange));
                                  row.appendChild(subRow);
                              });
                         }

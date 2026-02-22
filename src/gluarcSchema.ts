@@ -9,6 +9,7 @@ export interface FieldDescriptor {
     default?: unknown;
     enumValues?: string[];
     properties?: FieldDescriptor[];
+    additionalProperties?: FieldDescriptor;
     items?: FieldDescriptor;
     nullable: boolean;
 }
@@ -313,6 +314,18 @@ function buildFieldDescriptorInternal(
             descriptor.type = 'object';
         } else if (unwrapped.schemaDef['items'] !== undefined) {
             descriptor.type = 'array';
+        } else if (unwrapped.schemaDef['anyOf']) {
+            // Special case for EmmyLibraryItem which is an anyOf string | object
+            const anyOf = asSchemaArray(unwrapped.schemaDef['anyOf']);
+            const objectVariant = anyOf.find(v => {
+                const resolved = resolveSchemaRefs(v, rootObject, new Set(seenRefs));
+                return resolved['type'] === 'object' || resolved['properties'];
+            });
+            if (objectVariant) {
+                descriptor.type = 'object';
+                const resolvedObj = resolveSchemaRefs(objectVariant, rootObject, new Set(seenRefs));
+                unwrapped.schemaDef['properties'] = resolvedObj['properties'];
+            }
         }
     }
 
@@ -328,6 +341,17 @@ function buildFieldDescriptorInternal(
                     new Set(seenRefs),
                 );
             });
+        }
+
+        const additionalProperties = unwrapped.schemaDef['additionalProperties'];
+        if (additionalProperties && typeof additionalProperties === 'object') {
+            descriptor.additionalProperties = buildFieldDescriptorInternal(
+                'value',
+                [...path, '*'],
+                asObject(additionalProperties) ?? {},
+                rootObject,
+                new Set(seenRefs),
+            );
         }
     }
 
