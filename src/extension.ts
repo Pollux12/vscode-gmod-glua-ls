@@ -20,7 +20,7 @@ import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
-import { GmodRealmProvider, registerGmodRealmView } from './gmodRealmView';
+import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
     GmodErrorNotificationParams,
     GmodErrorStore,
@@ -61,7 +61,7 @@ let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodRdbUpdater: GmodRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
-let gmodRealmProvider: GmodRealmProvider | undefined;
+let gmodRealmProvider: GmodRealmStatusBar | undefined;
 let gmodErrorStore: GmodErrorStore | undefined;
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
@@ -778,6 +778,10 @@ async function setGmodRealm(realm?: string): Promise<void> {
         return;
     }
     const selectedRealm = normalizeGmodRealm(pickedRealm);
+    const currentRealm = getPersistedGmodRealm();
+    if (selectedRealm === currentRealm) {
+        return;
+    }
     const session = getActiveGmodDebugSession();
     const folder = getGmodRealmWorkspaceFolder(session);
     const target = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 1
@@ -806,7 +810,6 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
     }
     gmodErrorStore?.clear();
     gmodEntityExplorerProvider?.clear();
-    void gmodEntityExplorerProvider?.loadEntities();
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
     gmodRealmProvider?.refresh();
 }
@@ -855,6 +858,11 @@ function initializeGmodEntityExplorerView(context: vscode.ExtensionContext): voi
         treeDataProvider: gmodEntityExplorerProvider,
         showCollapseAll: true,
     });
+
+    gmodEntityExplorerProvider.setViewVisible(treeView.visible);
+    context.subscriptions.push(treeView.onDidChangeVisibility((event) => {
+        gmodEntityExplorerProvider?.setViewVisible(event.visible);
+    }));
 
     context.subscriptions.push(gmodEntityExplorerProvider, treeView);
 }
@@ -1370,8 +1378,14 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.output' && event.body && typeof event.body === 'object') {
-        recordGmodToolDebugOutput(event.body as Record<string, unknown>);
-        gmodMcpHost?.recordDebugOutput(event.body as Record<string, unknown>);
+        const outputBody = event.body as Record<string, unknown>;
+        recordGmodToolDebugOutput(outputBody);
+        gmodMcpHost?.recordDebugOutput(outputBody);
+        return;
+    }
+
+    if (event.event === 'gmod.connected') {
+        void gmodEntityExplorerProvider?.loadEntities();
         return;
     }
 
@@ -1433,12 +1447,17 @@ function coerceGmodErrorNotificationParams(body: unknown): GmodErrorNotification
     const count = typeof raw.count === 'number' && Number.isFinite(raw.count)
         ? Math.max(1, Math.floor(raw.count))
         : 1;
+    const stackTrace = Array.isArray(raw.stackTrace)
+        ? (raw.stackTrace as unknown[]).filter((s): s is string => typeof s === 'string')
+        : undefined;
 
     return {
         message,
         fingerprint,
         count,
         source,
+        stackTrace,
     };
 }
+
 

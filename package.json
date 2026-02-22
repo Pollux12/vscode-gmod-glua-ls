@@ -14,15 +14,7 @@
     ],
     "activationEvents": [
         "onDebug",
-        "onLanguage:lua",
-        "onView:gluals.gmodExplorer",
-        "onView:gluals.gmodRealmSelector",
-        "onView:gmodEntityExplorer",
-        "onCommand:gluals.gmod.openSettings",
-        "onCommand:gluals.gmod.createSettings",
-        "onCommand:gluals.gmod.editSettings",
-        "onCommand:gluals.gmod.onboarding.start",
-        "onCommand:gluals.gmod.diagnostics.repair"
+        "onLanguage:lua"
     ],
     "keywords": [
         "lua",
@@ -123,6 +115,11 @@
                 "command": "gluals.gmod.runCommand",
                 "title": "GMod Debug: Run Command",
                 "category": "GLuaLS"
+            },
+            {
+                "command": "gluals.gmod.showRealmMenu",
+                "title": "GLuaLS: Select GMod Execution Realm",
+                "category": "GLua"
             },
             {
                 "command": "gluals.gmod.setRealm",
@@ -794,12 +791,6 @@
         "views": {
             "debug": [
                 {
-                    "id": "gluals.gmodRealmSelector",
-                    "name": "GMod Debugger",
-                    "when": "workspaceFolderCount > 0",
-                    "icon": "$(broadcast)"
-                },
-                {
                     "id": "gmodErrors",
                     "name": "%view.gmodErrors.title%",
                     "when": "workspaceFolderCount > 0",
@@ -825,7 +816,7 @@
             "view/title": [
                 {
                     "command": "gluals.gmod.configureDebugger",
-                    "when": "view == gluals.gmodRealmSelector",
+                    "when": "view == gmodErrors",
                     "group": "navigation@1"
                 },
                 {

@@ -7,6 +7,7 @@ export interface GmodErrorNotificationParams {
     fingerprint: string;
     count: number;
     source: GmodErrorSource;
+    stackTrace?: string[];
 }
 
 export interface GmodError {
@@ -14,6 +15,7 @@ export interface GmodError {
     fingerprint: string;
     count: number;
     source: GmodErrorSource;
+    stackTrace?: string[];
     firstSeen: Date;
     lastSeen: Date;
 }
@@ -42,6 +44,7 @@ export class GmodErrorStore implements vscode.Disposable {
             fingerprint: params.fingerprint,
             count: safeCount,
             source: params.source,
+            stackTrace: params.stackTrace ?? [],
             firstSeen: now,
             lastSeen: now,
         });
@@ -67,7 +70,12 @@ export class GmodErrorStore implements vscode.Disposable {
 
 export class GmodErrorTreeItem extends vscode.TreeItem {
     constructor(public readonly error: GmodError) {
-        super(`[${error.count}x] ${error.message}`, vscode.TreeItemCollapsibleState.None);
+        super(
+            `[${error.count}x] ${error.message}`,
+            error.stackTrace && error.stackTrace.length > 0
+                ? vscode.TreeItemCollapsibleState.Collapsed
+                : vscode.TreeItemCollapsibleState.None
+        );
         this.description = error.source;
         this.contextValue = 'gmodError';
         this.iconPath = new vscode.ThemeIcon('warning');
@@ -81,8 +89,17 @@ export class GmodErrorTreeItem extends vscode.TreeItem {
     }
 }
 
-export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorTreeItem>, vscode.Disposable {
-    private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodErrorTreeItem | undefined | void>();
+export class GmodErrorFrameItem extends vscode.TreeItem {
+    constructor(public readonly frame: string) {
+        super(frame, vscode.TreeItemCollapsibleState.None);
+        this.contextValue = 'gmodErrorFrame';
+        this.iconPath = new vscode.ThemeIcon('list-tree');
+        this.tooltip = frame;
+    }
+}
+
+export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorTreeItem | GmodErrorFrameItem>, vscode.Disposable {
+    private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodErrorTreeItem | GmodErrorFrameItem | undefined | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
     private readonly storeSubscription: vscode.Disposable;
 
@@ -90,12 +107,23 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
         this.storeSubscription = this.store.onDidChange(() => this.refresh());
     }
 
-    getTreeItem(element: GmodErrorTreeItem): vscode.TreeItem {
+    getTreeItem(element: GmodErrorTreeItem | GmodErrorFrameItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(_element?: GmodErrorTreeItem): GmodErrorTreeItem[] {
-        return this.store.getAll().map((error) => new GmodErrorTreeItem(error));
+    getChildren(element?: GmodErrorTreeItem | GmodErrorFrameItem): Array<GmodErrorTreeItem | GmodErrorFrameItem> {
+        if (!element) {
+            return this.store.getAll().map((error) => new GmodErrorTreeItem(error));
+        }
+
+        if (element instanceof GmodErrorTreeItem) {
+            const stackTrace = element.error.stackTrace ?? [];
+            if (stackTrace.length > 0) {
+                return stackTrace.map((frame) => new GmodErrorFrameItem(frame));
+            }
+        }
+
+        return [];
     }
 
     refresh(): void {
@@ -115,7 +143,7 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
 export function registerGmodErrorView(context: vscode.ExtensionContext): {
     store: GmodErrorStore;
     provider: GmodErrorViewProvider;
-    treeView: vscode.TreeView<GmodErrorTreeItem>;
+    treeView: vscode.TreeView<GmodErrorTreeItem | GmodErrorFrameItem>;
 } {
     const store = new GmodErrorStore();
     const provider = new GmodErrorViewProvider(store);

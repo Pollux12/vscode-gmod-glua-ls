@@ -10,6 +10,10 @@ import {
 
 const ENTITY_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
+const ENTITY_POLL_INTERVAL_MS = 1500;
+const ENTITY_POLL_MAX_INTERVAL_MS = 30000;
+const ENTITY_POLL_FAILURE_THRESHOLD = 4;
+const ENTITY_DETAIL_MAX_CONCURRENCY = 3;
 
 type EntityTreeItemData =
     | {
@@ -30,6 +34,10 @@ type EntityTreeItemData =
         kind: 'info';
         message: string;
         severity: 'info' | 'warning' | 'error';
+        command?: {
+            id: string;
+            title: string;
+        };
     };
 
 export class EntityTreeItem extends vscode.TreeItem {
@@ -53,13 +61,23 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     private readonly loadingDetails = new Set<number>();
     private lastError: string | undefined;
     private searchDebounce: NodeJS.Timeout | undefined;
+    private pollTimeout: NodeJS.Timeout | undefined;
+    private viewVisible = true;
+    private pollingInProgress = false;
+    private consecutiveFailures = 0;
+    private pollingHalted = false;
+    private inFlightEntityDetailRequests = 0;
+    private readonly entityDetailRequestQueue: Array<() => void> = [];
 
-    constructor(private readonly getActiveSession: () => vscode.DebugSession | undefined) {}
+    constructor(private readonly getActiveSession: () => vscode.DebugSession | undefined) {
+        this.startPolling();
+    }
 
     getTreeItem(element: EntityTreeItem): vscode.TreeItem {
         switch (element.data.kind) {
             case 'entity': {
                 const { entity } = element.data;
+                element.id = `entity:${entity.index}`;
                 element.label = `[${entity.index}] ${entity.class}`;
                 element.description = this.shortenModelPath(entity.model);
                 element.tooltip = [
@@ -76,6 +94,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             }
             case 'property': {
                 const { property, value, editable } = element.data;
+                element.id = `entity:${element.data.entityIndex}:property:${property}`;
                 element.label = `${property}: ${this.formatValue(value)}`;
                 element.tooltip = `${property}: ${this.formatValue(value)}`;
                 element.iconPath = editable
@@ -94,6 +113,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 return element;
             }
             case 'loadMore':
+                element.id = 'entities:loadMore';
                 element.label = 'Load more...';
                 element.iconPath = new vscode.ThemeIcon('ellipsis');
                 element.contextValue = 'gmodEntityLoadMore';
@@ -103,6 +123,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 };
                 return element;
             case 'info':
+                element.id = `entities:info:${element.data.severity}:${element.data.message}`;
                 element.label = element.data.message;
                 element.contextValue = 'gmodEntityInfo';
                 element.iconPath = new vscode.ThemeIcon(
@@ -112,6 +133,12 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                             ? 'warning'
                             : 'info'
                 );
+                if (element.data.command) {
+                    element.command = {
+                        command: element.data.command.id,
+                        title: element.data.command.title,
+                    };
+                }
                 return element;
         }
     }
@@ -135,16 +162,19 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
 
         this.searchDebounce = setTimeout(() => {
+            this.resumePollingAfterRetry();
             void this.loadEntities();
         }, SEARCH_DEBOUNCE_MS);
     }
 
     async loadEntities(): Promise<void> {
-        await this.loadEntityPage(true);
+        this.resumePollingAfterRetry();
+        await this.loadEntityPage(true, false);
     }
 
     async loadMore(): Promise<void> {
-        await this.loadEntityPage(false);
+        this.resumePollingAfterRetry();
+        await this.loadEntityPage(false, false);
     }
 
     async editProperty(entityIndex: number, property: string, currentValue: unknown): Promise<void> {
@@ -180,17 +210,41 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     }
 
     clear(): void {
+        this.stopPolling();
+        this.resetPollingFailures();
+
+        const previousState = this.getRootStateKey();
         this.entities = [];
         this.entityDetails.clear();
         this.entityDetailErrors.clear();
         this.totalCount = 0;
         this.hasLoadedOnce = false;
         this.lastError = undefined;
-        this.onDidChangeTreeDataEmitter.fire();
+        if (previousState !== this.getRootStateKey()) {
+            this.onDidChangeTreeDataEmitter.fire();
+        }
+
+        if (this.viewVisible && this.requireActiveSession()) {
+            this.startPolling();
+        }
     }
 
     refresh(): void {
-        this.onDidChangeTreeDataEmitter.fire();
+        this.resumePollingAfterRetry();
+        void this.loadEntities();
+    }
+
+    setViewVisible(visible: boolean): void {
+        this.viewVisible = visible;
+        if (!visible) {
+            this.stopPolling();
+            return;
+        }
+
+        if (this.requireActiveSession()) {
+            this.startPolling();
+            void this.loadEntities();
+        }
     }
 
     dispose(): void {
@@ -198,11 +252,114 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             clearTimeout(this.searchDebounce);
             this.searchDebounce = undefined;
         }
+        this.stopPolling();
         this.onDidChangeTreeDataEmitter.dispose();
+    }
+
+    private startPolling(): void {
+        if (this.pollingHalted || this.pollTimeout || this.pollingInProgress) {
+            return;
+        }
+
+        if (!this.viewVisible || !this.requireActiveSession()) {
+            return;
+        }
+
+        this.scheduleNextPoll(ENTITY_POLL_INTERVAL_MS);
+    }
+
+    private stopPolling(): void {
+        if (this.searchDebounce) {
+            clearTimeout(this.searchDebounce);
+            this.searchDebounce = undefined;
+        }
+
+        if (!this.pollTimeout) {
+            return;
+        }
+
+        clearTimeout(this.pollTimeout);
+        this.pollTimeout = undefined;
+    }
+
+    private scheduleNextPoll(delayMs: number): void {
+        if (this.pollingHalted || this.pollTimeout || !this.viewVisible || !this.requireActiveSession()) {
+            return;
+        }
+
+        this.pollTimeout = setTimeout(() => {
+            this.pollTimeout = undefined;
+            void this.pollEntities();
+        }, delayMs);
+    }
+
+    private async pollEntities(): Promise<void> {
+        if (this.pollingInProgress) {
+            return;
+        }
+
+        if (!this.viewVisible || !this.requireActiveSession()) {
+            this.stopPolling();
+            this.resetPollingFailures();
+            return;
+        }
+
+        this.pollingInProgress = true;
+        let nextDelay = ENTITY_POLL_INTERVAL_MS;
+
+        try {
+            const loadResult = await this.loadEntityPage(true, true);
+            if (loadResult === 'failure') {
+                this.consecutiveFailures += 1;
+                if (this.consecutiveFailures >= ENTITY_POLL_FAILURE_THRESHOLD) {
+                    this.haltPollingAfterFailures();
+                    return;
+                }
+
+                // Apply exponential backoff on repeated refresh failures.
+                const backoffMultiplier = 2 ** (this.consecutiveFailures - 1);
+                nextDelay = Math.min(ENTITY_POLL_INTERVAL_MS * backoffMultiplier, ENTITY_POLL_MAX_INTERVAL_MS);
+            } else if (loadResult === 'success') {
+                this.resetPollingFailures();
+            }
+        } finally {
+            this.pollingInProgress = false;
+        }
+
+        if (!this.pollingHalted) {
+            this.scheduleNextPoll(nextDelay);
+        }
+    }
+
+    private haltPollingAfterFailures(): void {
+        this.pollingHalted = true;
+        this.stopPolling();
+        this.lastError = 'Connection lost - click to retry.';
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    private resetPollingFailures(): void {
+        this.consecutiveFailures = 0;
+        this.pollingHalted = false;
+    }
+
+    private resumePollingAfterRetry(): void {
+        if (!this.pollingHalted) {
+            return;
+        }
+
+        this.resetPollingFailures();
+        this.lastError = undefined;
+
+        if (this.viewVisible && this.requireActiveSession()) {
+            this.startPolling();
+        }
     }
 
     private async getRootItems(): Promise<EntityTreeItem[]> {
         if (!this.requireActiveSession()) {
+            this.stopPolling();
+            this.resetPollingFailures();
             return [
                 new EntityTreeItem({
                     kind: 'info',
@@ -211,6 +368,22 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 }),
             ];
         }
+
+        if (this.pollingHalted) {
+            return [
+                new EntityTreeItem({
+                    kind: 'info',
+                    message: 'Connection lost - click to retry.',
+                    severity: 'error',
+                    command: {
+                        id: 'gmodEntityExplorer.refresh',
+                        title: 'Retry Entity Polling',
+                    },
+                }),
+            ];
+        }
+
+        this.startPolling();
 
         if (!this.hasLoadedOnce && !this.loading && this.entities.length === 0 && !this.lastError) {
             await this.loadEntities();
@@ -266,21 +439,18 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     }
 
     private async getEntityDetailItems(entity: EntitySummary): Promise<EntityTreeItem[]> {
-        const existingError = this.entityDetailErrors.get(entity.index);
-        if (existingError) {
-            return [
-                new EntityTreeItem({
-                    kind: 'info',
-                    message: existingError,
-                    severity: 'error',
-                }),
-            ];
+        // Retry stale detail errors on next expand instead of permanently pinning
+        // the node in an error state after a transient backend failure.
+        if (this.entityDetailErrors.has(entity.index) && !this.loadingDetails.has(entity.index)) {
+            this.entityDetailErrors.delete(entity.index);
         }
 
         if (!this.entityDetails.has(entity.index) && !this.loadingDetails.has(entity.index)) {
             this.loadingDetails.add(entity.index);
             try {
-                const detail = await this.sendRequest<EntityDetail>('gmod.entity.getEntity', { index: entity.index });
+                const detail = await this.withEntityDetailRequestSlot(async () =>
+                    this.sendRequest<EntityDetail>('gmod.entity.getEntity', { index: entity.index })
+                );
                 this.entityDetails.set(entity.index, detail);
                 this.entityDetailErrors.delete(entity.index);
             } catch (error) {
@@ -361,69 +531,162 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         return items;
     }
 
-    private async loadEntityPage(reset: boolean): Promise<void> {
+    private async withEntityDetailRequestSlot<T>(request: () => Promise<T>): Promise<T> {
+        await this.acquireEntityDetailRequestSlot();
+        try {
+            return await request();
+        } finally {
+            this.releaseEntityDetailRequestSlot();
+        }
+    }
+
+    private async acquireEntityDetailRequestSlot(): Promise<void> {
+        if (this.inFlightEntityDetailRequests < ENTITY_DETAIL_MAX_CONCURRENCY) {
+            this.inFlightEntityDetailRequests += 1;
+            return;
+        }
+
+        await new Promise<void>((resolve) => {
+            this.entityDetailRequestQueue.push(resolve);
+        });
+        this.inFlightEntityDetailRequests += 1;
+    }
+
+    private releaseEntityDetailRequestSlot(): void {
+        this.inFlightEntityDetailRequests = Math.max(0, this.inFlightEntityDetailRequests - 1);
+        const next = this.entityDetailRequestQueue.shift();
+        if (next) {
+            next();
+        }
+    }
+
+    private async loadEntityPage(
+        reset: boolean,
+        backgroundRefresh: boolean,
+    ): Promise<'success' | 'failure' | 'skipped'> {
         const session = this.requireActiveSession();
         if (!session) {
             this.clear();
-            return;
+            return 'failure';
         }
 
         if (this.loading) {
-            return;
+            return 'skipped';
         }
+
+        const previousState = this.getRootStateKey();
+        const shouldShowInitialLoading =
+            !backgroundRefresh && reset && this.entities.length === 0 && !this.hasLoadedOnce;
 
         this.loading = true;
-        if (reset) {
-            this.entities = [];
-            this.entityDetails.clear();
-            this.entityDetailErrors.clear();
-            this.totalCount = 0;
-            this.lastError = undefined;
+        if (shouldShowInitialLoading) {
+            this.onDidChangeTreeDataEmitter.fire();
         }
-        this.onDidChangeTreeDataEmitter.fire();
 
         try {
-            const params = this.buildEntityQuery(reset ? 0 : this.entities.length);
+            const requestedLimit = reset
+                ? Math.max(ENTITY_PAGE_SIZE, this.entities.length || ENTITY_PAGE_SIZE)
+                : ENTITY_PAGE_SIZE;
+            const params = this.buildEntityQuery(reset ? 0 : this.entities.length, requestedLimit);
             const result = await this.sendRequest<GetEntitiesResult>('gmod.entity.getEntities', params);
             if (reset) {
-                this.entities = result.entities;
+                this.replaceEntities(result.entities, result.total);
             } else {
                 this.appendEntities(result.entities);
+                this.totalCount = result.total;
             }
-            this.totalCount = result.total;
             this.hasLoadedOnce = true;
             this.lastError = undefined;
+            return 'success';
         } catch (error) {
             this.lastError = this.humanizeLoadError(this.extractErrorMessage(error));
-            if (reset) {
-                this.entities = [];
-                this.totalCount = 0;
-            }
             this.hasLoadedOnce = true;
+            return 'failure';
         } finally {
             this.loading = false;
-            this.onDidChangeTreeDataEmitter.fire();
+            if (shouldShowInitialLoading || previousState !== this.getRootStateKey()) {
+                this.onDidChangeTreeDataEmitter.fire();
+            }
+        }
+    }
+
+    private replaceEntities(items: EntitySummary[], total: number): void {
+        this.entities = [...items];
+        this.totalCount = total;
+
+        const activeIndices = new Set(this.entities.map((entity) => entity.index));
+        for (const index of [...this.entityDetails.keys()]) {
+            if (!activeIndices.has(index)) {
+                this.entityDetails.delete(index);
+                this.entityDetailErrors.delete(index);
+                this.loadingDetails.delete(index);
+            }
+        }
+
+        for (const entity of this.entities) {
+            this.syncDetailFromSummary(entity);
         }
     }
 
     private appendEntities(items: EntitySummary[]): void {
-        const seen = new Set(this.entities.map((entity) => entity.index));
+        const indexByEntityId = new Map<number, number>();
+        this.entities.forEach((entity, index) => {
+            indexByEntityId.set(entity.index, index);
+        });
+
         for (const entity of items) {
-            if (!seen.has(entity.index)) {
+            const existingIndex = indexByEntityId.get(entity.index);
+            if (existingIndex === undefined) {
                 this.entities.push(entity);
-                seen.add(entity.index);
+                indexByEntityId.set(entity.index, this.entities.length - 1);
+            } else {
+                this.entities[existingIndex] = entity;
             }
+            this.syncDetailFromSummary(entity);
         }
     }
 
-    private buildEntityQuery(offset: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
+    private syncDetailFromSummary(entity: EntitySummary): void {
+        const detail = this.entityDetails.get(entity.index);
+        if (!detail) {
+            return;
+        }
+
+        detail.class = entity.class;
+        detail.model = entity.model;
+        detail.valid = entity.valid;
+        detail.pos = [...entity.pos] as Vec3;
+        detail.angles = [...entity.angles] as Vec3;
+    }
+
+    private getRootStateKey(): string {
+        return JSON.stringify({
+            entities: this.entities.map((entity) => [
+                entity.index,
+                entity.class,
+                entity.model,
+                entity.valid,
+                entity.pos[0],
+                entity.pos[1],
+                entity.pos[2],
+                entity.angles[0],
+                entity.angles[1],
+                entity.angles[2],
+            ]),
+            totalCount: this.totalCount,
+            lastError: this.lastError ?? '',
+            hasLoadedOnce: this.hasLoadedOnce,
+        });
+    }
+
+    private buildEntityQuery(offset: number, limit: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
         const trimmed = this.filterText.trim();
         const numericFilter = /^\d+$/.test(trimmed) ? Number(trimmed) : 0;
         const filterClass = numericFilter > 0 ? '' : trimmed;
 
         return {
             offset,
-            limit: ENTITY_PAGE_SIZE,
+            limit,
             filter_id: numericFilter,
             filter_class: filterClass,
         };
