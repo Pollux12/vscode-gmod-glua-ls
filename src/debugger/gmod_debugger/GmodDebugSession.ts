@@ -136,32 +136,7 @@ declare type DebuggerNotify =
   | OutputNotify
   | GmodErrorNotify
 
-function getStringifiableObject(value: any): any {
-  if (value == null) {
-    return 'nil'
-  } else if (value == undefined) {
-    return 'none'
-  } else if (typeof value === 'string') { // prevent putting quotes around the value
-    return value
-  } else if ((value instanceof Array)) {
-    const newArr: Array<any> = []
-    for (let i = 0; i < value.length; i++){
-      newArr.push(getStringifiableObject(value[i]))
-    }
-    return newArr
-  } else if (typeof value === 'object') {
-    const newObj: any = {}
-    const arrData = value['key']
-    for (let i = 0; i < arrData.length - 1; i += 2){
-      newObj[stringify_v3(arrData[i])] = getStringifiableObject(arrData[i + 1])
-    }
-    return newObj
-  } else {
-    return JSON.stringify(value)
-  }
-}
-
-// protocol_version 2
+// values are plain JSON (strings, numbers, booleans, objects)
 function stringify_v2(value: unknown): string {
   if (value == null) {
     return 'nil'
@@ -169,21 +144,6 @@ function stringify_v2(value: unknown): string {
     return 'none'
   } else if (typeof value === 'string') { // prevent putting quotes around the value
     return value
-  } else {
-    return JSON.stringify(value)
-  }
-}
-
-// protocol_version 3
-function stringify_v3(value: unknown): string {
-  if (value == null) {
-    return 'nil'
-  } else if (value == undefined) {
-    return 'none'
-  } else if (typeof value === 'string') { // prevent putting quotes around the value
-    return value
-  } else if (typeof value === 'object') {
-    return JSON.stringify(getStringifiableObject(value))
   } else {
     return JSON.stringify(value)
   }
@@ -231,7 +191,6 @@ export class GmodDebugSession extends DebugSession {
   private _debuggee_module_version?: string
   private _controlService?: GmodDebugControlService
   private _sourceRoot?: string
-  private _initializedEventSent = false
   private _configurationDoneReceived = false
   private _serverInitCompleted = false
 
@@ -270,7 +229,6 @@ export class GmodDebugSession extends DebugSession {
 
     this._debuggee_protocol_version = undefined
     this._debuggee_module_version = undefined
-    this._initializedEventSent = false
     this._configurationDoneReceived = false
     this._serverInitCompleted = false
     this._stopOnError = false
@@ -400,10 +358,7 @@ export class GmodDebugSession extends DebugSession {
           .catch((error) => {
             this.handleInitError(error)
           })
-        if (!this._initializedEventSent) {
-          this._initializedEventSent = true
-          this.sendEvent(new InitializedEvent())
-        }
+        this.sendEvent(new InitializedEvent())
       })
 
       this._debug_client.onTransportError.on((err) => {
@@ -501,10 +456,7 @@ export class GmodDebugSession extends DebugSession {
           .catch((error) => {
             this.handleInitError(error)
           })
-        if (!this._initializedEventSent) {
-          this._initializedEventSent = true
-          this.sendEvent(new InitializedEvent())
-        }
+        this.sendEvent(new InitializedEvent())
       })
 
       this._debug_client.onTransportError.on((err) => {
@@ -602,6 +554,9 @@ export class GmodDebugSession extends DebugSession {
       const debuggerFilePath = this.convertClientPathToDebugger(path)
 
       this._debug_client.clearBreakPoints({ file: debuggerFilePath })
+        .catch((err: Error) => {
+          this.sendEvent(new OutputEvent(`Warning: failed to clear breakpoints for '${debuggerFilePath}': ${err.message}\n`, 'stderr'))
+        })
 
       if (args.breakpoints) {
         // verify breakpoint locations
@@ -639,6 +594,9 @@ export class GmodDebugSession extends DebugSession {
               hit_condition: souceBreakpoint.hitCondition,
             }
             this._debug_client.addBreakPoint(sendbreakpoint)
+              .catch((err: Error) => {
+                this.sendEvent(new OutputEvent(`Failed to set breakpoint at '${debuggerFilePath}:${l}': ${err.message}\n`, 'stderr'))
+              })
           }
         }
       }
@@ -886,66 +844,30 @@ export class GmodDebugSession extends DebugSession {
 
       const variables: DebugProtocol.Variable[] = []
       if (variablesData instanceof Array) {
-        if (this._debuggee_protocol_version === '2') {
-          variablesData.forEach((v, i) => {
-            const typename = typeof v
-            const k = i + 1
-            const varRef =
-              typename === 'object' ? this._variableHandles.create(evalParam(k)) : 0
-            variables.push({
-              name: `${k}`,
-              type: typename,
-              value: stringify_v2(v),
-              variablesReference: varRef,
-            })
+        variablesData.forEach((v, i) => {
+          const typename = typeof v
+          const k = i + 1
+          const varRef =
+            typename === 'object' ? this._variableHandles.create(evalParam(k)) : 0
+          variables.push({
+            name: `${k}`,
+            type: typename,
+            value: stringify_v2(v),
+            variablesReference: varRef,
           })
-        } else {
-          variablesData.forEach((v, i) => {
-            const typename = typeof v
-            const k = i + 1
-            const varRef =
-              typename === 'object' ? this._variableHandles.create(evalParam(k)) : 0
-            variables.push({
-              name: `${k}`,
-              type: typename,
-              value: stringify_v3(v),
-              variablesReference: varRef,
-            })
+        })
+      } else if (typeof variablesData === 'object' && variablesData !== null) {
+        const varData = variablesData as Record<string, any>
+        for (const k in varData) {
+          const typename = typeof varData[k]
+          const varRef =
+            typename === 'object' ? this._variableHandles.create(evalParam(k)) : 0
+          variables.push({
+            name: k,
+            type: typename,
+            value: stringify_v2(varData[k]),
+            variablesReference: varRef,
           })
-        }
-      }
-      else if (typeof variablesData === 'object') {
-        if (this._debuggee_protocol_version === '2') {
-          const varData = variablesData as Record<string, any>
-          for (const k in varData) {
-            const typename = typeof varData[k]
-            const varRef =
-              typename === 'object' ? this._variableHandles.create(evalParam(k)) : 0
-            variables.push({
-              name: k,
-              type: typename,
-              value: stringify_v2(varData[k]),
-              variablesReference: varRef,
-            })
-          }
-        } else {
-          if (variablesData !== null && variablesData !== undefined && 'key' in variablesData) {
-            const arrData = (variablesData as {key: Array<object>}).key
-
-            for (let i = 0; i < arrData.length - 1; i += 2){
-              const key = arrData[i]
-              const val = arrData[i + 1]
-
-              const typename = typeof val
-              const varRef = typename === 'object' ? this._variableHandles.create(evalParam(key)) : 0
-              variables.push({
-                name: `${key}`,
-                type: typename,
-                value: stringify_v3(val),
-                variablesReference: varRef,
-              })
-            }
-          }
         }
       }
 
@@ -1186,11 +1108,7 @@ export class GmodDebugSession extends DebugSession {
           this._debug_client.eval(requestParam).then((res) => {
             if (res.result instanceof Array) {
               let ret = ''
-              if (this._debuggee_protocol_version === '2') {
-                  ret = res.result.map((v) => stringify_v2(v)).join('\t')
-              } else {
-                  ret = res.result.map((v) => stringify_v3(v)).join('\t')
-              }
+              ret = res.result.map((v) => stringify_v2(v)).join('\t')
               let varRef = 0
               if (res.result.length == 1) {
                 const refobj = res.result[0]
@@ -1264,11 +1182,7 @@ export class GmodDebugSession extends DebugSession {
       this._debug_client.eval(requestParam).then((res) => {
         if (res.result instanceof Array) {
           let ret = ''
-          if (this._debuggee_protocol_version === '2') {
-              ret = res.result.map((v) => stringify_v2(v)).join('\t')
-          } else {
-              ret = res.result.map((v) => stringify_v3(v)).join('\t')
-          }
+          ret = res.result.map((v) => stringify_v2(v)).join('\t')
           let varRef = 0
           if (res.result.length == 1) {
             const refobj = res.result[0]

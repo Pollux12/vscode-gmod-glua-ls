@@ -71,7 +71,7 @@
     "command.gmodEntityExplorer.search.title": "Search",
     "command.gmodEntityExplorer.editProperty.title": "Edit Property",
     "command.gmodEntityExplorer.loadMore.title": "Load More",
-    "view.gmodErrors.title": "GMod Errors",
+    "view.gmodErrors.title": "Errors",
     "view.gmodErrors.welcome": "No errors detected in this debug session.",
     "view.gmodEntityExplorer.title": "Entity Explorer",
     "view.gmodEntityExplorer.welcome": "Connect debugger to see entities.",

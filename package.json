@@ -806,7 +806,7 @@
             "explorer": [
                 {
                     "id": "gluals.gmodExplorer",
-                    "name": "GMod Toolkit",
+                    "name": "Class Explorer",
                     "when": "workspaceFolderCount > 0",
                     "icon": "$(symbol-misc)"
                 }
