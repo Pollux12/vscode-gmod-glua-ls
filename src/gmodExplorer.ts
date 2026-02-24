@@ -24,7 +24,7 @@ interface ItemData {
     rcType?: ResourceCategory;
     // resourceGroup
     groupKey?: string;
-    // file
+    // file and representative node URI
     uri?: vscode.Uri;
 }
 
@@ -74,7 +74,7 @@ async function fetchLsScriptedClasses(): Promise<LsScriptedClassEntry[]> {
     }
 }
 
-class GmodExplorerItem extends vscode.TreeItem {
+export class GmodExplorerItem extends vscode.TreeItem {
     constructor(public readonly data: ItemData) {
         super(data.label, data.collapsible);
         this.contextValue = data.type;
@@ -209,13 +209,14 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         if (d.type === 'scriptedClassType' && d.scType) {
             const cache = await this.getScriptedClassCache();
             const classMap = cache.get(d.scType) ?? new Map<string, vscode.Uri[]>();
-            const classItems = [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className]) =>
+            const classItems = [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) =>
                 new GmodExplorerItem({
                     type: 'scriptedClass',
                     label: className,
                     collapsible: vscode.TreeItemCollapsibleState.Collapsed,
                     scType: d.scType,
                     className,
+                    uri: files[0],
                 })
             );
 
@@ -256,6 +257,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                     collapsible: vscode.TreeItemCollapsibleState.Collapsed,
                     rcType: d.rcType,
                     groupKey,
+                    uri: files[0],
                 }));
             }
             return items;
@@ -270,6 +272,69 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         return [];
+    }
+
+    public async resolveItemUri(target: unknown, preferFolder: boolean = false): Promise<vscode.Uri | undefined> {
+        const item = target instanceof GmodExplorerItem ? target : undefined;
+        const data = item?.data;
+        if (!data) {
+            return undefined;
+        }
+
+        let uri = data.uri;
+        if (!uri) {
+            uri = await this.resolveRepresentativeUri(data);
+        }
+        if (!uri) {
+            return undefined;
+        }
+
+        if (!preferFolder) {
+            return uri;
+        }
+
+        return vscode.Uri.file(path.dirname(uri.fsPath));
+    }
+
+    private async resolveRepresentativeUri(data: ItemData): Promise<vscode.Uri | undefined> {
+        if (data.type === 'scriptedClass' && data.scType && data.className) {
+            const cache = await this.getScriptedClassCache();
+            return cache.get(data.scType)?.get(data.className)?.[0];
+        }
+
+        if (data.type === 'scriptedClassType' && data.scType) {
+            const cache = await this.getScriptedClassCache();
+            const classMap = cache.get(data.scType);
+            if (!classMap) {
+                return undefined;
+            }
+            for (const files of classMap.values()) {
+                if (files.length > 0) {
+                    return files[0];
+                }
+            }
+            return undefined;
+        }
+
+        if (data.type === 'resourceGroup' && data.rcType && data.groupKey !== undefined) {
+            const cache = await this.getResourceCache();
+            return cache.get(data.rcType)?.get(data.groupKey)?.[0];
+        }
+
+        if (data.type === 'resourceCategory' && data.rcType) {
+            const cache = await this.getResourceCache();
+            const groupMap = cache.get(data.rcType);
+            if (!groupMap) {
+                return undefined;
+            }
+            for (const files of groupMap.values()) {
+                if (files.length > 0) {
+                    return files[0];
+                }
+            }
+        }
+
+        return undefined;
     }
 
     private async getScriptedClassCache(): Promise<Map<ScriptedClassType, Map<string, vscode.Uri[]>>> {

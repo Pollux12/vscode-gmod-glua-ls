@@ -7,6 +7,7 @@ import {
     SetEntityPropertyValue,
     Vec3,
 } from './debugger/gmod_debugger/lrdb/Client';
+import { extensionContext } from './extension';
 
 const ENTITY_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -15,7 +16,28 @@ const ENTITY_POLL_MAX_INTERVAL_MS = 30000;
 const ENTITY_POLL_FAILURE_THRESHOLD = 4;
 const ENTITY_DETAIL_MAX_CONCURRENCY = 3;
 
+type EntityClassGroupKind = 'player' | 'luaDefined' | 'other';
+export type EntityClassGroupFilter = 'all' | EntityClassGroupKind;
+
+interface EntityClassGroup {
+    className: string;
+    groupKind: EntityClassGroupKind;
+    entities: EntitySummary[];
+}
+
+interface LsScriptedClassEntry {
+    uri: string;
+    classType: string;
+    className: string;
+}
+
 type EntityTreeItemData =
+    | {
+        kind: 'classGroup';
+        className: string;
+        groupKind: EntityClassGroupKind;
+        entities: EntitySummary[];
+    }
     | {
         kind: 'entity';
         entity: EntitySummary;
@@ -33,6 +55,7 @@ type EntityTreeItemData =
     | {
         kind: 'info';
         message: string;
+        id?: string;
         severity: 'info' | 'warning' | 'error';
         command?: {
             id: string;
@@ -68,6 +91,8 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     private pollingHalted = false;
     private inFlightEntityDetailRequests = 0;
     private readonly entityDetailRequestQueue: Array<() => void> = [];
+    private classGroupFilter: EntityClassGroupFilter = 'all';
+    private luaDefinedClassNames?: Set<string>;
 
     constructor(private readonly getActiveSession: () => vscode.DebugSession | undefined) {
         this.startPolling();
@@ -75,6 +100,26 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
     getTreeItem(element: EntityTreeItem): vscode.TreeItem {
         switch (element.data.kind) {
+            case 'classGroup': {
+                element.id = `entityClass:${element.data.className}`;
+                element.label = `${element.data.className} (${element.data.entities.length})`;
+                element.tooltip = `Class: ${element.data.className}`;
+                element.iconPath = new vscode.ThemeIcon(
+                    element.data.groupKind === 'player'
+                        ? 'account'
+                        : element.data.groupKind === 'luaDefined'
+                            ? 'symbol-interface'
+                            : 'symbol-class'
+                );
+                element.description = element.data.groupKind === 'player'
+                    ? 'Player'
+                    : element.data.groupKind === 'luaDefined'
+                        ? 'Lua Defined'
+                        : undefined;
+                element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+                element.contextValue = 'gmodEntityClassGroup';
+                return element;
+            }
             case 'entity': {
                 const { entity } = element.data;
                 element.id = `entity:${entity.index}`;
@@ -123,7 +168,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 };
                 return element;
             case 'info':
-                element.id = `entities:info:${element.data.severity}:${element.data.message}`;
+                element.id = element.data.id ?? `entities:info:${element.data.severity}:${element.data.message}`;
                 element.label = element.data.message;
                 element.contextValue = 'gmodEntityInfo';
                 element.iconPath = new vscode.ThemeIcon(
@@ -148,6 +193,10 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return this.getRootItems();
         }
 
+        if (element.data.kind === 'classGroup') {
+            return element.data.entities.map((entity) => new EntityTreeItem({ kind: 'entity', entity }));
+        }
+
         if (element.data.kind !== 'entity') {
             return [];
         }
@@ -165,6 +214,19 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             this.resumePollingAfterRetry();
             void this.loadEntities();
         }, SEARCH_DEBOUNCE_MS);
+    }
+
+    getClassGroupFilter(): EntityClassGroupFilter {
+        return this.classGroupFilter;
+    }
+
+    setClassGroupFilter(filter: EntityClassGroupFilter): void {
+        if (this.classGroupFilter === filter) {
+            return;
+        }
+
+        this.classGroupFilter = filter;
+        this.onDidChangeTreeDataEmitter.fire();
     }
 
     async loadEntities(): Promise<void> {
@@ -231,6 +293,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
     refresh(): void {
         this.resumePollingAfterRetry();
+        this.luaDefinedClassNames = undefined;
         void this.loadEntities();
     }
 
@@ -419,7 +482,27 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             ];
         }
 
-        const items = this.entities.map((entity) => new EntityTreeItem({ kind: 'entity', entity }));
+        const groupedEntities = await this.groupEntitiesByClass(this.entities);
+        const filteredGroups = this.applyClassGroupFilter(groupedEntities);
+
+        if (filteredGroups.length === 0) {
+            return [
+                new EntityTreeItem({
+                    kind: 'info',
+                    message: 'No entities match the selected category filter.',
+                    severity: 'info',
+                }),
+            ];
+        }
+
+        const items = filteredGroups.map((group) =>
+            new EntityTreeItem({
+                kind: 'classGroup',
+                className: group.className,
+                groupKind: group.groupKind,
+                entities: group.entities,
+            })
+        );
 
         if (this.entities.length < this.totalCount) {
             items.push(new EntityTreeItem({ kind: 'loadMore' }));
@@ -454,7 +537,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 this.entityDetails.set(entity.index, detail);
                 this.entityDetailErrors.delete(entity.index);
             } catch (error) {
-                this.entityDetailErrors.set(entity.index, this.humanizeLoadError(this.extractErrorMessage(error)));
+                this.entityDetailErrors.set(entity.index, this.humanizeEntityDetailError(this.extractErrorMessage(error)));
             } finally {
                 this.loadingDetails.delete(entity.index);
             }
@@ -464,6 +547,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return [
                 new EntityTreeItem({
                     kind: 'info',
+                    id: `entity:${entity.index}:loading`,
                     message: 'Loading entity details...',
                     severity: 'info',
                 }),
@@ -475,6 +559,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return [
                 new EntityTreeItem({
                     kind: 'info',
+                    id: `entity:${entity.index}:error`,
                     message: detailError,
                     severity: 'error',
                 }),
@@ -494,7 +579,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 entityIndex: detail.index,
                 property: 'health',
                 value: detail.health,
-                editable: detail.health <= 0,
+                editable: true,
             }),
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'valid', value: detail.valid, editable: false }),
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'class', value: detail.class, editable: false }),
@@ -611,7 +696,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     }
 
     private replaceEntities(items: EntitySummary[], total: number): void {
-        this.entities = [...items];
+        this.entities = items.filter((entity) => this.isDisplayableEntity(entity));
         this.totalCount = total;
 
         const activeIndices = new Set(this.entities.map((entity) => entity.index));
@@ -635,6 +720,10 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         });
 
         for (const entity of items) {
+            if (!this.isDisplayableEntity(entity)) {
+                continue;
+            }
+
             const existingIndex = indexByEntityId.get(entity.index);
             if (existingIndex === undefined) {
                 this.entities.push(entity);
@@ -644,6 +733,99 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             }
             this.syncDetailFromSummary(entity);
         }
+    }
+
+    private async groupEntitiesByClass(entities: EntitySummary[]): Promise<EntityClassGroup[]> {
+        const grouped = new Map<string, EntitySummary[]>();
+        const luaDefinedClassNames = await this.getLuaDefinedClassNames();
+
+        for (const entity of entities) {
+            const className = entity.class;
+            const bucket = grouped.get(className) ?? [];
+            bucket.push(entity);
+            grouped.set(className, bucket);
+        }
+
+        return [...grouped.entries()]
+            .map(([className, groupedEntities]) => {
+                const sortedEntities = [...groupedEntities].sort((left, right) => left.index - right.index);
+                return {
+                    className,
+                    groupKind: this.getEntityClassGroupKind(className, luaDefinedClassNames),
+                    entities: sortedEntities,
+                };
+            })
+            .sort((left, right) => {
+                const leftRank = this.getClassGroupRank(left.groupKind);
+                const rightRank = this.getClassGroupRank(right.groupKind);
+                if (leftRank !== rightRank) {
+                    return leftRank - rightRank;
+                }
+                return left.className.localeCompare(right.className);
+            });
+    }
+
+    private applyClassGroupFilter(groups: EntityClassGroup[]): EntityClassGroup[] {
+        if (this.classGroupFilter === 'all') {
+            return groups;
+        }
+
+        return groups.filter((group) => group.groupKind === this.classGroupFilter);
+    }
+
+    private getClassGroupRank(groupKind: EntityClassGroupKind): number {
+        switch (groupKind) {
+            case 'player':
+                return 0;
+            case 'luaDefined':
+                return 1;
+            case 'other':
+            default:
+                return 2;
+        }
+    }
+
+    private getEntityClassGroupKind(className: string, luaDefinedClassNames: Set<string>): EntityClassGroupKind {
+        const normalizedClass = className.trim().toLowerCase();
+        if (normalizedClass === 'player') {
+            return 'player';
+        }
+
+        if (luaDefinedClassNames.has(normalizedClass)) {
+            return 'luaDefined';
+        }
+
+        return 'other';
+    }
+
+    private async getLuaDefinedClassNames(): Promise<Set<string>> {
+        if (this.luaDefinedClassNames) {
+            return this.luaDefinedClassNames;
+        }
+
+        const client = extensionContext?.client;
+        if (!client) {
+            this.luaDefinedClassNames = new Set<string>();
+            return this.luaDefinedClassNames;
+        }
+
+        try {
+            const entries = await client.sendRequest<LsScriptedClassEntry[] | null>('gluals/gmodScriptedClasses', {});
+            this.luaDefinedClassNames = new Set(
+                (entries ?? [])
+                    .map((entry) => entry.className?.trim().toLowerCase())
+                    .filter((className): className is string => typeof className === 'string' && className.length > 0)
+            );
+        } catch (error) {
+            console.warn('Failed to fetch scripted classes for entity sorting:', error);
+            this.luaDefinedClassNames = new Set<string>();
+        }
+
+        return this.luaDefinedClassNames;
+    }
+
+    private isDisplayableEntity(entity: EntitySummary): boolean {
+        return entity.valid && entity.class.trim().length > 0;
     }
 
     private syncDetailFromSummary(entity: EntitySummary): void {
@@ -930,6 +1112,14 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
 
         return `Failed to load entities: ${message}`;
+    }
+
+    private humanizeEntityDetailError(message: string): string {
+        if (message.includes('-32001')) {
+            return 'Cannot inspect entity details: debugger must be paused.';
+        }
+
+        return `Failed to load entity details: ${message}`;
     }
 
     private shortenModelPath(model: string): string {

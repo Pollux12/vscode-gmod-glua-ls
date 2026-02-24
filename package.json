@@ -188,6 +188,11 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "gmodErrors.openLocation",
+                "title": "GMod Errors: Open Source Location",
+                "category": "GLuaLS"
+            },
+            {
                 "command": "gmodEntityExplorer.refresh",
                 "title": "%command.gmodEntityExplorer.refresh.title%",
                 "category": "GLuaLS",
@@ -200,6 +205,12 @@
                 "icon": "$(search)"
             },
             {
+                "command": "gmodEntityExplorer.filter",
+                "title": "GMod Entity Explorer: Filter Categories",
+                "category": "GLuaLS",
+                "icon": "$(filter)"
+            },
+            {
                 "command": "gmodEntityExplorer.editProperty",
                 "title": "%command.gmodEntityExplorer.editProperty.title%",
                 "category": "GLuaLS",
@@ -209,6 +220,24 @@
                 "command": "gmodEntityExplorer.loadMore",
                 "title": "%command.gmodEntityExplorer.loadMore.title%",
                 "category": "GLuaLS"
+            },
+            {
+                "command": "gluals.gmod.explorer.copyRelativePath",
+                "title": "GMod Explorer: Copy Relative Path",
+                "category": "GLuaLS",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "gluals.gmod.explorer.copyAbsolutePath",
+                "title": "GMod Explorer: Copy Absolute Path",
+                "category": "GLuaLS",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "gluals.gmod.explorer.revealInExplorer",
+                "title": "GMod Explorer: Reveal in Explorer",
+                "category": "GLuaLS",
+                "icon": "$(go-to-file)"
             }
         ],
         "languageModelTools": [
@@ -848,6 +877,11 @@
                     "command": "gmodEntityExplorer.search",
                     "when": "view == gmodEntityExplorer",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "gmodEntityExplorer.filter",
+                    "when": "view == gmodEntityExplorer",
+                    "group": "navigation@3"
                 }
             ],
             "commandPalette": [
@@ -874,6 +908,91 @@
                     "command": "gmodEntityExplorer.editProperty",
                     "when": "view == gmodEntityExplorer && viewItem == gmodEntityPropertyEditable",
                     "group": "inline"
+                },
+                {
+                    "command": "gmodErrors.openLocation",
+                    "when": "view == gmodErrors && viewItem == gmodErrorNavigable",
+                    "group": "inline"
+                },
+                {
+                    "command": "gmodErrors.openLocation",
+                    "when": "view == gmodErrors && viewItem == gmodErrorFrameNavigable",
+                    "group": "inline"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyRelativePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == file",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyAbsolutePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == file",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "gluals.gmod.explorer.revealInExplorer",
+                    "when": "view == gluals.gmodExplorer && viewItem == file",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyRelativePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClass",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyAbsolutePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClass",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "gluals.gmod.explorer.revealInExplorer",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClass",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyRelativePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyAbsolutePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "gluals.gmod.explorer.revealInExplorer",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyRelativePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceGroup",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyAbsolutePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceGroup",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "gluals.gmod.explorer.revealInExplorer",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceGroup",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyRelativePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "gluals.gmod.explorer.copyAbsolutePath",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "gluals.gmod.explorer.revealInExplorer",
+                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
+                    "group": "navigation@3"
                 }
             ],
             "explorer/context": [

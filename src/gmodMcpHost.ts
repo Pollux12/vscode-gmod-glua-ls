@@ -35,7 +35,24 @@ interface GmodMcpHostOptions {
 interface GmodMcpRequestPayload {
     readonly request_id?: unknown;
     readonly tool?: unknown;
+    readonly name?: unknown;
+    readonly args?: unknown;
     readonly arguments?: unknown;
+    readonly jsonrpc?: unknown;
+    readonly id?: unknown;
+    readonly method?: unknown;
+    readonly params?: unknown;
+}
+
+interface GmodMcpJsonRpcResponse {
+    readonly jsonrpc: '2.0';
+    readonly id: unknown;
+    readonly result?: unknown;
+    readonly error?: {
+        readonly code: number;
+        readonly message: string;
+        readonly data?: unknown;
+    };
 }
 
 interface GmodMcpOutputEntry {
@@ -324,11 +341,20 @@ export class GmodMcpHost implements vscode.Disposable {
             return;
         }
 
+        if (method === 'POST' && (path === '/mcp' || path === '/')) {
+            await this.handleJsonRpcRequest(req, res, requestId);
+            return;
+        }
+
         if (method === 'POST' && path === '/tool') {
             const payload = await this.readJsonBody(req);
-            const toolName = typeof payload.tool === 'string' ? payload.tool : '';
+            const toolName = typeof payload.tool === 'string'
+                ? payload.tool
+                : typeof payload.name === 'string'
+                    ? payload.name
+                    : '';
             const tool = this.validateToolName(toolName);
-            const args = this.coerceArgs(payload.arguments);
+            const args = this.coerceArgs(payload.arguments ?? payload.args);
             const toolRequestId = typeof payload.request_id === 'string' && payload.request_id.trim().length > 0
                 ? payload.request_id
                 : requestId;
@@ -360,6 +386,230 @@ export class GmodMcpHost implements vscode.Disposable {
         }
 
         this.respondWithError(res, requestId, new HostError('E_ROUTE_NOT_FOUND', `Unsupported route: ${method} ${path}`, 404));
+    }
+
+    private async handleJsonRpcRequest(req: http.IncomingMessage, res: http.ServerResponse, fallbackRequestId: string): Promise<void> {
+        const payload = await this.readJsonBody(req);
+        const method = typeof payload.method === 'string' ? payload.method : '';
+        const id = payload.id;
+        const responseId = id !== undefined ? id : fallbackRequestId;
+
+        if (method.length === 0) {
+            this.respondJsonRpcError(res, responseId, -32600, 'Invalid Request: missing method.');
+            return;
+        }
+
+        if (method === 'notifications/initialized') {
+            if (id === undefined) {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
+            this.respondJsonRpcResult(res, id, {});
+            return;
+        }
+
+        try {
+            switch (method) {
+                case 'initialize': {
+                    this.respondJsonRpcResult(res, responseId, {
+                        protocolVersion: '2024-11-05',
+                        capabilities: {
+                            tools: {},
+                        },
+                        serverInfo: {
+                            name: 'gluals-gmod-mcp',
+                            version: '0.0.3',
+                        },
+                    });
+                    return;
+                }
+
+                case 'tools/list': {
+                    this.respondJsonRpcResult(res, responseId, {
+                        tools: this.getMcpToolDefinitions(),
+                    });
+                    return;
+                }
+
+                case 'tools/call': {
+                    const params = payload.params;
+                    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+                        throw new HostError('E_INVALID_REQUEST', 'tools/call requires object params.', 400);
+                    }
+
+                    const toolName = typeof (params as Record<string, unknown>).name === 'string'
+                        ? (params as Record<string, unknown>).name as string
+                        : '';
+                    const tool = this.validateToolName(toolName);
+                    const args = this.coerceArgs((params as Record<string, unknown>).arguments);
+                    const toolRequestId = typeof id === 'string' && id.trim().length > 0
+                        ? id
+                        : fallbackRequestId;
+
+                    try {
+                        const data = await this.executeTool(tool, args);
+                        this.appendAudit({
+                            timestamp: new Date().toISOString(),
+                            requestId: toolRequestId,
+                            event: `tool.${tool}`,
+                            success: true,
+                            code: 'OK',
+                        });
+
+                        this.respondJsonRpcResult(res, responseId, {
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: JSON.stringify(data, null, 2),
+                                },
+                            ],
+                            structuredContent: data,
+                            isError: false,
+                        });
+                    } catch (error) {
+                        const normalized = this.normalizeError(error);
+                        this.appendAudit({
+                            timestamp: new Date().toISOString(),
+                            requestId: toolRequestId,
+                            event: `tool.${tool}`,
+                            success: false,
+                            code: normalized.code,
+                            details: normalized.details && typeof normalized.details === 'object'
+                                ? normalized.details as Record<string, unknown>
+                                : undefined,
+                        });
+
+                        const rpcCode = normalized.code === 'E_ROUTE_NOT_FOUND'
+                            ? -32601
+                            : normalized.code === 'E_INVALID_REQUEST' || normalized.code === 'E_TOOL_NOT_ALLOWED'
+                                ? -32602
+                                : -32000;
+                        this.respondJsonRpcError(res, responseId, rpcCode, normalized.message, normalized.details);
+                    }
+                    return;
+                }
+
+                default:
+                    this.respondJsonRpcError(res, responseId, -32601, `Method not found: ${method}`);
+                    return;
+            }
+        } catch (error) {
+            const normalized = this.normalizeError(error);
+            const rpcCode = normalized.code === 'E_ROUTE_NOT_FOUND'
+                ? -32601
+                : normalized.code === 'E_INVALID_REQUEST' || normalized.code === 'E_TOOL_NOT_ALLOWED'
+                    ? -32602
+                    : -32000;
+
+            this.respondJsonRpcError(res, responseId, rpcCode, normalized.message, normalized.details);
+        }
+    }
+
+    private getMcpToolDefinitions(): Array<{ name: GmodMcpToolName; description: string; inputSchema: Record<string, unknown>; }> {
+        return [
+            {
+                name: 'run_lua',
+                description: 'Execute Lua source code in the active GMod debug session.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        lua: { type: 'string' },
+                        chunk: { type: 'string' },
+                        realm: { type: 'string', enum: [...GMOD_REALMS] },
+                    },
+                    anyOf: [
+                        { required: ['lua'] },
+                        { required: ['chunk'] },
+                    ],
+                },
+            },
+            {
+                name: 'run_command',
+                description: 'Run a Garry\'s Mod console command in the active debug session.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        command: { type: 'string' },
+                    },
+                    required: ['command'],
+                },
+            },
+            {
+                name: 'run_file',
+                description: 'Dispatch a Lua file path for execution in the active debug session.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        path: { type: 'string' },
+                        file: { type: 'string' },
+                        realm: { type: 'string', enum: [...GMOD_REALMS] },
+                    },
+                    anyOf: [
+                        { required: ['path'] },
+                        { required: ['file'] },
+                    ],
+                },
+            },
+            {
+                name: 'get_output',
+                description: 'Read recent buffered debugger output entries.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        limit: { type: 'number' },
+                    },
+                },
+            },
+            {
+                name: 'get_errors',
+                description: 'Read recent buffered debugger error entries.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        limit: { type: 'number' },
+                    },
+                },
+            },
+            {
+                name: 'get_debug_state',
+                description: 'Read the active GMod debugger state snapshot.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                },
+            },
+            {
+                name: 'list_realms',
+                description: 'List available execution realms and the currently selected realm.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                },
+            },
+        ];
+    }
+
+    private respondJsonRpcResult(res: http.ServerResponse, id: unknown, result: unknown): void {
+        const payload: GmodMcpJsonRpcResponse = {
+            jsonrpc: '2.0',
+            id,
+            result,
+        };
+        this.respondJson(res, 200, payload);
+    }
+
+    private respondJsonRpcError(res: http.ServerResponse, id: unknown, code: number, message: string, data?: unknown): void {
+        const payload: GmodMcpJsonRpcResponse = {
+            jsonrpc: '2.0',
+            id,
+            error: {
+                code,
+                message,
+                data,
+            },
+        };
+        this.respondJson(res, 200, payload);
     }
 
     private async executeTool(tool: GmodMcpToolName, args: Record<string, unknown>): Promise<unknown> {
@@ -608,7 +858,7 @@ export class GmodMcpHost implements vscode.Disposable {
         this.respondJson(res, error.statusCode, payload);
     }
 
-    private respondJson(res: http.ServerResponse, statusCode: number, payload: GmodMcpSuccessResponse | GmodMcpErrorResponse): void {
+    private respondJson(res: http.ServerResponse, statusCode: number, payload: unknown): void {
         const serialized = JSON.stringify(payload);
         res.statusCode = statusCode;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');

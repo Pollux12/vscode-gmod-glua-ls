@@ -229,8 +229,11 @@ export class GmodDebugControlService {
 
   private buildLuaRunCommand(lua: string, realm: GmodRealm): string {
     const command = realm === 'client' ? 'lua_run_cl' : realm === 'menu' ? 'lua_run_menu' : 'lua_run'
-    const payload = lua.replace(/\r?\n/g, '; ')
-    return `${command} ${payload}`
+    const escaped = lua
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\r?\n/g, '\\n')
+    return `${command} RunString("${escaped}")`
   }
 
   private buildFileRunCommand(filePath: string, realm: GmodRealm): string {

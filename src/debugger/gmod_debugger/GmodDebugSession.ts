@@ -193,6 +193,7 @@ export class GmodDebugSession extends DebugSession {
   private _sourceRoot?: string
   private _configurationDoneReceived = false
   private _serverInitCompleted = false
+  private _isPaused = false
 
   /**
    * Creates a new debug adapter that is used for one debug session.
@@ -231,6 +232,7 @@ export class GmodDebugSession extends DebugSession {
     this._debuggee_module_version = undefined
     this._configurationDoneReceived = false
     this._serverInitCompleted = false
+    this._isPaused = false
     this._stopOnError = false
     this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
@@ -1037,6 +1039,7 @@ export class GmodDebugSession extends DebugSession {
 
       this._serverInitCompleted = false
       this._configurationDoneReceived = false
+      this._isPaused = false
 
       this.sendResponse(response)
     } catch(e) {
@@ -1081,15 +1084,20 @@ export class GmodDebugSession extends DebugSession {
 
       if (args.context === 'repl') {
         const explicitLuaPrefix = /^(lua|eval)\s+/i
+        const explicitCommandPrefix = /^con\s+/i
         let command = expression
         let luaExpression: string | undefined
+        const frameScopedEvaluation = this._isPaused && typeof args.frameId === 'number' && Number.isFinite(args.frameId)
 
         if (expression.startsWith('=')) {
           luaExpression = expression.slice(1).trim()
         } else if (explicitLuaPrefix.test(expression)) {
           luaExpression = expression.replace(explicitLuaPrefix, '').trim()
-        } else if (/^con\s+/i.test(expression)) {
-          command = expression.replace(/^con\s+/i, '').trim()
+        } else if (explicitCommandPrefix.test(expression)) {
+          command = expression.replace(explicitCommandPrefix, '').trim()
+        } else if (frameScopedEvaluation) {
+          // Preserve Evaluate-in-Debug-Console behavior for frame-bound expressions.
+          luaExpression = expression
         }
 
         if (luaExpression != null) {
@@ -1227,8 +1235,10 @@ export class GmodDebugSession extends DebugSession {
       switch (event.method) {
         case 'paused':
           if (event.params.reason === 'entry' && !this._stopOnEntry) {
+            this._isPaused = false
             this._debug_client?.continue()
           } else {
+            this._isPaused = true
             this.sendEvent(
               new StoppedEvent(
                 event.params.reason,
@@ -1240,6 +1250,7 @@ export class GmodDebugSession extends DebugSession {
           break
 
         case 'running':
+          this._isPaused = false
           this._variableHandles.reset()
           this.sendEvent(new ContinuedEvent(GmodDebugSession.THREAD_ID))
           break

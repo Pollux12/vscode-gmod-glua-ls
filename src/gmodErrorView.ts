@@ -20,6 +20,41 @@ export interface GmodError {
     lastSeen: Date;
 }
 
+export interface GmodErrorLocation {
+    filePath: string;
+    line: number;
+    column?: number;
+}
+
+export function parseGmodErrorLocation(text: string): GmodErrorLocation | undefined {
+    const line = text.trim();
+    if (line.length === 0) {
+        return undefined;
+    }
+
+    const match = line.match(/@?((?:[A-Za-z]:)?[^:\r\n]+\.lua):(\d+)(?::(\d+))?/i);
+    if (!match) {
+        return undefined;
+    }
+
+    const filePath = match[1]?.replace(/^\[string\s+"/, '').replace(/"\]$/, '').trim();
+    if (!filePath) {
+        return undefined;
+    }
+
+    const lineNumber = Number(match[2]);
+    if (!Number.isFinite(lineNumber) || lineNumber <= 0) {
+        return undefined;
+    }
+
+    const column = match[3] != null ? Number(match[3]) : undefined;
+    return {
+        filePath,
+        line: Math.floor(lineNumber),
+        column: column != null && Number.isFinite(column) && column > 0 ? Math.floor(column) : undefined,
+    };
+}
+
 export class GmodErrorStore implements vscode.Disposable {
     private readonly errors = new Map<string, GmodError>();
     private readonly changeEmitter = new vscode.EventEmitter<void>();
@@ -77,7 +112,12 @@ export class GmodErrorTreeItem extends vscode.TreeItem {
                 : vscode.TreeItemCollapsibleState.None
         );
         this.description = error.source;
-        this.contextValue = 'gmodError';
+        const primaryLocation = (error.stackTrace ?? [])
+            .map((frame) => parseGmodErrorLocation(frame))
+            .find((location): location is GmodErrorLocation => location != null)
+            ?? parseGmodErrorLocation(error.message);
+
+        this.contextValue = primaryLocation ? 'gmodErrorNavigable' : 'gmodError';
         this.iconPath = new vscode.ThemeIcon('warning');
         this.tooltip = [
             error.message,
@@ -86,15 +126,31 @@ export class GmodErrorTreeItem extends vscode.TreeItem {
             `First seen: ${error.firstSeen.toLocaleString()}`,
             `Last seen: ${error.lastSeen.toLocaleString()}`,
         ].join('\n');
+
+        if (primaryLocation) {
+            this.command = {
+                command: 'gmodErrors.openLocation',
+                title: 'Open Error Location',
+                arguments: [primaryLocation],
+            };
+        }
     }
 }
 
 export class GmodErrorFrameItem extends vscode.TreeItem {
-    constructor(public readonly frame: string) {
+    constructor(public readonly frame: string, public readonly location?: GmodErrorLocation) {
         super(frame, vscode.TreeItemCollapsibleState.None);
-        this.contextValue = 'gmodErrorFrame';
+        this.contextValue = location ? 'gmodErrorFrameNavigable' : 'gmodErrorFrame';
         this.iconPath = new vscode.ThemeIcon('list-tree');
         this.tooltip = frame;
+
+        if (location) {
+            this.command = {
+                command: 'gmodErrors.openLocation',
+                title: 'Open Error Location',
+                arguments: [location],
+            };
+        }
     }
 }
 
@@ -119,7 +175,7 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
         if (element instanceof GmodErrorTreeItem) {
             const stackTrace = element.error.stackTrace ?? [];
             if (stackTrace.length > 0) {
-                return stackTrace.map((frame) => new GmodErrorFrameItem(frame));
+                return stackTrace.map((frame) => new GmodErrorFrameItem(frame, parseGmodErrorLocation(frame)));
             }
         }
 

@@ -19,15 +19,17 @@ import { insertEmmyDebugCode, registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
-import { GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
+import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
+    GmodErrorLocation,
     GmodErrorNotificationParams,
     GmodErrorStore,
     GmodErrorViewProvider,
+    parseGmodErrorLocation,
     registerGmodErrorView,
 } from './gmodErrorView';
-import { EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
+import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
@@ -167,10 +169,15 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
         { id: 'gluals.gmod.configureDebugger', handler: configureGmodDebugger },
         { id: 'gmodErrors.clear', handler: clearGmodErrors },
+        { id: 'gmodErrors.openLocation', handler: openGmodErrorLocation },
         { id: 'gmodEntityExplorer.refresh', handler: refreshGmodEntityExplorer },
         { id: 'gmodEntityExplorer.search', handler: searchGmodEntityExplorer },
+        { id: 'gmodEntityExplorer.filter', handler: filterGmodEntityExplorer },
         { id: 'gmodEntityExplorer.editProperty', handler: editGmodEntityExplorerProperty },
         { id: 'gmodEntityExplorer.loadMore', handler: loadMoreGmodEntityExplorer },
+        { id: 'gluals.gmod.explorer.copyRelativePath', handler: copyGmodExplorerRelativePath },
+        { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
+        { id: 'gluals.gmod.explorer.revealInExplorer', handler: revealGmodExplorerItemInExplorer },
     ];
 
     // Register all commands
@@ -875,6 +882,89 @@ function clearGmodErrors(): void {
     gmodErrorViewProvider?.clear();
 }
 
+async function copyGmodExplorerRelativePath(item?: GmodExplorerItem): Promise<void> {
+    const preferFolder = item?.data.type !== 'file';
+    const uri = await gmodExplorerProvider?.resolveItemUri(item, preferFolder);
+    if (!uri) {
+        vscode.window.showWarningMessage('No path is available for this item.');
+        return;
+    }
+
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+    const relativePath = workspaceFolder
+        ? path.relative(workspaceFolder.uri.fsPath, uri.fsPath)
+        : uri.fsPath;
+
+    await vscode.env.clipboard.writeText(relativePath);
+    vscode.window.showInformationMessage(`Copied relative path: ${relativePath}`);
+}
+
+async function copyGmodExplorerAbsolutePath(item?: GmodExplorerItem): Promise<void> {
+    const preferFolder = item?.data.type !== 'file';
+    const uri = await gmodExplorerProvider?.resolveItemUri(item, preferFolder);
+    if (!uri) {
+        vscode.window.showWarningMessage('No path is available for this item.');
+        return;
+    }
+
+    await vscode.env.clipboard.writeText(uri.fsPath);
+    vscode.window.showInformationMessage(`Copied absolute path: ${uri.fsPath}`);
+}
+
+async function revealGmodExplorerItemInExplorer(item?: GmodExplorerItem): Promise<void> {
+    const preferFolder = item?.data.type !== 'file';
+    const uri = await gmodExplorerProvider?.resolveItemUri(item, preferFolder);
+    if (!uri) {
+        vscode.window.showWarningMessage('No file or folder could be resolved for this item.');
+        return;
+    }
+
+    await vscode.commands.executeCommand('revealInExplorer', uri);
+}
+
+async function openGmodErrorLocation(location?: GmodErrorLocation | string): Promise<void> {
+    const resolvedLocation = (() => {
+        if (typeof location === 'string') {
+            return parseGmodErrorLocation(location);
+        }
+        return location;
+    })();
+
+    if (!resolvedLocation) {
+        vscode.window.showWarningMessage('No source location could be parsed from this error entry.');
+        return;
+    }
+
+    const line = Math.max(1, resolvedLocation.line);
+    const column = Math.max(1, resolvedLocation.column ?? 1);
+
+    let targetPath = resolvedLocation.filePath;
+    if (!path.isAbsolute(targetPath)) {
+        const folders = vscode.workspace.workspaceFolders ?? [];
+        const matchedFolder = folders.find((folder) =>
+            fs.existsSync(path.join(folder.uri.fsPath, targetPath))
+        );
+
+        if (matchedFolder) {
+            targetPath = path.join(matchedFolder.uri.fsPath, targetPath);
+        } else if (folders.length > 0) {
+            targetPath = path.join(folders[0].uri.fsPath, targetPath);
+        }
+    }
+
+    const targetUri = vscode.Uri.file(path.normalize(targetPath));
+    if (!fs.existsSync(targetUri.fsPath)) {
+        vscode.window.showWarningMessage(`Could not find source file: ${targetUri.fsPath}`);
+        return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(targetUri);
+    const editor = await vscode.window.showTextDocument(document, { preview: false });
+    const position = new vscode.Position(line - 1, column - 1);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+}
+
 async function refreshGmodEntityExplorer(): Promise<void> {
     if (!gmodEntityExplorerProvider) {
         return;
@@ -901,6 +991,48 @@ async function searchGmodEntityExplorer(): Promise<void> {
     }
 
     gmodEntityExplorerProvider.setFilter(text);
+}
+
+async function filterGmodEntityExplorer(): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    const currentFilter = gmodEntityExplorerProvider.getClassGroupFilter();
+    const picks: Array<vscode.QuickPickItem & { value: EntityClassGroupFilter; }> = [
+        {
+            label: `${currentFilter === 'all' ? '$(check) ' : ''}All entities`,
+            description: 'Show every runtime entity class group',
+            value: 'all',
+        },
+        {
+            label: `${currentFilter === 'player' ? '$(check) ' : ''}Players`,
+            description: 'Show only player entities',
+            value: 'player',
+        },
+        {
+            label: `${currentFilter === 'luaDefined' ? '$(check) ' : ''}Lua defined`,
+            description: 'Show only scripted Lua entity classes',
+            value: 'luaDefined',
+        },
+        {
+            label: `${currentFilter === 'other' ? '$(check) ' : ''}Other entities`,
+            description: 'Show non-player, non-scripted runtime classes',
+            value: 'other',
+        },
+    ];
+
+    const picked = await vscode.window.showQuickPick(picks, {
+        title: 'Filter Entity Groups',
+        placeHolder: 'Select which entity categories to show',
+        ignoreFocusOut: true,
+    });
+
+    if (!picked) {
+        return;
+    }
+
+    gmodEntityExplorerProvider.setClassGroupFilter(picked.value);
 }
 
 async function editGmodEntityExplorerProperty(item?: EntityTreeItem): Promise<void> {
