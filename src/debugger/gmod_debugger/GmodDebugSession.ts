@@ -21,6 +21,8 @@ import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
 import {
   EntityDetail,
+  GetEntityNetworkVarsResult,
+  GetEntityTableResult,
   EvalRequest,
   ExitNotify,
   GetEntitiesParams,
@@ -1361,6 +1363,14 @@ export class GmodDebugSession extends DebugSession {
         return this.handleGetEntitiesRequest(args)
       case 'gmod.entity.getEntity':
         return this.handleGetEntityRequest(args)
+      case 'gmod.entity.getEntityNetworkVars':
+        return this.handleGetEntityNetworkVarsRequest(args)
+      case 'gmod.entity.getEntityTable':
+        return this.handleGetEntityTableRequest(args)
+      case 'gmod.entity.setTableValue':
+        return this.handleSetEntityTableValueRequest(args)
+      case 'gmod.entity.setNetworkVar':
+        return this.handleSetEntityNetworkVarRequest(args)
       case 'gmod.entity.setProperty':
         return this.handleSetEntityPropertyRequest(args)
       default:
@@ -1377,6 +1387,52 @@ export class GmodDebugSession extends DebugSession {
   private async handleGetEntityRequest(args: any): Promise<EntityDetail> {
     const client = this.requireDebugClient()
     const response = await client.getEntity({ index: this.coerceEntityIndex(args) })
+    return response.result
+  }
+
+  private async handleGetEntityTableRequest(args: any): Promise<GetEntityTableResult> {
+    const client = this.requireDebugClient()
+    const response = await client.getEntityTable(this.coerceEntityTableParams(args))
+    return response.result
+  }
+
+  private async handleGetEntityNetworkVarsRequest(args: any): Promise<GetEntityNetworkVarsResult> {
+    const client = this.requireDebugClient()
+    const response = await client.getEntityNetworkVars({ index: this.coerceEntityIndex(args) })
+    return response.result
+  }
+
+  private async handleSetEntityNetworkVarRequest(
+    args: any
+  ): Promise<{ ok: boolean; index: number; name: string }> {
+    const client = this.requireDebugClient()
+    const raw = args && typeof args === 'object' ? args as Record<string, unknown> : {}
+    const index = this.coerceEntityIndex(raw)
+    const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+    if (name.length === 0) {
+      throw new Error('NetworkVar name is required.')
+    }
+
+    const valueArgs = this.coerceEntityPropertyParams({
+      index,
+      property: name,
+      value: raw.value,
+    })
+
+    const response = await client.setEntityNetworkVar({
+      index: valueArgs.index,
+      name,
+      value: valueArgs.value,
+    })
+    return response.result
+  }
+
+  private async handleSetEntityTableValueRequest(
+    args: any
+  ): Promise<{ ok: boolean; index: number; property: string }> {
+    const client = this.requireDebugClient()
+    const params = this.coerceEntityPropertyParams(args)
+    const response = await client.setEntityTableValue(params)
     return response.result
   }
 
@@ -1448,6 +1504,21 @@ export class GmodDebugSession extends DebugSession {
     }
 
     throw new Error('Entity property value must be a string, number, boolean, or [x, y, z] vector.')
+  }
+
+  private coerceEntityTableParams(args: any): { index: number; filter?: string } {
+    const raw = args && typeof args === 'object' ? args as Record<string, unknown> : {}
+    const index = typeof raw.index === 'number' && Number.isFinite(raw.index)
+      ? Math.floor(raw.index)
+      : -1
+    if (index < 0) {
+      throw new Error('Entity index must be a non-negative integer.')
+    }
+
+    const filter = typeof raw.filter === 'string' ? raw.filter.trim() : ''
+    return filter.length > 0
+      ? { index, filter }
+      : { index }
   }
 
   private coerceNonNegativeInteger(value: unknown, fallback: number): number {

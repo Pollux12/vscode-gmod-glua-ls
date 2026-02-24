@@ -28,6 +28,10 @@ export type DebugRequest =
   | CommandRequest
   | GetEntitiesRequest
   | GetEntityRequest
+  | GetEntityNetworkVarsRequest
+  | GetEntityTableRequest
+  | SetEntityTableValueRequest
+  | SetEntityNetworkVarRequest
   | SetEntityPropertyRequest
 
 export interface DebugClientAdapter {
@@ -248,6 +252,46 @@ export class Client {
       params,
     })
 
+  getEntityNetworkVars = (
+    params: GetEntityNetworkVarsRequest['params']
+  ): Promise<DebugResponseType<GetEntityNetworkVarsRequest>> =>
+    this.send({
+      method: 'get_entity_network_vars',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  setEntityNetworkVar = (
+    params: SetEntityNetworkVarRequest['params']
+  ): Promise<DebugResponseType<SetEntityNetworkVarRequest>> =>
+    this.send({
+      method: 'set_entity_network_var',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  setEntityTableValue = (
+    params: SetEntityTableValueRequest['params']
+  ): Promise<DebugResponseType<SetEntityTableValueRequest>> =>
+    this.send({
+      method: 'set_entity_table_value',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  getEntityTable = (
+    params: GetEntityTableRequest['params']
+  ): Promise<DebugResponseType<GetEntityTableRequest>> =>
+    this.send({
+      method: 'get_entity_table',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
   setEntityProperty = (
     params: SetEntityPropertyRequest['params']
   ): Promise<DebugResponseType<SetEntityPropertyRequest>> =>
@@ -445,6 +489,30 @@ export interface EntityDetail {
   properties: Record<string, string | number | boolean>
 }
 
+export interface EntityTableEntry {
+  key: string
+  display: string
+  editable: boolean
+  value?: SetEntityPropertyValue
+}
+
+export interface GetEntityTableParams {
+  index: number
+  filter?: string
+}
+
+export interface GetEntityTableResult {
+  index: number
+  total: number
+  entries: EntityTableEntry[]
+}
+
+export interface GetEntityNetworkVarsResult {
+  index: number
+  total: number
+  entries: EntityTableEntry[]
+}
+
 export interface GetEntitiesParams {
   offset: number
   limit: number
@@ -467,6 +535,12 @@ export interface SetEntityPropertyParams {
   value: SetEntityPropertyValue
 }
 
+export interface SetEntityNetworkVarParams {
+  index: number
+  name: string
+  value: SetEntityPropertyValue
+}
+
 export interface GetEntitiesRequest extends JsonRpcRequest {
   method: 'get_entities'
   params: GetEntitiesParams
@@ -479,9 +553,31 @@ export interface GetEntityRequest extends JsonRpcRequest {
   }
 }
 
+export interface GetEntityTableRequest extends JsonRpcRequest {
+  method: 'get_entity_table'
+  params: GetEntityTableParams
+}
+
+export interface GetEntityNetworkVarsRequest extends JsonRpcRequest {
+  method: 'get_entity_network_vars'
+  params: {
+    index: number
+  }
+}
+
 export interface SetEntityPropertyRequest extends JsonRpcRequest {
   method: 'set_entity_property'
   params: SetEntityPropertyParams
+}
+
+export interface SetEntityTableValueRequest extends JsonRpcRequest {
+  method: 'set_entity_table_value'
+  params: SetEntityPropertyParams
+}
+
+export interface SetEntityNetworkVarRequest extends JsonRpcRequest {
+  method: 'set_entity_network_var'
+  params: SetEntityNetworkVarParams
 }
 
 type StackInfo = {
@@ -519,6 +615,18 @@ type ResponseResultType = {
   command: never
   get_entities: GetEntitiesResult
   get_entity: EntityDetail
+  get_entity_network_vars: GetEntityNetworkVarsResult
+  get_entity_table: GetEntityTableResult
+  set_entity_table_value: {
+    ok: boolean
+    index: number
+    property: string
+  }
+  set_entity_network_var: {
+    ok: boolean
+    index: number
+    name: string
+  }
   set_entity_property: {
     ok: boolean
     index: number

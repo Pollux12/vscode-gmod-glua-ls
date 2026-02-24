@@ -211,6 +211,18 @@
                 "icon": "$(filter)"
             },
             {
+                "command": "gmodEntityExplorer.searchTable",
+                "title": "GMod Entity Explorer: Search Entity Table Values",
+                "category": "GLuaLS",
+                "icon": "$(search)"
+            },
+            {
+                "command": "gmodEntityExplorer.searchNetworkVars",
+                "title": "GMod Entity Explorer: Search NetworkVars",
+                "category": "GLuaLS",
+                "icon": "$(search)"
+            },
+            {
                 "command": "gmodEntityExplorer.editProperty",
                 "title": "%command.gmodEntityExplorer.editProperty.title%",
                 "category": "GLuaLS",
@@ -907,6 +919,26 @@
                 {
                     "command": "gmodEntityExplorer.editProperty",
                     "when": "view == gmodEntityExplorer && viewItem == gmodEntityPropertyEditable",
+                    "group": "inline"
+                },
+                {
+                    "command": "gmodEntityExplorer.searchTable",
+                    "when": "view == gmodEntityExplorer && viewItem == gmodEntityTableSection",
+                    "group": "inline"
+                },
+                {
+                    "command": "gmodEntityExplorer.searchTable",
+                    "when": "view == gmodEntityExplorer && viewItem == gmodEntityTableSearch",
+                    "group": "inline"
+                },
+                {
+                    "command": "gmodEntityExplorer.searchNetworkVars",
+                    "when": "view == gmodEntityExplorer && viewItem == gmodEntityNetworkVarSection",
+                    "group": "inline"
+                },
+                {
+                    "command": "gmodEntityExplorer.searchNetworkVars",
+                    "when": "view == gmodEntityExplorer && viewItem == gmodEntityNetworkVarSearch",
                     "group": "inline"
                 },
                 {

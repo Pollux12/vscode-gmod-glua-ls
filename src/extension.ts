@@ -173,6 +173,8 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gmodEntityExplorer.refresh', handler: refreshGmodEntityExplorer },
         { id: 'gmodEntityExplorer.search', handler: searchGmodEntityExplorer },
         { id: 'gmodEntityExplorer.filter', handler: filterGmodEntityExplorer },
+        { id: 'gmodEntityExplorer.searchTable', handler: searchGmodEntityExplorerTable },
+        { id: 'gmodEntityExplorer.searchNetworkVars', handler: searchGmodEntityExplorerNetworkVars },
         { id: 'gmodEntityExplorer.editProperty', handler: editGmodEntityExplorerProperty },
         { id: 'gmodEntityExplorer.loadMore', handler: loadMoreGmodEntityExplorer },
         { id: 'gluals.gmod.explorer.copyRelativePath', handler: copyGmodExplorerRelativePath },
@@ -870,6 +872,16 @@ function initializeGmodEntityExplorerView(context: vscode.ExtensionContext): voi
     context.subscriptions.push(treeView.onDidChangeVisibility((event) => {
         gmodEntityExplorerProvider?.setViewVisible(event.visible);
     }));
+    context.subscriptions.push(treeView.onDidCollapseElement((event) => {
+        if (event.element.data.kind === 'entityTableSection') {
+            gmodEntityExplorerProvider?.onEntityTableSectionCollapsed(event.element.data.entityIndex);
+            return;
+        }
+
+        if (event.element.data.kind === 'networkVarSection') {
+            gmodEntityExplorerProvider?.onEntityNetworkVarSectionCollapsed(event.element.data.entityIndex);
+        }
+    }));
 
     context.subscriptions.push(gmodEntityExplorerProvider, treeView);
 }
@@ -1035,17 +1047,64 @@ async function filterGmodEntityExplorer(): Promise<void> {
     gmodEntityExplorerProvider.setClassGroupFilter(picked.value);
 }
 
+async function searchGmodEntityExplorerTable(item?: EntityTreeItem): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    if (!item || (item.data.kind !== 'entityTableSection' && item.data.kind !== 'entityTableSearch')) {
+        vscode.window.showWarningMessage('Expand an Entity:GetTable() section and run search from that item.');
+        return;
+    }
+
+    await gmodEntityExplorerProvider.searchEntityTable(item.data.entityIndex);
+}
+
+async function searchGmodEntityExplorerNetworkVars(item?: EntityTreeItem): Promise<void> {
+    if (!gmodEntityExplorerProvider) {
+        return;
+    }
+
+    if (!item || (item.data.kind !== 'networkVarSection' && item.data.kind !== 'networkVarSearch')) {
+        vscode.window.showWarningMessage('Expand a NetworkVars section and run search from that item.');
+        return;
+    }
+
+    await gmodEntityExplorerProvider.searchEntityNetworkVars(item.data.entityIndex);
+}
+
 async function editGmodEntityExplorerProperty(item?: EntityTreeItem): Promise<void> {
     if (!gmodEntityExplorerProvider) {
         return;
     }
 
-    if (!item || item.data.kind !== 'property' || !item.data.editable) {
+    if (!item || (
+        item.data.kind !== 'property'
+        && item.data.kind !== 'tableProperty'
+        && item.data.kind !== 'networkVarProperty'
+    ) || !item.data.editable) {
         vscode.window.showWarningMessage('Select an editable entity property first.');
         return;
     }
 
-    await gmodEntityExplorerProvider.editProperty(item.data.entityIndex, item.data.property, item.data.value);
+    const editableValue = item.data.value;
+
+    if (editableValue === undefined) {
+        vscode.window.showWarningMessage('Selected value is read-only and cannot be edited.');
+        return;
+    }
+
+    if (item.data.kind === 'networkVarProperty') {
+        await gmodEntityExplorerProvider.editNetworkVar(item.data.entityIndex, item.data.property, editableValue);
+        return;
+    }
+
+    if (item.data.kind === 'tableProperty') {
+        await gmodEntityExplorerProvider.editTableValue(item.data.entityIndex, item.data.property, editableValue);
+        return;
+    }
+
+    await gmodEntityExplorerProvider.editProperty(item.data.entityIndex, item.data.property, editableValue);
 }
 
 async function loadMoreGmodEntityExplorer(): Promise<void> {
@@ -1366,9 +1425,9 @@ function getGmodDebugState(): Record<string, unknown> {
     const session = getActiveGmodDebugSession();
     return {
         hasActiveSession: !!session,
-        sessionId: session?.id ?? null,
-        sessionName: session?.name ?? null,
-        sessionType: session?.type ?? null,
+        sessionId: session?.id,
+        sessionName: session?.name,
+        sessionType: session?.type,
         realm: getPersistedGmodRealm(),
         serverState: extensionContext.serverStatus.state,
     };
@@ -1377,7 +1436,7 @@ function getGmodDebugState(): Record<string, unknown> {
 function getGmodDebugStateForTool(): Record<string, unknown> {
     return {
         ...getGmodDebugState(),
-        mcpHost: gmodMcpHost?.getHealth() ?? null,
+        mcpHost: gmodMcpHost?.getHealth(),
         outputCount: gmodToolOutputEntries.length,
         errorCount: gmodToolErrorEntries.length,
     };

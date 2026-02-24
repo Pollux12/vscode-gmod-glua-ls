@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import {
     EntityDetail,
+    EntityTableEntry,
+    GetEntityNetworkVarsResult,
+    GetEntityTableResult,
     EntitySummary,
     GetEntitiesResult,
     SetEntityPropertyParams,
@@ -50,6 +53,38 @@ type EntityTreeItemData =
         editable: boolean;
     }
     | {
+        kind: 'tableProperty';
+        entityIndex: number;
+        property: string;
+        displayValue: string;
+        value?: SetEntityPropertyValue;
+        editable: boolean;
+    }
+    | {
+        kind: 'entityTableSection';
+        entityIndex: number;
+    }
+    | {
+        kind: 'networkVarSection';
+        entityIndex: number;
+    }
+    | {
+        kind: 'networkVarSearch';
+        entityIndex: number;
+    }
+    | {
+        kind: 'networkVarProperty';
+        entityIndex: number;
+        property: string;
+        displayValue: string;
+        value?: SetEntityPropertyValue;
+        editable: boolean;
+    }
+    | {
+        kind: 'entityTableSearch';
+        entityIndex: number;
+    }
+    | {
         kind: 'loadMore';
     }
     | {
@@ -93,6 +128,12 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     private readonly entityDetailRequestQueue: Array<() => void> = [];
     private classGroupFilter: EntityClassGroupFilter = 'all';
     private luaDefinedClassNames?: Set<string>;
+    private readonly entityTableEntries = new Map<number, EntityTableEntry[]>();
+    private readonly loadingEntityTables = new Set<number>();
+    private readonly entityTableFilters = new Map<number, string>();
+    private readonly entityNetworkVars = new Map<number, EntityTableEntry[]>();
+    private readonly loadingEntityNetworkVars = new Set<number>();
+    private readonly entityNetworkVarFilters = new Map<number, string>();
 
     constructor(private readonly getActiveSession: () => vscode.DebugSession | undefined) {
         this.startPolling();
@@ -157,6 +198,101 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 }
                 return element;
             }
+            case 'tableProperty': {
+                const { property, displayValue, editable, value } = element.data;
+                element.id = `entity:${element.data.entityIndex}:tableProperty:${property}`;
+                element.label = `${property}: ${displayValue}`;
+                element.tooltip = `${property}: ${displayValue}`;
+                element.iconPath = editable
+                    ? new vscode.ThemeIcon('edit')
+                    : new vscode.ThemeIcon('lock');
+                element.contextValue = editable
+                    ? 'gmodEntityPropertyEditable'
+                    : 'gmodEntityPropertyReadonly';
+                if (editable && value !== undefined) {
+                    element.command = {
+                        command: 'gmodEntityExplorer.editProperty',
+                        title: 'Edit Entity Property',
+                        arguments: [element],
+                    };
+                }
+                return element;
+            }
+            case 'entityTableSection': {
+                const filter = this.entityTableFilters.get(element.data.entityIndex) ?? '';
+                element.id = `entity:${element.data.entityIndex}:tableSection`;
+                element.label = 'EntityTable';
+                element.tooltip = filter.length > 0
+                    ? `Expand to inspect Entity:GetTable() values (filter: ${filter}). Collapsing clears cached values.`
+                    : 'Expand to inspect Entity:GetTable() values. Collapsing clears cached values.';
+                element.iconPath = new vscode.ThemeIcon('list-tree');
+                element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+                element.contextValue = 'gmodEntityTableSection';
+                return element;
+            }
+            case 'networkVarSection': {
+                const filter = this.entityNetworkVarFilters.get(element.data.entityIndex) ?? '';
+                element.id = `entity:${element.data.entityIndex}:networkVarSection`;
+                element.label = 'NetworkVars';
+                element.tooltip = filter.length > 0
+                    ? `Expand to inspect NetworkVars (filter: ${filter}).`
+                    : 'Expand to inspect NetworkVars declared via Entity:NetworkVar.';
+                element.iconPath = new vscode.ThemeIcon('broadcast');
+                element.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+                element.contextValue = 'gmodEntityNetworkVarSection';
+                return element;
+            }
+            case 'networkVarSearch': {
+                const filter = this.entityNetworkVarFilters.get(element.data.entityIndex) ?? '';
+                element.id = `entity:${element.data.entityIndex}:networkVarSearch`;
+                element.label = filter.length > 0
+                    ? `Search vars... (current: ${filter})`
+                    : 'Search vars...';
+                element.tooltip = 'Filter NetworkVars by name or value text.';
+                element.iconPath = new vscode.ThemeIcon('search');
+                element.contextValue = 'gmodEntityNetworkVarSearch';
+                element.command = {
+                    command: 'gmodEntityExplorer.searchNetworkVars',
+                    title: 'Search NetworkVars',
+                    arguments: [element],
+                };
+                return element;
+            }
+            case 'entityTableSearch': {
+                const filter = this.entityTableFilters.get(element.data.entityIndex) ?? '';
+                element.id = `entity:${element.data.entityIndex}:tableSearch`;
+                element.label = filter.length > 0
+                    ? `Search values... (current: ${filter})`
+                    : 'Search values...';
+                element.tooltip = 'Filter Entity:GetTable() entries by key or display text.';
+                element.iconPath = new vscode.ThemeIcon('search');
+                element.contextValue = 'gmodEntityTableSearch';
+                element.command = {
+                    command: 'gmodEntityExplorer.searchTable',
+                    title: 'Search Entity Table Values',
+                    arguments: [element],
+                };
+                return element;
+            }
+            case 'networkVarProperty': {
+                element.id = `entity:${element.data.entityIndex}:networkVar:${element.data.property}`;
+                element.label = `${element.data.property}: ${element.data.displayValue}`;
+                element.tooltip = `${element.data.property}: ${element.data.displayValue}`;
+                element.iconPath = element.data.editable
+                    ? new vscode.ThemeIcon('edit')
+                    : new vscode.ThemeIcon('lock');
+                element.contextValue = element.data.editable
+                    ? 'gmodEntityPropertyEditable'
+                    : 'gmodEntityPropertyReadonly';
+                if (element.data.editable && element.data.value !== undefined) {
+                    element.command = {
+                        command: 'gmodEntityExplorer.editProperty',
+                        title: 'Edit NetworkVar Value',
+                        arguments: [element],
+                    };
+                }
+                return element;
+            }
             case 'loadMore':
                 element.id = 'entities:loadMore';
                 element.label = 'Load more...';
@@ -197,6 +333,14 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return element.data.entities.map((entity) => new EntityTreeItem({ kind: 'entity', entity }));
         }
 
+        if (element.data.kind === 'entityTableSection') {
+            return this.getEntityTableItems(element.data.entityIndex);
+        }
+
+        if (element.data.kind === 'networkVarSection') {
+            return this.getEntityNetworkVarItems(element.data.entityIndex);
+        }
+
         if (element.data.kind !== 'entity') {
             return [];
         }
@@ -226,6 +370,58 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
 
         this.classGroupFilter = filter;
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    onEntityTableSectionCollapsed(entityIndex: number): void {
+        this.loadingEntityTables.delete(entityIndex);
+        this.entityTableEntries.delete(entityIndex);
+        this.entityTableFilters.delete(entityIndex);
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    onEntityNetworkVarSectionCollapsed(entityIndex: number): void {
+        this.loadingEntityNetworkVars.delete(entityIndex);
+        this.entityNetworkVars.delete(entityIndex);
+        this.entityNetworkVarFilters.delete(entityIndex);
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    async searchEntityTable(entityIndex: number): Promise<void> {
+        const currentFilter = this.entityTableFilters.get(entityIndex) ?? '';
+        const nextFilter = await vscode.window.showInputBox({
+            title: 'Search Entity:GetTable() values',
+            prompt: 'Filter table entries by key or value text',
+            placeHolder: 'Example: weapon, health, active',
+            value: currentFilter,
+            ignoreFocusOut: true,
+        });
+
+        if (nextFilter === undefined) {
+            return;
+        }
+
+        this.entityTableFilters.set(entityIndex, nextFilter.trim());
+        this.entityTableEntries.delete(entityIndex);
+        this.onDidChangeTreeDataEmitter.fire();
+    }
+
+    async searchEntityNetworkVars(entityIndex: number): Promise<void> {
+        const currentFilter = this.entityNetworkVarFilters.get(entityIndex) ?? '';
+        const nextFilter = await vscode.window.showInputBox({
+            title: 'Search NetworkVars',
+            prompt: 'Filter NetworkVars by key or value text',
+            placeHolder: 'Example: speed, owner, true',
+            value: currentFilter,
+            ignoreFocusOut: true,
+        });
+
+        if (nextFilter === undefined) {
+            return;
+        }
+
+        this.entityNetworkVarFilters.set(entityIndex, nextFilter.trim());
+        this.entityNetworkVars.delete(entityIndex);
         this.onDidChangeTreeDataEmitter.fire();
     }
 
@@ -271,6 +467,94 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
     }
 
+    async editNetworkVar(entityIndex: number, name: string, currentValue: unknown): Promise<void> {
+        const session = this.requireActiveSession();
+        if (!session) {
+            vscode.window.showErrorMessage('Cannot edit: no active GMod debug session.');
+            return;
+        }
+
+        const nextValue = await this.promptEditedValue(name, currentValue);
+        if (nextValue === undefined) {
+            return;
+        }
+
+        try {
+            await this.sendRequest<{ ok: boolean; index: number; name: string }>('gmod.entity.setNetworkVar', {
+                index: entityIndex,
+                name,
+                value: nextValue,
+            });
+
+            const vars = this.entityNetworkVars.get(entityIndex);
+            if (vars) {
+                const updated = vars.map((entry) =>
+                    entry.key === name
+                        ? {
+                            ...entry,
+                            display: this.formatValue(nextValue),
+                            value: nextValue,
+                        }
+                        : entry
+                );
+                this.entityNetworkVars.set(entityIndex, updated);
+            }
+
+            this.onDidChangeTreeDataEmitter.fire();
+            vscode.window.showInformationMessage(`Updated entity ${entityIndex} NetworkVar "${name}".`);
+        } catch (error) {
+            if (this.extractErrorCode(error) === -32001) {
+                vscode.window.showErrorMessage('Cannot edit NetworkVars: debugger must be paused');
+                return;
+            }
+            vscode.window.showErrorMessage(`Failed to edit NetworkVar: ${this.extractErrorMessage(error)}`);
+        }
+    }
+
+    async editTableValue(entityIndex: number, property: string, currentValue: unknown): Promise<void> {
+        const session = this.requireActiveSession();
+        if (!session) {
+            vscode.window.showErrorMessage('Cannot edit: no active GMod debug session.');
+            return;
+        }
+
+        const nextValue = await this.promptEditedValue(property, currentValue);
+        if (nextValue === undefined) {
+            return;
+        }
+
+        try {
+            await this.sendRequest<{ ok: boolean; index: number; property: string }>('gmod.entity.setTableValue', {
+                index: entityIndex,
+                property,
+                value: nextValue,
+            });
+
+            const entries = this.entityTableEntries.get(entityIndex);
+            if (entries) {
+                const updated = entries.map((entry) =>
+                    entry.key === property
+                        ? {
+                            ...entry,
+                            display: this.formatValue(nextValue),
+                            value: nextValue,
+                        }
+                        : entry
+                );
+                this.entityTableEntries.set(entityIndex, updated);
+            }
+
+            this.onDidChangeTreeDataEmitter.fire();
+            vscode.window.showInformationMessage(`Updated entity ${entityIndex} EntityTable value "${property}".`);
+        } catch (error) {
+            if (this.extractErrorCode(error) === -32001) {
+                vscode.window.showErrorMessage('Cannot edit EntityTable values: debugger must be paused');
+                return;
+            }
+            vscode.window.showErrorMessage(`Failed to edit EntityTable value: ${this.extractErrorMessage(error)}`);
+        }
+    }
+
     clear(): void {
         this.stopPolling();
         this.resetPollingFailures();
@@ -279,6 +563,12 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         this.entities = [];
         this.entityDetails.clear();
         this.entityDetailErrors.clear();
+        this.entityTableEntries.clear();
+        this.loadingEntityTables.clear();
+        this.entityTableFilters.clear();
+        this.entityNetworkVars.clear();
+        this.loadingEntityNetworkVars.clear();
+        this.entityNetworkVarFilters.clear();
         this.totalCount = 0;
         this.hasLoadedOnce = false;
         this.lastError = undefined;
@@ -574,6 +864,9 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         const items: EntityTreeItem[] = [
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'pos', value: detail.pos, editable: true }),
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'angles', value: detail.angles, editable: true }),
+        ];
+
+        items.push(
             new EntityTreeItem({
                 kind: 'property',
                 entityIndex: detail.index,
@@ -584,7 +877,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'valid', value: detail.valid, editable: false }),
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'class', value: detail.class, editable: false }),
             new EntityTreeItem({ kind: 'property', entityIndex: detail.index, property: 'model', value: detail.model, editable: false }),
-        ];
+        );
 
         if (detail.parent_index !== null) {
             items.push(
@@ -598,22 +891,164 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             );
         }
 
-        const propertyEntries = Object.entries(detail.properties)
-            .sort(([left], [right]) => left.localeCompare(right));
+        items.push(new EntityTreeItem({ kind: 'entityTableSection', entityIndex: detail.index }));
 
-        for (const [name, value] of propertyEntries) {
-            items.push(
+        const luaDefinedClassNames = await this.getLuaDefinedClassNames();
+        if (luaDefinedClassNames.has(detail.class.trim().toLowerCase())) {
+            items.push(new EntityTreeItem({ kind: 'networkVarSection', entityIndex: detail.index }));
+        }
+
+        return items;
+    }
+
+    private async getEntityTableItems(entityIndex: number): Promise<EntityTreeItem[]> {
+        const resultItems: EntityTreeItem[] = [
+            new EntityTreeItem({ kind: 'entityTableSearch', entityIndex }),
+        ];
+
+        if (this.loadingEntityTables.has(entityIndex)) {
+            resultItems.push(
                 new EntityTreeItem({
-                    kind: 'property',
-                    entityIndex: detail.index,
-                    property: name,
-                    value,
-                    editable: true,
+                    kind: 'info',
+                    id: `entity:${entityIndex}:tableLoading`,
+                    message: 'Loading Entity:GetTable() values...',
+                    severity: 'info',
+                })
+            );
+            return resultItems;
+        }
+
+        if (!this.entityTableEntries.has(entityIndex)) {
+            this.loadingEntityTables.add(entityIndex);
+            try {
+                const filter = this.entityTableFilters.get(entityIndex) ?? '';
+                const response = await this.sendRequest<GetEntityTableResult>('gmod.entity.getEntityTable', {
+                    index: entityIndex,
+                    filter,
+                });
+                this.entityTableEntries.set(entityIndex, this.sanitizeEntityEntries(response.entries));
+            } catch (error) {
+                const message = `Failed to load Entity:GetTable(): ${this.extractErrorMessage(error)}`;
+                resultItems.push(
+                    new EntityTreeItem({
+                        kind: 'info',
+                        id: `entity:${entityIndex}:tableError`,
+                        message,
+                        severity: 'error',
+                    })
+                );
+                this.loadingEntityTables.delete(entityIndex);
+                return resultItems;
+            } finally {
+                this.loadingEntityTables.delete(entityIndex);
+            }
+        }
+
+        const entries = [...(this.entityTableEntries.get(entityIndex) ?? [])]
+            .sort((left, right) => left.key.localeCompare(right.key));
+        if (entries.length === 0) {
+            resultItems.push(
+                new EntityTreeItem({
+                    kind: 'info',
+                    id: `entity:${entityIndex}:tableEmpty`,
+                    message: 'No Entity:GetTable() entries matched the current filter.',
+                    severity: 'info',
+                })
+            );
+            return resultItems;
+        }
+
+        for (const entry of entries) {
+            resultItems.push(
+                new EntityTreeItem({
+                    kind: 'tableProperty',
+                    entityIndex,
+                    property: entry.key,
+                    displayValue: entry.display,
+                    value: entry.value,
+                    editable: entry.editable,
                 })
             );
         }
 
-        return items;
+        return resultItems;
+    }
+
+    private async getEntityNetworkVarItems(entityIndex: number): Promise<EntityTreeItem[]> {
+        const resultItems: EntityTreeItem[] = [
+            new EntityTreeItem({ kind: 'networkVarSearch', entityIndex }),
+        ];
+
+        if (this.loadingEntityNetworkVars.has(entityIndex)) {
+            resultItems.push(
+                new EntityTreeItem({
+                    kind: 'info',
+                    id: `entity:${entityIndex}:networkVarsLoading`,
+                    message: 'Loading NetworkVars...',
+                    severity: 'info',
+                }),
+            );
+            return resultItems;
+        }
+
+        if (!this.entityNetworkVars.has(entityIndex)) {
+            this.loadingEntityNetworkVars.add(entityIndex);
+            try {
+                const response = await this.sendRequest<GetEntityNetworkVarsResult>('gmod.entity.getEntityNetworkVars', {
+                    index: entityIndex,
+                });
+                this.entityNetworkVars.set(entityIndex, this.sanitizeEntityEntries(response.entries));
+            } catch (error) {
+                this.loadingEntityNetworkVars.delete(entityIndex);
+                resultItems.push(
+                    new EntityTreeItem({
+                        kind: 'info',
+                        id: `entity:${entityIndex}:networkVarsError`,
+                        message: `Failed to load NetworkVars: ${this.extractErrorMessage(error)}`,
+                        severity: 'error',
+                    }),
+                );
+                return resultItems;
+            } finally {
+                this.loadingEntityNetworkVars.delete(entityIndex);
+            }
+        }
+
+        const filter = this.entityNetworkVarFilters.get(entityIndex) ?? '';
+        const entries = [...(this.entityNetworkVars.get(entityIndex) ?? [])]
+            .filter((entry) =>
+                filter.length === 0
+                    || entry.key.toLowerCase().includes(filter.toLowerCase())
+                    || entry.display.toLowerCase().includes(filter.toLowerCase())
+            )
+            .sort((left, right) => left.key.localeCompare(right.key));
+
+        if (entries.length === 0) {
+            resultItems.push(
+                new EntityTreeItem({
+                    kind: 'info',
+                    id: `entity:${entityIndex}:networkVarsEmpty`,
+                    message: filter.length > 0
+                        ? 'No NetworkVars matched the current filter.'
+                        : 'No NetworkVars found on this entity.',
+                    severity: 'info',
+                }),
+            );
+            return resultItems;
+        }
+
+        for (const entry of entries) {
+            resultItems.push(new EntityTreeItem({
+                kind: 'networkVarProperty',
+                entityIndex,
+                property: entry.key,
+                displayValue: entry.display,
+                value: entry.value,
+                editable: entry.editable,
+            }));
+        }
+
+        return resultItems;
     }
 
     private async withEntityDetailRequestSlot<T>(request: () => Promise<T>): Promise<T> {
@@ -643,6 +1078,39 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         if (next) {
             next();
         }
+    }
+
+    private sanitizeEntityEntries(entries: unknown): EntityTableEntry[] {
+        if (!Array.isArray(entries)) {
+            return [];
+        }
+
+        return entries
+            .filter((entry): entry is EntityTableEntry => typeof entry === 'object' && entry !== null)
+            .map((entry) => {
+                const key = typeof entry.key === 'string' ? entry.key : String(entry.key ?? '');
+                const display = typeof entry.display === 'string' ? entry.display : this.formatUnknownDisplay(entry.display);
+                const editable = entry.editable === true;
+                const value = editable ? entry.value : undefined;
+                return { key, display, editable, value };
+            })
+            .filter((entry) => entry.key.trim().length > 0);
+    }
+
+    private formatUnknownDisplay(value: unknown): string {
+        if (value === null || value === undefined) {
+            return 'nil';
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        return '<value>';
     }
 
     private async loadEntityPage(
@@ -696,21 +1164,49 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     }
 
     private replaceEntities(items: EntitySummary[], total: number): void {
+        const previousByIndex = new Map<number, EntitySummary>(
+            this.entities.map((entity) => [entity.index, entity])
+        );
+
         this.entities = items.filter((entity) => this.isDisplayableEntity(entity));
         this.totalCount = total;
+
+        for (const entity of this.entities) {
+            const previous = previousByIndex.get(entity.index);
+            if (!previous) {
+                continue;
+            }
+
+            const signatureChanged = previous.class !== entity.class
+                || previous.model !== entity.model
+                || previous.valid !== entity.valid;
+            if (signatureChanged) {
+                this.clearEntityCaches(entity.index);
+            }
+        }
 
         const activeIndices = new Set(this.entities.map((entity) => entity.index));
         for (const index of [...this.entityDetails.keys()]) {
             if (!activeIndices.has(index)) {
-                this.entityDetails.delete(index);
-                this.entityDetailErrors.delete(index);
-                this.loadingDetails.delete(index);
+                this.clearEntityCaches(index);
             }
         }
 
         for (const entity of this.entities) {
             this.syncDetailFromSummary(entity);
         }
+    }
+
+    private clearEntityCaches(index: number): void {
+        this.entityDetails.delete(index);
+        this.entityDetailErrors.delete(index);
+        this.loadingDetails.delete(index);
+        this.entityTableEntries.delete(index);
+        this.loadingEntityTables.delete(index);
+        this.entityTableFilters.delete(index);
+        this.entityNetworkVars.delete(index);
+        this.loadingEntityNetworkVars.delete(index);
+        this.entityNetworkVarFilters.delete(index);
     }
 
     private appendEntities(items: EntitySummary[]): void {
