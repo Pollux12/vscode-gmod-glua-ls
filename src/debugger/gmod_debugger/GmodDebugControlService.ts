@@ -263,10 +263,18 @@ export class GmodDebugControlService {
   }
 
   private resolvePath(inputPath: string): string {
-    if (path.isAbsolute(inputPath)) {
-      return inputPath
+    const resolved = path.isAbsolute(inputPath)
+      ? path.resolve(inputPath)
+      : (this.workspaceRoot ? path.resolve(this.workspaceRoot, inputPath) : path.resolve(inputPath))
+    // Prevent path traversal outside workspace root
+    if (this.workspaceRoot) {
+      const normalizedRoot = path.resolve(this.workspaceRoot)
+      const normalizedResolved = path.resolve(resolved)
+      if (!normalizedResolved.startsWith(normalizedRoot + path.sep) && normalizedResolved !== normalizedRoot) {
+        throw new Error(`Path escapes workspace root: ${inputPath}`)
+      }
     }
-    return this.workspaceRoot ? path.resolve(this.workspaceRoot, inputPath) : path.resolve(inputPath)
+    return resolved
   }
 
   private toLuaRelativePath(filePath: string): string {

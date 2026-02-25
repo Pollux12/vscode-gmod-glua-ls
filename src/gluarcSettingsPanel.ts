@@ -175,7 +175,8 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     type: 'configUpdated',
                     config: this.config,
                 });
-            } catch {
+            } catch (error) {
+                console.warn('[GLuaLS] Failed to reload .gluarc.json:', error instanceof Error ? error.message : error);
             }
         }, 300);
     }

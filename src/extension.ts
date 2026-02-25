@@ -206,7 +206,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
                 const frameId = activeItem instanceof vscode.DebugStackFrame ? activeItem.frameId : undefined;
                 try {
                     await session.customRequest('evaluate', { expression: text, context: 'repl', frameId });
-                } catch { /* ignore */ }
+                } catch (error) {
+                    console.warn('[GLuaLS] Debug evaluate failed for non-GMod session:', error instanceof Error ? error.message : error);
+                }
                 return;
             }
             const activeItem = vscode.debug.activeStackItem;

@@ -904,10 +904,10 @@ export class GmodMcpHost implements vscode.Disposable {
     }
 
     private getTokenHint(): string {
-        if (this.authToken.length <= 8) {
-            return this.authToken;
+        if (this.authToken.length <= 4) {
+            return '****';
         }
-        return `${this.authToken.slice(0, 4)}...${this.authToken.slice(-4)}`;
+        return `${this.authToken.slice(0, 4)}${'*'.repeat(Math.min(this.authToken.length - 4, 8))}`;
     }
 
     private coerceTimestamp(value: unknown): string {

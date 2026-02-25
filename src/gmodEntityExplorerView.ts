@@ -1060,14 +1060,29 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
     }
 
+    private static readonly ENTITY_DETAIL_QUEUE_TIMEOUT_MS = 30_000;
+
     private async acquireEntityDetailRequestSlot(): Promise<void> {
         if (this.inFlightEntityDetailRequests < ENTITY_DETAIL_MAX_CONCURRENCY) {
             this.inFlightEntityDetailRequests += 1;
             return;
         }
 
-        await new Promise<void>((resolve) => {
-            this.entityDetailRequestQueue.push(resolve);
+        await new Promise<void>((resolve, reject) => {
+            const callback = () => {
+                clearTimeout(timer);
+                resolve();
+            };
+
+            const timer = setTimeout(() => {
+                const idx = this.entityDetailRequestQueue.indexOf(callback);
+                if (idx >= 0) {
+                    this.entityDetailRequestQueue.splice(idx, 1);
+                }
+                reject(new Error('Entity detail request timed out waiting for a slot.'));
+            }, GmodEntityExplorerProvider.ENTITY_DETAIL_QUEUE_TIMEOUT_MS);
+
+            this.entityDetailRequestQueue.push(callback);
         });
         this.inFlightEntityDetailRequests += 1;
     }

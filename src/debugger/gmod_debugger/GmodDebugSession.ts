@@ -685,6 +685,10 @@ export class GmodDebugSession extends DebugSession {
         }
 
         this.sendResponse(response)
+      }).catch((err) => {
+        response.success = false
+        response.message = err instanceof Error ? err.message : String(err)
+        this.sendResponse(response)
       })
     } catch(e) {
       response.success = false

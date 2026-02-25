@@ -3,8 +3,10 @@
     "displayName": "Garry's Mod Language Server",
     "description": "Language Server for Garry's Mod GLua",
     "version": "0.0.3",
-    "icon": "",
+    "icon": "res/logo.png",
     "publisher": "Pollux",
+    "license": "MIT",
+    "homepage": "https://github.com/Pollux12/gmod-glua-ls",
     "engines": {
         "vscode": "^1.95.0"
     },
@@ -32,131 +34,131 @@
         "commands": [
             {
                 "command": "gluals.restartServer",
-                "title": "GLuaLS: Restart Lua Server"
+                "title": "Restart Lua Server"
             },
             {
                 "command": "gluals.stopServer",
-                "title": "GLuaLS: Stop GLua Language Server"
+                "title": "Stop GLua Language Server"
             },
             {
                 "command": "gluals.showSyntaxTree",
-                "title": "GLuaLS: Show Syntax Tree",
+                "title": "Show Syntax Tree",
                 "icon": "$(symbol-structure)"
             },
             {
                 "command": "gluals.gmod.updateAnnotations",
-                "title": "GLuaLS: Update GLuaLS Annotations",
+                "title": "Update GLuaLS Annotations",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.removeAnnotations",
-                "title": "GLuaLS: Remove GLuaLS Annotations",
+                "title": "Remove GLuaLS Annotations",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.openSettings",
-                "title": "GLuaLS: Open Workspace Config",
+                "title": "Open Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.createSettings",
-                "title": "GLuaLS: Create Workspace Config",
+                "title": "Create Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.editSettings",
-                "title": "GLuaLS: Edit Workspace Config",
+                "title": "Edit Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.pauseSoft",
-                "title": "GLuaLS Debug: Pause (Soft)",
+                "title": "Debug: Pause (Soft)",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.pauseNow",
-                "title": "GLuaLS Debug: Pause (Immediate)",
+                "title": "Debug: Pause (Immediate)",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.resume",
-                "title": "GLuaLS Debug: Resume",
+                "title": "Debug: Resume",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.breakHere",
-                "title": "GLuaLS Debug: Break Here",
+                "title": "Debug: Break Here",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.waitIDE",
-                "title": "GLuaLS Debug: Wait IDE",
+                "title": "Debug: Wait IDE",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.runLua",
-                "title": "GLuaLS: Run Lua",
+                "title": "Run Lua",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.runFile",
-                "title": "GLuaLS: Run Lua File",
+                "title": "Run Lua File",
                 "category": "GLuaLS",
                 "icon": "$(run)"
             },
             {
                 "command": "gluals.gmod.refreshFile",
-                "title": "GLuaLS: Refresh Lua File",
+                "title": "Refresh Lua File",
                 "category": "GLuaLS",
                 "icon": "$(refresh)"
             },
             {
                 "command": "gluals.gmod.runSelection",
-                "title": "GLuaLS: Run Lua Selection",
+                "title": "Run Lua Selection",
                 "category": "GLuaLS",
                 "icon": "$(run-all)"
             },
             {
                 "command": "gluals.gmod.runCommand",
-                "title": "GLuaLS: Run Command",
+                "title": "Run Command",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.showRealmMenu",
-                "title": "GLuaLS: Select GMod Lua Execution Realm",
+                "title": "Select GMod Lua Execution Realm",
                 "category": "GLua"
             },
             {
                 "command": "gluals.gmod.setRealm",
-                "title": "GLuaLS: Set Lua Execution Realm",
+                "title": "Set Lua Execution Realm",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.startHost",
-                "title": "GLuaLS MCP: Start Host",
+                "title": "MCP: Start Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.stopHost",
-                "title": "GLuaLS MCP: Stop Host",
+                "title": "MCP: Stop Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.restartHost",
-                "title": "GLuaLS MCP: Restart Host",
+                "title": "MCP: Restart Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.healthCheck",
-                "title": "GLuaLS MCP: Health Check",
+                "title": "MCP: Health Check",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.explorer.refresh",
-                "title": "GLuaLS Explorer: Refresh",
+                "title": "Explorer: Refresh",
                 "category": "GLuaLS",
                 "icon": "$(refresh)"
             },
@@ -167,19 +169,19 @@
             },
             {
                 "command": "gluals.gmod.onboarding.start",
-                "title": "GLuaLS: Run Setup Wizard",
+                "title": "Run Setup Wizard",
                 "category": "GLuaLS",
                 "icon": "$(rocket)"
             },
             {
                 "command": "gluals.gmod.diagnostics.repair",
-                "title": "GLuaLS: Run Diagnostics and Repair",
+                "title": "Run Diagnostics and Repair",
                 "category": "GLuaLS",
                 "icon": "$(tools)"
             },
             {
                 "command": "gluals.gmod.configureDebugger",
-                "title": "GLuaLS: Configure Debugger",
+                "title": "Configure Debugger",
                 "category": "GLuaLS",
                 "icon": "$(debug-configure)"
             },
@@ -197,7 +199,7 @@
             },
             {
                 "command": "gmodErrors.openLocation",
-                "title": "GLuaLS Errors: Open Source Location",
+                "title": "Errors: Open Source Location",
                 "category": "GLuaLS"
             },
             {
@@ -243,19 +245,19 @@
             },
             {
                 "command": "gluals.gmod.explorer.copyRelativePath",
-                "title": "GLuaLS Explorer: Copy Relative Path",
+                "title": "Explorer: Copy Relative Path",
                 "category": "GLuaLS",
                 "icon": "$(copy)"
             },
             {
                 "command": "gluals.gmod.explorer.copyAbsolutePath",
-                "title": "GLuaLS Explorer: Copy Absolute Path",
+                "title": "Explorer: Copy Absolute Path",
                 "category": "GLuaLS",
                 "icon": "$(copy)"
             },
             {
                 "command": "gluals.gmod.explorer.revealInExplorer",
-                "title": "GLuaLS Explorer: Reveal in Explorer",
+                "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
             }
@@ -746,6 +748,34 @@
                 {
                     "command": "gluals.gmod.mcp.healthCheck",
                     "when": "resourceExtname == .lua"
+                },
+                {
+                    "command": "gluals.gmod.pauseSoft",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.pauseNow",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.resume",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.breakHere",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.waitIDE",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.runLua",
+                    "when": "inDebugMode && debugType == gluals_gmod"
+                },
+                {
+                    "command": "gluals.gmod.runCommand",
+                    "when": "inDebugMode && debugType == gluals_gmod"
                 }
             ],
             "view/item/context": [
