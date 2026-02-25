@@ -15,7 +15,7 @@ import * as Annotator from './annotator';
 import { EmmyrcSchemaContentProvider } from './emmyrcSchemaContentProvider';
 import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
 import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
-import { insertEmmyDebugCode, registerDebuggers } from './debugger';
+import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
@@ -140,8 +140,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.showServerMenu', handler: showServerMenu },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
-        // debugger commands
-        { id: 'gluals.insertEmmyDebugCode', handler: insertEmmyDebugCode },
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
@@ -157,6 +155,8 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.waitIDE', handler: () => runGmodControlCommand('waitIDE') },
         { id: 'gluals.gmod.runLua', handler: runGmodRunLua },
         { id: 'gluals.gmod.runFile', handler: runGmodRunFile },
+        { id: 'gluals.gmod.refreshFile', handler: runGmodRefreshFile },
+        { id: 'gluals.gmod.runSelection', handler: runGmodRunSelection },
         { id: 'gluals.gmod.runCommand', handler: runGmodRunCommand },
         { id: 'gluals.gmod.setRealm', handler: setGmodRealm },
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
@@ -187,7 +187,50 @@ function registerCommands(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand(id, handler)
     );
 
-    context.subscriptions.push(...commands);
+    // Override the built-in "Evaluate in Debug Console" editor action so that
+    // selections are evaluated as Lua for GMod debug sessions.
+    // We pass the frameId from the active stack item so that frameScopedEvaluation
+    // fires correctly in the debug adapter without needing any '=' prefix.
+    const evaluateInConsoleOverride = vscode.commands.registerCommand(
+        'editor.debug.action.selectionToRepl',
+        async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) return;
+            const text = editor.document.getText(editor.selection).trim();
+            if (!text) return;
+            const session = vscode.debug.activeDebugSession;
+            if (!session) return;
+            if (session.type !== 'gluals_gmod') {
+                // Non-GMod session: fall back to standard evaluate behaviour.
+                const activeItem = vscode.debug.activeStackItem;
+                const frameId = activeItem instanceof vscode.DebugStackFrame ? activeItem.frameId : undefined;
+                try {
+                    await session.customRequest('evaluate', { expression: text, context: 'repl', frameId });
+                } catch { /* ignore */ }
+                return;
+            }
+            const activeItem = vscode.debug.activeStackItem;
+            const frameId = activeItem instanceof vscode.DebugStackFrame ? activeItem.frameId : undefined;
+            if (frameId !== undefined) {
+                // Paused: frameScopedEvaluation in the adapter treats the raw expression as Lua eval.
+                try {
+                    const result = await session.customRequest('evaluate', { expression: '=' + text, context: 'repl', frameId });
+                    const output = typeof result?.result === 'string' ? result.result : JSON.stringify(result);
+                    if (output) {
+                        vscode.debug.activeDebugConsole.appendLine(output);
+                    }
+                } catch (error) {
+                    const msg = error instanceof Error ? error.message : String(error);
+                    vscode.debug.activeDebugConsole.appendLine(`Evaluate error: ${msg}`);
+                }
+            } else {
+                // Not paused: run via control channel so Lua executes without a stack frame.
+                await runGmodControlCommand('runLua', { lua: text });
+            }
+        }
+    );
+
+    context.subscriptions.push(...commands, evaluateInConsoleOverride);
 }
 
 /**
@@ -252,6 +295,7 @@ async function initializeExtension(): Promise<void> {
     // Initialize GMod annotation manager
     gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
     gmodRdbUpdater = new GmodRdbUpdater(extensionContext.vscodeContext);
+    void gmodRdbUpdater.ensureRuntimeFilesUpToDate();
 
     // Initialize annotations before starting server
     await gmodAnnotationManager.initializeAnnotations();
@@ -666,6 +710,7 @@ type GmodControlCommand =
     | 'waitIDE'
     | 'runLua'
     | 'runFile'
+    | 'refreshFile'
     | 'runCommand'
     | 'setRealm';
 
@@ -732,7 +777,7 @@ async function executeGmodControlCommand(command: GmodControlCommand, args: Reco
         throw new Error('No active GMod debug session.');
     }
 
-    const realmAwareCommands: GmodControlCommand[] = ['breakHere', 'waitIDE', 'runLua', 'runFile', 'setRealm'];
+    const realmAwareCommands: GmodControlCommand[] = ['breakHere', 'waitIDE', 'runLua', 'runFile', 'refreshFile', 'setRealm'];
     const payload = realmAwareCommands.includes(command)
         ? { realm: getPersistedGmodRealm(session), ...args }
         : args;
@@ -762,6 +807,30 @@ async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
     await runGmodControlCommand('runFile', { path: targetUri.fsPath });
 }
 
+async function runGmodRefreshFile(uri?: vscode.Uri): Promise<void> {
+    const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
+    if (!targetUri?.fsPath) {
+        vscode.window.showWarningMessage('No Lua file selected.');
+        return;
+    }
+    await runGmodControlCommand('refreshFile', { path: targetUri.fsPath });
+}
+
+async function runGmodRunSelection(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showWarningMessage('No active editor.');
+        return;
+    }
+    const selection = editor.selection;
+    const lua = editor.document.getText(selection);
+    if (!lua.trim()) {
+        vscode.window.showWarningMessage('No text selected.');
+        return;
+    }
+    await runGmodControlCommand('runLua', { lua });
+}
+
 async function runGmodRunCommand(): Promise<void> {
     const command = await vscode.window.showInputBox({
         title: 'Run Garry\'s Mod Console Command',
@@ -779,7 +848,7 @@ async function setGmodRealm(realm?: string): Promise<void> {
     const pickedRealm = realm ?? await vscode.window.showQuickPick(
         [...GMOD_REALMS],
         {
-            title: 'Select Garry\'s Mod Debug Realm',
+            title: 'Select GMod Lua Execution Realm',
             placeHolder: `Current: ${getPersistedGmodRealm()}`
         }
     );
@@ -810,13 +879,14 @@ async function setGmodRealm(realm?: string): Promise<void> {
         await session.customRequest('setRealm', { realm: selectedRealm });
     }
     gmodRealmProvider?.refresh();
-    vscode.window.showInformationMessage(`GMod debug realm set to ${selectedRealm}.`);
+    vscode.window.showInformationMessage(`GMod Lua execution realm set to ${selectedRealm}.`);
 }
 
 function onDidStartDebugSession(session: vscode.DebugSession): void {
     if (session.type !== 'gluals_gmod') {
         return;
     }
+    void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
     gmodErrorStore?.clear();
     gmodEntityExplorerProvider?.clear();
     gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));

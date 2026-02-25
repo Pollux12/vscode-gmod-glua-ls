@@ -1,9 +1,5 @@
 import * as vscode from "vscode";
-import * as path from "path";
 import { extensionContext } from "../extension";
-import { EmmyNewDebuggerProvider } from "./new_debugger/EmmyNewDebuggerProvider";
-import { EmmyAttachDebuggerProvider } from "./attach/EmmyAttachDebuggerProvider";
-import { EmmyLaunchDebuggerProvider } from "./launch/EmmyLaunchDebuggerProvider";
 import { InlineDebugAdapterFactory } from "./DebugFactory";
 import { GmodDebuggerProvider } from "./gmod_debugger/GmodDebuggerProvider";
 
@@ -17,64 +13,10 @@ interface DebuggerConfig {
 }
 
 
-export async function insertEmmyDebugCode() {
-    const context = extensionContext.vscodeContext;
-    const activeEditor = vscode.window.activeTextEditor;
-    if (!activeEditor) {
-        return;
-    }
-    const document = activeEditor.document;
-    if (document.languageId !== "lua") {
-        return;
-    }
-
-    let dllPath = "";
-    const isWindows = process.platform === "win32";
-    const isMac = process.platform === "darwin";
-    const isLinux = process.platform === "linux";
-    if (isWindows) {
-        const arch = await vscode.window.showQuickPick(["x64", "x86"]);
-        if (!arch) {
-            return;
-        }
-        dllPath = path.join(
-            context.extensionPath,
-            `debugger/emmy/windows/${arch}/?.dll`
-        );
-    } else if (isMac) {
-        const arch = await vscode.window.showQuickPick(["x64", "arm64"]);
-        if (!arch) {
-            return;
-        }
-        dllPath = path.join(
-            context.extensionPath,
-            `debugger/emmy/mac/${arch}/emmy_core.dylib`
-        );
-    } else if (isLinux) {
-        dllPath = path.join(
-            context.extensionPath,
-            `debugger/emmy/linux/emmy_core.so`
-        );
-    }
-
-    const host = "localhost";
-    const port = 9966;
-    const ins = new vscode.SnippetString();
-    ins.appendText(
-        `package.cpath = package.cpath .. ";${dllPath.replace(/\\/g, "/")}"\n`
-    );
-    ins.appendText(`local dbg = require("emmy_core")\n`);
-    ins.appendText(`dbg.tcpListen("${host}", ${port})`);
-    activeEditor.insertSnippet(ins);
-}
-
 export function registerDebuggers(): void {
     const context = extensionContext.vscodeContext;
 
     const debuggerConfigs: DebuggerConfig[] = [
-        { type: 'gluals_new', provider: new EmmyNewDebuggerProvider('gluals_new', context) },
-        { type: 'gluals_attach', provider: new EmmyAttachDebuggerProvider('gluals_attach', context) },
-        { type: 'gluals_launch', provider: new EmmyLaunchDebuggerProvider('gluals_launch', context) },
         { type: "gluals_gmod", provider: new GmodDebuggerProvider("gluals_gmod", context) },
     ];
 

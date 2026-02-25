@@ -172,6 +172,7 @@ export class GmodDebugSession extends DebugSession {
     'waitIDE',
     'runLua',
     'runFile',
+    'refreshFile',
     'runCommand',
     'setRealm',
   ])
@@ -1085,12 +1086,10 @@ export class GmodDebugSession extends DebugSession {
       const expression = args.expression.trim()
 
       if (args.context === 'repl') {
-        // When unpaused there is no stack frame available for LRDB `eval`, so we have to show an error for any eval attempt
+        // Expressions default to console commands; prefix with = or lua/eval to explicitly request a Lua eval.
         const explicitLuaPrefix = /^(lua|eval)\s+/i
-        const explicitCommandPrefix = /^con\s+/i
-        const isConsole = explicitCommandPrefix.test(expression)
         const isLuaPrefix = expression.startsWith('=') || explicitLuaPrefix.test(expression)
-        if (!this._isPaused && !isConsole && !isLuaPrefix) {
+        if (!this._isPaused && isLuaPrefix) {
           response.success = false
           response.message =
             'Evaluation is only available when execution is paused; pause the debugger or use Run Lua.'
@@ -1100,17 +1099,11 @@ export class GmodDebugSession extends DebugSession {
 
         let command = expression
         let luaExpression: string | undefined
-        const frameScopedEvaluation = this._isPaused && typeof args.frameId === 'number' && Number.isFinite(args.frameId)
 
         if (expression.startsWith('=')) {
           luaExpression = expression.slice(1).trim()
         } else if (explicitLuaPrefix.test(expression)) {
           luaExpression = expression.replace(explicitLuaPrefix, '').trim()
-        } else if (explicitCommandPrefix.test(expression)) {
-          command = expression.replace(explicitCommandPrefix, '').trim()
-        } else if (frameScopedEvaluation) {
-          // Preserve Evaluate-in-Debug-Console behavior for frame-bound expressions.
-          luaExpression = expression
         }
 
         if (luaExpression != null) {
@@ -1656,6 +1649,15 @@ export class GmodDebugSession extends DebugSession {
             }
             return this._debug_client.continue()
           },
+          runLua: (lua: string, realm: GmodRealm) => {
+            return this.sendRunLua(lua, realm)
+          },
+          runFile: (filePath: string, realm: GmodRealm) => {
+            return this.sendRunFile(filePath, realm)
+          },
+          refreshFile: (filePath: string) => {
+            return this.sendRefreshFile(filePath)
+          },
           runCommand: (command: string) => {
             return this.sendConsoleCommand(command)
           },
@@ -1716,6 +1718,45 @@ export class GmodDebugSession extends DebugSession {
     }
 
     return this._debug_client.command(command).then(() => undefined)
+  }
+
+  private sendRunLua(lua: string, realm: GmodRealm): Promise<void> {
+    const commandReadinessError = this.getConsoleCommandReadinessError()
+    if (commandReadinessError) {
+      return Promise.reject(new Error(commandReadinessError))
+    }
+
+    if (!this._debug_client) {
+      return Promise.reject(new Error('Debugger is not connected.'))
+    }
+
+    return this._debug_client.runLua({ lua, realm }).then(() => undefined)
+  }
+
+  private sendRunFile(filePath: string, realm: GmodRealm): Promise<void> {
+    const commandReadinessError = this.getConsoleCommandReadinessError()
+    if (commandReadinessError) {
+      return Promise.reject(new Error(commandReadinessError))
+    }
+
+    if (!this._debug_client) {
+      return Promise.reject(new Error('Debugger is not connected.'))
+    }
+
+    return this._debug_client.runFile({ file: filePath, realm }).then(() => undefined)
+  }
+
+  private sendRefreshFile(filePath: string): Promise<void> {
+    const commandReadinessError = this.getConsoleCommandReadinessError()
+    if (commandReadinessError) {
+      return Promise.reject(new Error(commandReadinessError))
+    }
+
+    if (!this._debug_client) {
+      return Promise.reject(new Error('Debugger is not connected.'))
+    }
+
+    return this._debug_client.refreshFile({ file: filePath }).then(() => undefined)
   }
 
   protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {

@@ -13,7 +13,6 @@
         "Debuggers"
     ],
     "activationEvents": [
-        "onDebug",
         "onLanguage:lua"
     ],
     "keywords": [
@@ -36,10 +35,6 @@
                 "title": "GLuaLS: Restart Lua Server"
             },
             {
-                "command": "gluals.insertEmmyDebugCode",
-                "title": "GLuaLS: Insert Emmy Debugger Code"
-            },
-            {
                 "command": "gluals.stopServer",
                 "title": "GLuaLS: Stop GLua Language Server"
             },
@@ -50,105 +45,118 @@
             },
             {
                 "command": "gluals.gmod.updateAnnotations",
-                "title": "GMod: Update GLuaLS Annotations",
+                "title": "GLuaLS: Update GLuaLS Annotations",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.removeAnnotations",
-                "title": "GMod: Remove GLuaLS Annotations",
+                "title": "GLuaLS: Remove GLuaLS Annotations",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.openSettings",
-                "title": "GMod: Open GLua Settings",
+                "title": "GLuaLS: Open Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.createSettings",
-                "title": "Create GLua Settings",
+                "title": "GLuaLS: Create Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.editSettings",
-                "title": "Edit GLua Settings",
+                "title": "GLuaLS: Edit Workspace Config",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.pauseSoft",
-                "title": "GMod Debug: Pause (Soft)",
+                "title": "GLuaLS Debug: Pause (Soft)",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.pauseNow",
-                "title": "GMod Debug: Pause (Immediate)",
+                "title": "GLuaLS Debug: Pause (Immediate)",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.resume",
-                "title": "GMod Debug: Resume",
+                "title": "GLuaLS Debug: Resume",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.breakHere",
-                "title": "GMod Debug: Break Here",
+                "title": "GLuaLS Debug: Break Here",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.waitIDE",
-                "title": "GMod Debug: Wait IDE",
+                "title": "GLuaLS Debug: Wait IDE",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.runLua",
-                "title": "GMod Debug: Run Lua",
+                "title": "GLuaLS: Run Lua",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.runFile",
-                "title": "GMod Debug: Run File",
-                "category": "GLuaLS"
+                "title": "GLuaLS: Run Lua File",
+                "category": "GLuaLS",
+                "icon": "$(run)"
+            },
+            {
+                "command": "gluals.gmod.refreshFile",
+                "title": "GLuaLS: Refresh Lua File",
+                "category": "GLuaLS",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "gluals.gmod.runSelection",
+                "title": "GLuaLS: Run Lua Selection",
+                "category": "GLuaLS",
+                "icon": "$(run-all)"
             },
             {
                 "command": "gluals.gmod.runCommand",
-                "title": "GMod Debug: Run Command",
+                "title": "GLuaLS: Run Command",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.showRealmMenu",
-                "title": "GLuaLS: Select GMod Execution Realm",
+                "title": "GLuaLS: Select GMod Lua Execution Realm",
                 "category": "GLua"
             },
             {
                 "command": "gluals.gmod.setRealm",
-                "title": "GMod Debug: Set Realm",
+                "title": "GLuaLS: Set Lua Execution Realm",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.startHost",
-                "title": "GMod MCP: Start Host",
+                "title": "GLuaLS MCP: Start Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.stopHost",
-                "title": "GMod MCP: Stop Host",
+                "title": "GLuaLS MCP: Stop Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.restartHost",
-                "title": "GMod MCP: Restart Host",
+                "title": "GLuaLS MCP: Restart Host",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.mcp.healthCheck",
-                "title": "GMod MCP: Health Check",
+                "title": "GLuaLS MCP: Health Check",
                 "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.explorer.refresh",
-                "title": "GMod Explorer: Refresh",
+                "title": "GLuaLS Explorer: Refresh",
                 "category": "GLuaLS",
                 "icon": "$(refresh)"
             },
@@ -159,19 +167,19 @@
             },
             {
                 "command": "gluals.gmod.onboarding.start",
-                "title": "GMod: Run Setup Wizard",
+                "title": "GLuaLS: Run Setup Wizard",
                 "category": "GLuaLS",
                 "icon": "$(rocket)"
             },
             {
                 "command": "gluals.gmod.diagnostics.repair",
-                "title": "GMod: Run Diagnostics and Repair",
+                "title": "GLuaLS: Run Diagnostics and Repair",
                 "category": "GLuaLS",
                 "icon": "$(tools)"
             },
             {
                 "command": "gluals.gmod.configureDebugger",
-                "title": "GMod: Configure Debugger",
+                "title": "GLuaLS: Configure Debugger",
                 "category": "GLuaLS",
                 "icon": "$(debug-configure)"
             },
@@ -189,7 +197,7 @@
             },
             {
                 "command": "gmodErrors.openLocation",
-                "title": "GMod Errors: Open Source Location",
+                "title": "GLuaLS Errors: Open Source Location",
                 "category": "GLuaLS"
             },
             {
@@ -206,19 +214,19 @@
             },
             {
                 "command": "gmodEntityExplorer.filter",
-                "title": "GMod Entity Explorer: Filter Categories",
+                "title": "Entity Explorer: Filter Categories",
                 "category": "GLuaLS",
                 "icon": "$(filter)"
             },
             {
                 "command": "gmodEntityExplorer.searchTable",
-                "title": "GMod Entity Explorer: Search Entity Table Values",
+                "title": "Entity Explorer: Search Entity Table Values",
                 "category": "GLuaLS",
                 "icon": "$(search)"
             },
             {
                 "command": "gmodEntityExplorer.searchNetworkVars",
-                "title": "GMod Entity Explorer: Search NetworkVars",
+                "title": "Entity Explorer: Search NetworkVars",
                 "category": "GLuaLS",
                 "icon": "$(search)"
             },
@@ -235,19 +243,19 @@
             },
             {
                 "command": "gluals.gmod.explorer.copyRelativePath",
-                "title": "GMod Explorer: Copy Relative Path",
+                "title": "GLuaLS Explorer: Copy Relative Path",
                 "category": "GLuaLS",
                 "icon": "$(copy)"
             },
             {
                 "command": "gluals.gmod.explorer.copyAbsolutePath",
-                "title": "GMod Explorer: Copy Absolute Path",
+                "title": "GLuaLS Explorer: Copy Absolute Path",
                 "category": "GLuaLS",
                 "icon": "$(copy)"
             },
             {
                 "command": "gluals.gmod.explorer.revealInExplorer",
-                "title": "GMod Explorer: Reveal in Explorer",
+                "title": "GLuaLS Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
             }
@@ -285,7 +293,7 @@
                 "toolReferenceName": "gmodRunLua",
                 "icon": "$(terminal)",
                 "userDescription": "Execute a Lua chunk in the active Garry's Mod debug session.",
-                "modelDescription": "Runs arbitrary Lua code in the currently active Garry's Mod debug session using the selected runtime realm (server, client, or menu). Use this when the user asks to test Lua behavior live in-game, query runtime state, or perform controlled debugger-side execution. This tool requires an active GMod debug session and returns a formatted summary including realm, success status, and diagnostics.",
+                "modelDescription": "Runs arbitrary Lua code in the currently active Garry's Mod debug session using the selected runtime realm (server, client, or shared). Use this when the user asks to test Lua behavior live in-game, query runtime state, or perform controlled debugger-side execution. This tool requires an active GMod debug session and returns a formatted summary including realm, success status, and diagnostics.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -298,7 +306,7 @@
                             "enum": [
                                 "server",
                                 "client",
-                                "menu"
+                                "shared"
                             ],
                             "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
                         }
@@ -336,7 +344,7 @@
                 "toolReferenceName": "gmodRunFile",
                 "icon": "$(terminal)",
                 "userDescription": "Dispatch a Lua file path to be include()'d in Garry's Mod.",
-                "modelDescription": "Dispatches a Lua file path for execution in Garry's Mod via debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/menu realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
+                "modelDescription": "Dispatches a Lua file path for execution in Garry's Mod via debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/shared realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -349,7 +357,7 @@
                             "enum": [
                                 "server",
                                 "client",
-                                "menu"
+                                "shared"
                             ],
                             "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
                         }
@@ -453,205 +461,6 @@
         ],
         "debuggers": [
             {
-                "type": "gluals_attach",
-                "label": "GLuaLS Attach Debug",
-                "program": "./out/debugger/attach/EmmyAttachDebugAdapter.js",
-                "runtime": "node",
-                "configurationAttributes": {
-                    "attach": {
-                        "required": [
-                            "pid"
-                        ],
-                        "properties": {
-                            "pid": {
-                                "type": "number",
-                                "description": "%debug.attach.target_pid%",
-                                "default": 0
-                            },
-                            "processName": {
-                                "type": "string",
-                                "description": "%debug.attach.target_process%",
-                                "default": ""
-                            },
-                            "captureLog": {
-                                "type": "boolean",
-                                "description": "%debug.attach.captureLog%",
-                                "default": false
-                            }
-                        }
-                    }
-                },
-                "initialConfigurations": [
-                    {
-                        "type": "gluals_attach",
-                        "request": "attach",
-                        "name": "%debug.attach.name%",
-                        "pid": 0,
-                        "processName": "",
-                        "captureLog": false
-                    }
-                ],
-                "configurationSnippets": [
-                    {
-                        "label": "%debug.attach.label%",
-                        "description": "%debug.attach.desc%",
-                        "body": {
-                            "type": "gluals_attach",
-                            "request": "attach",
-                            "name": "%debug.attach.name%",
-                            "pid": 0,
-                            "processName": ""
-                        }
-                    }
-                ],
-                "languages": [
-                    "lua"
-                ]
-            },
-            {
-                "type": "gluals_launch",
-                "label": "GLuaLS Launch Debug",
-                "program": "./out/debugger/launch/EmmyLaunchDebugAdapter.js",
-                "runtime": "node",
-                "configurationAttributes": {
-                    "launch": {
-                        "required": [
-                            "program",
-                            "workingDir",
-                            "arguments",
-                            "newWindow"
-                        ],
-                        "properties": {
-                            "program": {
-                                "type": "string",
-                                "description": "%debug.launch.program%",
-                                "default": ""
-                            },
-                            "workingDir": {
-                                "type": "string",
-                                "description": "%debug.launch.workingDir%",
-                                "default": ""
-                            },
-                            "arguments": {
-                                "type": "array",
-                                "description": "%debug.launch.arguments%",
-                                "default": []
-                            },
-                            "newWindow": {
-                                "type": "boolean",
-                                "description": "%debug.launch.newWindow%",
-                                "default": false
-                            }
-                        }
-                    }
-                },
-                "initialConfigurations": [
-                    {
-                        "type": "gluals_launch",
-                        "request": "launch",
-                        "name": "%debug.launch.name%",
-                        "program": "",
-                        "workingDir": "",
-                        "arguments": [],
-                        "newWindow": false
-                    }
-                ],
-                "configurationSnippets": [
-                    {
-                        "label": "%debug.launch.label%",
-                        "description": "%debug.launch.desc%",
-                        "body": {
-                            "type": "gluals_launch",
-                            "request": "launch",
-                            "name": "%debug.launch.name%",
-                            "program": "",
-                            "workingDir": "",
-                            "arguments": [],
-                            "newWindow": false
-                        }
-                    }
-                ],
-                "languages": [
-                    "lua"
-                ]
-            },
-            {
-                "type": "gluals_new",
-                "label": "GLuaLS New Debugger",
-                "program": "./out/debugger/new_debugger/EmmyNewDebugAdapter.js",
-                "runtime": "node",
-                "configurationAttributes": {
-                    "launch": {
-                        "required": [
-                            "host",
-                            "port",
-                            "ideConnectDebugger"
-                        ],
-                        "properties": {
-                            "host": {
-                                "type": "string",
-                                "description": "host",
-                                "default": "localhost"
-                            },
-                            "port": {
-                                "type": "number",
-                                "description": "port",
-                                "default": 9966
-                            },
-                            "ideConnectDebugger": {
-                                "type": "boolean",
-                                "description": "连接方式",
-                                "default": true
-                            },
-                            "ext": {
-                                "type": "array",
-                                "description": "Lua文件后缀",
-                                "default": [
-                                    ".lua"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "initialConfigurations": [
-                    {
-                        "type": "gluals_new",
-                        "request": "launch",
-                        "name": "GLuaLS New Debug",
-                        "host": "localhost",
-                        "port": 9966,
-                        "ext": [
-                            ".lua",
-                            ".lua.txt",
-                            ".lua.bytes"
-                        ],
-                        "ideConnectDebugger": true
-                    }
-                ],
-                "configurationSnippets": [
-                    {
-                        "label": "GLuaLS New Debug",
-                        "description": "GLuaLS New Debug",
-                        "body": {
-                            "type": "gluals_new",
-                            "request": "launch",
-                            "name": "GLuaLS New Debug",
-                            "host": "localhost",
-                            "port": 9966,
-                            "ext": [
-                                ".lua",
-                                ".lua.txt",
-                                ".lua.bytes"
-                            ],
-                            "ideConnectDebugger": true
-                        }
-                    }
-                ],
-                "languages": [
-                    "lua"
-                ]
-            },
-            {
                 "type": "gluals_gmod",
                 "label": "GMod Remote Debug",
                 "program": "./out/debugger/gmod_debugger/GmodDebugAdapter.js",
@@ -698,7 +507,7 @@
                                 "enum": [
                                     "server",
                                     "client",
-                                    "menu"
+                                    "shared"
                                 ],
                                 "default": "server"
                             }
@@ -760,7 +569,7 @@
                                 "enum": [
                                     "server",
                                     "client",
-                                    "menu"
+                                    "shared"
                                 ],
                                 "default": "server"
                             }
@@ -854,6 +663,35 @@
             ]
         },
         "menus": {
+            "editor/title": [
+                {
+                    "command": "gluals.gmod.runFile",
+                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "group": "navigation"
+                },
+                {
+                    "command": "gluals.gmod.refreshFile",
+                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "group": "navigation@1"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "gluals.gmod.runSelection",
+                    "when": "resourceLangId == lua && editorHasSelection && inDebugMode && debugType == gluals_gmod",
+                    "group": "gmod@1"
+                },
+                {
+                    "command": "gluals.gmod.runFile",
+                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "group": "gmod@3"
+                },
+                {
+                    "command": "gluals.gmod.refreshFile",
+                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "group": "gmod@4"
+                }
+            ],
             "view/title": [
                 {
                     "command": "gluals.gmod.configureDebugger",
@@ -1714,11 +1552,11 @@
                         "enum": [
                             "server",
                             "client",
-                            "menu"
+                            "shared"
                         ],
                         "default": "server",
                         "scope": "resource",
-                        "markdownDescription": "Default realm used for GMod debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
+                        "markdownDescription": "Lua execution realm used by debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
                     },
                     "gluals.gmod.debugger.autoUpdateRdb": {
                         "type": "boolean",

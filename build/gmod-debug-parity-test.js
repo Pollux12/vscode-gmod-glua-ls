@@ -163,9 +163,9 @@ async function run() {
     assert.strictEqual(setVariableResult.body.value, '42')
 
     // --- evaluation behaviour ------------------------------------------------
-    // when not paused, eval should be rejected with an explanatory message
+    // when not paused, explicit Lua eval (= prefix) should be rejected
     const evalResponse1 = makeResponse('evaluate')
-    session.evaluateRequest(evalResponse1, { expression: '1+1', context: 'repl' })
+    session.evaluateRequest(evalResponse1, { expression: '=1+1', context: 'repl' })
     const evalResult1 = await session.nextResponse()
     assert.strictEqual(evalResult1.success, false)
     assert.match(evalResult1.message, /paused/i)

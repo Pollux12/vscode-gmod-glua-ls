@@ -26,6 +26,9 @@ export type DebugRequest =
   | GetGlobalRequest
   | SetVarRequest
   | CommandRequest
+  | RunLuaRequest
+  | RunFileRequest
+  | RefreshFileRequest
   | GetEntitiesRequest
   | GetEntityRequest
   | GetEntityNetworkVarsRequest
@@ -227,6 +230,36 @@ export class Client {
   ): Promise<DebugResponseType<CommandRequest>> =>
     this.send({
       method: 'command',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  runLua = (
+    params: RunLuaRequest['params']
+  ): Promise<DebugResponseType<RunLuaRequest>> =>
+    this.send({
+      method: 'run_lua',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  runFile = (
+    params: RunFileRequest['params']
+  ): Promise<DebugResponseType<RunFileRequest>> =>
+    this.send({
+      method: 'run_file',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  refreshFile = (
+    params: RefreshFileRequest['params']
+  ): Promise<DebugResponseType<RefreshFileRequest>> =>
+    this.send({
+      method: 'refresh_file',
       jsonrpc: '2.0',
       id: this.seqId++,
       params,
@@ -466,6 +499,29 @@ export interface CommandRequest extends JsonRpcRequest {
   params: string
 }
 
+export interface RunLuaRequest extends JsonRpcRequest {
+  method: 'run_lua'
+  params: {
+    lua: string
+    realm: 'server' | 'client' | 'shared'
+  }
+}
+
+export interface RunFileRequest extends JsonRpcRequest {
+  method: 'run_file'
+  params: {
+    file: string
+    realm: 'server' | 'client' | 'shared'
+  }
+}
+
+export interface RefreshFileRequest extends JsonRpcRequest {
+  method: 'refresh_file'
+  params: {
+    file: string
+  }
+}
+
 export type Vec3 = [number, number, number]
 
 export interface EntitySummary {
@@ -613,6 +669,9 @@ type ResponseResultType = {
   clear_breakpoints: never
   set_var: boolean
   command: never
+  run_lua: never
+  run_file: never
+  refresh_file: never
   get_entities: GetEntitiesResult
   get_entity: EntityDetail
   get_entity_network_vars: GetEntityNetworkVarsResult

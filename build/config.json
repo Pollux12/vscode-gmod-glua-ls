@@ -1,6 +1,4 @@
 {
-    "emmyDebuggerVersion": "1.9.0",
-    "emmyDebuggerUrl": "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download",
     "newLanguageServerVersion": "0.20.0",
     "newLanguageServerUrl": "https://github.com/Pollux12/gmod-glua-ls/releases/download",
     "newLanguageServerSchemaUrl": "https://raw.githubusercontent.com/Pollux12/gmod-glua-ls/refs/tags/{{tag}}/crates/emmylua_code_analysis/resources/schema.json"

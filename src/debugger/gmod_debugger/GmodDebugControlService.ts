@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-export const GMOD_REALMS = ['server', 'client', 'menu'] as const
+export const GMOD_REALMS = ['server', 'client', 'shared'] as const
 export type GmodRealm = (typeof GMOD_REALMS)[number]
 
 export type GmodControlCommand =
@@ -12,6 +12,7 @@ export type GmodControlCommand =
   | 'waitIDE'
   | 'runLua'
   | 'runFile'
+  | 'refreshFile'
   | 'runCommand'
   | 'setRealm'
 
@@ -19,6 +20,9 @@ export interface GmodControlTransport {
   pauseSoft(): Promise<unknown> | void
   pauseNow(): Promise<unknown> | void
   resume(): Promise<unknown> | void
+  runLua(lua: string, realm: GmodRealm): Promise<unknown> | void
+  runFile(filePath: string, realm: GmodRealm): Promise<unknown> | void
+  refreshFile(filePath: string): Promise<unknown> | void
   runCommand(command: string): Promise<unknown> | void
 }
 
@@ -106,7 +110,7 @@ export class GmodDebugControlService {
   public async execute(command: GmodControlCommand, args: Record<string, unknown> = {}): Promise<GmodControlResult> {
     const correlationId = this.nextCorrelationId(command)
     const diagnostics: GmodControlDiagnostic[] = []
-    const realm = this.resolveRealm(args.realm)
+    let realm = this.resolveRealm(args.realm)
     let request: string | undefined
 
     switch (command) {
@@ -131,8 +135,8 @@ export class GmodDebugControlService {
         break
 
       case 'breakHere':
-        request = this.buildLuaRunCommand('if dbg and dbg.breakHere then dbg.breakHere() end', realm)
-        await this.transport.runCommand(request)
+        request = 'run_lua(server): breakHere()'
+        await this.transport.runLua('if dbg and dbg.breakHere then dbg.breakHere() end', 'server')
         diagnostics.push({ level: 'info', message: 'breakHere dispatched.' })
         break
 
@@ -142,8 +146,8 @@ export class GmodDebugControlService {
         const snippet = timeoutExpr.length > 0
           ? `if dbg and dbg.waitIDE then dbg.waitIDE(${timeoutExpr}) end`
           : 'if dbg and dbg.waitIDE then dbg.waitIDE() end'
-        request = this.buildLuaRunCommand(snippet, realm)
-        await this.transport.runCommand(request)
+        request = 'run_lua(server): waitIDE()'
+        await this.transport.runLua(snippet, 'server')
         diagnostics.push({ level: 'info', message: 'waitIDE dispatched.' })
         break
       }
@@ -154,8 +158,8 @@ export class GmodDebugControlService {
           diagnostics.push({ level: 'error', message: 'Lua chunk is empty.' })
           return { ok: false, command, realm, correlationId, diagnostics }
         }
-        request = this.buildLuaRunCommand(lua, realm)
-        await this.transport.runCommand(request)
+        request = `run_lua(${realm}) bytes=${lua.length}`
+        await this.transport.runLua(lua, realm)
         diagnostics.push({ level: 'info', message: 'Lua chunk dispatched.' })
         break
       }
@@ -179,9 +183,47 @@ export class GmodDebugControlService {
         if (stat.size === 0) {
           diagnostics.push({ level: 'warning', message: `File is empty: ${resolved}` })
         }
-        request = this.buildFileRunCommand(resolved, realm)
-        await this.transport.runCommand(request)
-        diagnostics.push({ level: 'info', message: `File dispatched: ${resolved}` })
+        const relativeLuaPath = this.toLuaRelativePath(resolved)
+        if (path.isAbsolute(relativeLuaPath)) {
+          diagnostics.push({ level: 'error', message: `File must be inside a lua/ directory: ${resolved}` })
+          return { ok: false, command, realm, correlationId, diagnostics }
+        }
+
+        request = `run_file(${realm}) ${relativeLuaPath}`
+        await this.transport.runFile(relativeLuaPath, realm)
+        diagnostics.push({ level: 'info', message: `File dispatched: ${relativeLuaPath}` })
+        break
+      }
+
+      case 'refreshFile': {
+        realm = 'server'
+        const inputPath = typeof args.path === 'string' ? args.path : typeof args.file === 'string' ? args.file : ''
+        if (inputPath.trim().length === 0) {
+          diagnostics.push({ level: 'error', message: 'File path is required.' })
+          return { ok: false, command, realm, correlationId, diagnostics }
+        }
+
+        const resolved = this.resolvePath(inputPath)
+        if (!fs.existsSync(resolved)) {
+          diagnostics.push({ level: 'error', message: `File not found: ${resolved}` })
+          return { ok: false, command, realm, correlationId, diagnostics }
+        }
+
+        const stat = fs.statSync(resolved)
+        if (!stat.isFile()) {
+          diagnostics.push({ level: 'error', message: `Not a file: ${resolved}` })
+          return { ok: false, command, realm, correlationId, diagnostics }
+        }
+
+        const relativeLuaPath = this.toLuaRelativePath(resolved)
+        if (path.isAbsolute(relativeLuaPath)) {
+          diagnostics.push({ level: 'error', message: `File must be inside a lua/ directory: ${resolved}` })
+          return { ok: false, command, realm, correlationId, diagnostics }
+        }
+
+        request = `refresh_file(server) ${relativeLuaPath}`
+        await this.transport.refreshFile(relativeLuaPath)
+        diagnostics.push({ level: 'info', message: `Refresh dispatched: ${relativeLuaPath}` })
         break
       }
 
@@ -227,22 +269,18 @@ export class GmodDebugControlService {
     return this.workspaceRoot ? path.resolve(this.workspaceRoot, inputPath) : path.resolve(inputPath)
   }
 
-  private buildLuaRunCommand(lua: string, realm: GmodRealm): string {
-    const command = realm === 'client' ? 'lua_run_cl' : realm === 'menu' ? 'lua_run_menu' : 'lua_run'
-    const escaped = lua
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\r?\n/g, '\\n')
-    return `${command} RunString("${escaped}")`
-  }
+  private toLuaRelativePath(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/')
+    if (normalized.toLowerCase().startsWith('lua/')) {
+      return normalized.slice(4)
+    }
 
-  private buildFileRunCommand(filePath: string, realm: GmodRealm): string {
-    const normalized = filePath.replace(/\\/g, '/').replace(/"/g, '\\"')
-    const command = realm === 'client'
-      ? 'lua_openscript_cl'
-      : realm === 'menu'
-        ? 'lua_openscript_menu'
-        : 'lua_openscript'
-    return `${command} "${normalized}"`
+    const marker = '/lua/'
+    const markerIndex = normalized.toLowerCase().lastIndexOf(marker)
+    if (markerIndex >= 0) {
+      return normalized.slice(markerIndex + marker.length)
+    }
+
+    return normalized
   }
 }

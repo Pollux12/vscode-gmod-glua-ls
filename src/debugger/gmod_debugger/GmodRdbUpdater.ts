@@ -3,11 +3,15 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
+    cleanupLegacyInitInjection,
+    DEFAULT_RDB_PORT,
     downloadFile,
     fetchLatestRelease,
+    getStoredGarrysmodPath,
     GmRdbRelease,
     promptForGarrysmodPath,
     ReleaseAsset,
+    syncAutorunFile,
 } from './GmodDebugSetupWizard';
 
 export const EXPECTED_GM_RDB_VERSION = '1.2.0';
@@ -60,7 +64,7 @@ export class GmodRdbUpdater {
 
     public async runManualUpdateCommand(): Promise<void> {
         const action = await vscode.window.showInformationMessage(
-            `Check and install gm_rdb ${EXPECTED_GM_RDB_VERSION} from GitHub releases?`,
+            `Check and install gm_rdb ${EXPECTED_GM_RDB_VERSION} and refresh GLuaLS runtime files?`,
             'Update Now',
             'Cancel'
         );
@@ -70,6 +74,26 @@ export class GmodRdbUpdater {
         }
 
         await this.runUpdateFlow();
+    }
+
+    public async ensureRuntimeFilesUpToDate(session?: vscode.DebugSession): Promise<void> {
+        const garrysmodPath = this.resolveKnownGarrysmodPath(session);
+        if (!garrysmodPath) {
+            return;
+        }
+
+        try {
+            const debugPort = this.resolveDebugPort(session?.workspaceFolder);
+            const autorunStatus = syncAutorunFile(garrysmodPath, debugPort);
+            cleanupLegacyInitInjection(garrysmodPath);
+
+            if (autorunStatus !== 'unchanged') {
+                console.log(`[GLuaLS] Updated runtime file: lua/autorun/debug.lua (${autorunStatus}).`);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn(`[GLuaLS] Failed to sync runtime files: ${message}`);
+        }
     }
 
     public async promptForUpdate(moduleVersion: string): Promise<void> {
@@ -153,6 +177,12 @@ export class GmodRdbUpdater {
                     }
 
                     progress.report({ message: `Installed ${asset.name} to garrysmod/lua/bin.` });
+
+                    const debugPort = this.resolveDebugPort();
+
+                    progress.report({ message: 'Writing shared debugger autorun file...' });
+                    syncAutorunFile(garrysmodPath, debugPort);
+                    cleanupLegacyInitInjection(garrysmodPath);
                 }
             );
 
@@ -206,5 +236,60 @@ export class GmodRdbUpdater {
     private isSkippedExpectedVersion(): boolean {
         const skippedVersion = this.context.globalState.get<string>(this.SKIP_EXPECTED_VERSION_KEY);
         return skippedVersion === EXPECTED_GM_RDB_VERSION;
+    }
+
+    private resolveKnownGarrysmodPath(session?: vscode.DebugSession): string | undefined {
+        const sourceRoot = this.resolveSessionSourceRoot(session);
+        if (sourceRoot) {
+            return sourceRoot;
+        }
+
+        return getStoredGarrysmodPath(this.context);
+    }
+
+    private resolveSessionSourceRoot(session?: vscode.DebugSession): string | undefined {
+        if (!session || session.type !== 'gluals_gmod') {
+            return undefined;
+        }
+
+        const sourceRoot = this.coerceSessionSourceRoot(session);
+        if (!sourceRoot || sourceRoot.includes('${')) {
+            return undefined;
+        }
+
+        const resolved = path.resolve(sourceRoot);
+        if (path.basename(resolved).toLowerCase() === 'garrysmod') {
+            return resolved;
+        }
+
+        const garrysmodCandidate = path.join(resolved, 'garrysmod');
+        if (fs.existsSync(garrysmodCandidate)) {
+            return garrysmodCandidate;
+        }
+
+        return undefined;
+    }
+
+    private coerceSessionSourceRoot(session: vscode.DebugSession): string | undefined {
+        if (!session.configuration || typeof session.configuration !== 'object') {
+            return undefined;
+        }
+
+        const sourceRoot = (session.configuration as Record<string, unknown>)['sourceRoot'];
+        if (typeof sourceRoot !== 'string') {
+            return undefined;
+        }
+
+        const trimmed = sourceRoot.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }
+
+    private resolveDebugPort(scope?: vscode.ConfigurationScope): number {
+        const configuredPort = vscode.workspace
+            .getConfiguration('gluals.gmod', scope)
+            .get<number>('debugPort');
+        return typeof configuredPort === 'number' && Number.isFinite(configuredPort)
+            ? Math.max(1, Math.floor(configuredPort))
+            : DEFAULT_RDB_PORT;
     }
 }

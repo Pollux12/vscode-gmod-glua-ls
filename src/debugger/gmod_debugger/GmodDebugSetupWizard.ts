@@ -9,7 +9,9 @@ const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
 const LEGACY_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.garrysmodPath';
 const GMOD_DEBUGGER_TYPE = 'gluals_gmod';
 const GM_RDB_REPO = 'Pollux12/gm_rdb';
-const DEFAULT_RDB_PORT = 21111;
+export const DEFAULT_RDB_PORT = 21111;
+const LEGACY_LOADER_START_MARKER = '-- gm_rdb debugger loader (added by GLuaLS)';
+const LEGACY_LOADER_END_MARKER = '-- end gm_rdb';
 
 const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
     'Windows 64-bit': 'gmsv_rdb_win64.dll',
@@ -61,6 +63,8 @@ interface ResolvedSrcdsPath {
     srcdsRoot: string;
     garrysmodPath: string;
 }
+
+export type AutorunSyncStatus = 'created' | 'updated' | 'unchanged';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -258,32 +262,208 @@ export function downloadFile(url: string, destinationPath: string): Promise<void
     });
 }
 
-function injectRdbLoader(garrysmodPath: string, port: number): void {
-    const initLuaPath = path.join(garrysmodPath, 'lua', 'includes', 'init.lua');
-    const marker = 'require("rdb")';
-    const loaderBlock = [
-        '-- gm_rdb debugger loader (added by GLuaLS)',
+function buildSharedAutorunLua(port: number): string {
+    return [
+        '-- [GLuaLS] Auto-managed by GLuaLS extension. Do not edit.',
+        '_GLUALS = _GLUALS or {}',
+        '',
         'if SERVER then',
         '    require("rdb")',
         `    rdb.activate(${port})`,
-        'end',
-        '-- end gm_rdb',
+        '    util.AddNetworkString("gm_rdb_exec")',
         '',
+        '    local function normalizeRealm(realm)',
+        '        realm = string.lower(tostring(realm or "server"))',
+        '        if realm ~= "server" and realm ~= "client" and realm ~= "shared" then',
+        '            realm = "server"',
+        '        end',
+        '        return realm',
+        '    end',
+        '',
+        '    local function sendClientExec(kind, payload)',
+        '        net.Start("gm_rdb_exec")',
+        '        net.WriteString(kind)',
+        '        net.WriteString(payload)',
+        '        net.Broadcast()',
+        '    end',
+        '',
+        '    local function runServerChunk(code, chunkName)',
+        '        local fn, compileErr = CompileString(code, chunkName or "gluals_run_lua", false)',
+        '        if not isfunction(fn) then',
+        '            return false, tostring(compileErr)',
+        '        end',
+        '        local ok, runtimeErr = xpcall(fn, debug.traceback)',
+        '        if not ok then',
+        '            return false, tostring(runtimeErr)',
+        '        end',
+        '        return true',
+        '    end',
+        '',
+        '    local function includeServerFile(filePath)',
+        '        local ok, includeErr = pcall(include, filePath)',
+        '        if not ok then',
+        '            return false, tostring(includeErr)',
+        '        end',
+        '        return true',
+        '    end',
+        '',
+        '    local function readServerFileForClient(filePath)',
+        '        local content = file.Read(filePath, "LUA")',
+        '        if isstring(content) then',
+        '            return content',
+        '        end',
+        '',
+        '        content = file.Read("lua/" .. filePath, "GAME")',
+        '        if isstring(content) then',
+        '            return content',
+        '        end',
+        '',
+        '        return nil, "unable to read file for client execution: " .. filePath',
+        '    end',
+        '',
+        '    function _GLUALS.runLua(realm, code)',
+        '        realm = normalizeRealm(realm)',
+        '        if type(code) ~= "string" then',
+        '            return false, "lua chunk must be a string"',
+        '        end',
+        '',
+        '        if realm == "server" or realm == "shared" then',
+        '            local ok, err = runServerChunk(code, "gluals_run_lua")',
+        '            if not ok then',
+        '                return false, err',
+        '            end',
+        '        end',
+        '',
+        '        if realm == "client" or realm == "shared" then',
+        '            sendClientExec("lua", code)',
+        '        end',
+        '',
+        '        return true',
+        '    end',
+        '',
+        '    function _GLUALS.runFile(realm, filePath)',
+        '        realm = normalizeRealm(realm)',
+        '        filePath = tostring(filePath or "")',
+        '        if filePath == "" then',
+        '            return false, "file path is required"',
+        '        end',
+        '',
+        '        if realm == "server" or realm == "shared" then',
+        '            local ok, err = includeServerFile(filePath)',
+        '            if not ok then',
+        '                return false, err',
+        '            end',
+        '        end',
+        '',
+        '        if realm == "client" or realm == "shared" then',
+        '            local clientCode, readErr = readServerFileForClient(filePath)',
+        '            if not isstring(clientCode) then',
+        '                return false, tostring(readErr)',
+        '            end',
+        '            sendClientExec("lua", clientCode)',
+        '        end',
+        '',
+        '        return true',
+        '    end',
+        '',
+        '    function _GLUALS.refreshFile(filePath)',
+        '        filePath = tostring(filePath or "")',
+        '        if filePath == "" then',
+        '            return false, "file path is required"',
+        '        end',
+        '',
+        '        if not game or not game.ConsoleCommand then',
+        '            return false, "game.ConsoleCommand is unavailable"',
+        '        end',
+        '',
+        '        local quotedPath = string.format("%q", filePath)',
+        '        game.ConsoleCommand("lua_refresh_file " .. quotedPath .. "\\n")',
+        '        return true',
+        '    end',
+        'end',
+        '',
+        'if CLIENT then',
+        '    net.Receive("gm_rdb_exec", function()',
+        '        local kind = net.ReadString()',
+        '        local payload = net.ReadString()',
+        '        if kind == "lua" then',
+        '            local func, err = CompileString(payload, "gluals_client_exec", false)',
+        '            if not isfunction(func) then',
+        '                ErrorNoHalt("[GLuaLS] Client exec compile error: " .. tostring(err) .. "\\n")',
+        '                return',
+        '            end',
+        '',
+        '            local ok, runtimeErr = xpcall(func, debug.traceback)',
+        '            if not ok then',
+        '                ErrorNoHalt("[GLuaLS] Client exec runtime error: " .. tostring(runtimeErr) .. "\\n")',
+        '            end',
+        '            return',
+        '        end',
+        '',
+        '        ErrorNoHalt("[GLuaLS] Unknown exec kind: " .. tostring(kind) .. "\\n")',
+        '    end)',
+        'end',
         '',
     ].join('\n');
+}
 
-    let existing = '';
-    try {
-        existing = fs.readFileSync(initLuaPath, 'utf8');
-    } catch {
-        existing = '';
+export function writeAutorunFile(garrysmodPath: string, port: number): void {
+    syncAutorunFile(garrysmodPath, port);
+}
+
+export function syncAutorunFile(garrysmodPath: string, port: number): AutorunSyncStatus {
+    const autorunDir = path.join(garrysmodPath, 'lua', 'autorun');
+    // the debugger runtime script used to live at sh_luals.lua; we now create debug.lua
+    const autorunPath = path.join(autorunDir, 'debug.lua');
+
+    // if an old sh_luals.lua file still exists, remove it so users don't get confused
+    const legacyPath = path.join(autorunDir, 'sh_luals.lua');
+    if (fs.existsSync(legacyPath) && legacyPath !== autorunPath) {
+        try {
+            fs.unlinkSync(legacyPath);
+        } catch {
+            // ignore failures
+        }
     }
 
-    if (existing.includes(marker)) {
+    const content = buildSharedAutorunLua(port);
+    const hadExistingFile = fs.existsSync(autorunPath);
+
+    if (hadExistingFile) {
+        try {
+            const existing = fs.readFileSync(autorunPath, 'utf8');
+            if (existing === content) {
+                return 'unchanged';
+            }
+        } catch {
+            // Fall through and rewrite the file if it cannot be read.
+        }
+    }
+
+    fs.mkdirSync(autorunDir, { recursive: true });
+    fs.writeFileSync(autorunPath, content, 'utf8');
+    return hadExistingFile ? 'updated' : 'created';
+}
+
+export function cleanupLegacyInitInjection(garrysmodPath: string): void {
+    const initLuaPath = path.join(garrysmodPath, 'lua', 'includes', 'init.lua');
+    if (!fs.existsSync(initLuaPath)) {
         return;
     }
 
-    fs.writeFileSync(initLuaPath, loaderBlock + existing, 'utf8');
+    const existing = fs.readFileSync(initLuaPath, 'utf8');
+    const start = existing.indexOf(LEGACY_LOADER_START_MARKER);
+    if (start < 0) {
+        return;
+    }
+
+    const end = existing.indexOf(LEGACY_LOADER_END_MARKER, start);
+    const cutEnd = end >= 0
+        ? end + LEGACY_LOADER_END_MARKER.length
+        : start + LEGACY_LOADER_START_MARKER.length;
+    const before = existing.slice(0, start);
+    const after = existing.slice(cutEnd).replace(/^\s*\r?\n/, '');
+    fs.writeFileSync(initLuaPath, `${before}${after}`, 'utf8');
 }
 
 async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<void> {
@@ -330,8 +510,9 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
             fs.mkdirSync(binDir, { recursive: true });
             await downloadFile(asset.browser_download_url, destinationPath);
 
-            progress.report({ message: 'Injecting loader into init.lua…' });
-            injectRdbLoader(garrysmodPath, port);
+            progress.report({ message: 'Writing shared debugger autorun file…' });
+            writeAutorunFile(garrysmodPath, port);
+            cleanupLegacyInitInjection(garrysmodPath);
         }
     );
 
@@ -724,4 +905,15 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
     if (requestPick.value === 'attach' && !existingDll) {
         vscode.window.showInformationMessage('If gm_rdb was just installed, restart SRCDS before attaching.');
     }
+}
+
+export function getStoredGarrysmodPath(context: vscode.ExtensionContext): string | undefined {
+    const legacyPath = context.workspaceState.get<string>(LEGACY_GARRYSMOD_PATH_STATE_KEY);
+    const legacySrcdsPath = legacyPath ? path.dirname(legacyPath) : undefined;
+    const savedSrcdsPath = context.workspaceState.get<string>(SRCDS_ROOT_STATE_KEY) ?? legacySrcdsPath;
+    if (!savedSrcdsPath || savedSrcdsPath.trim().length === 0) {
+        return undefined;
+    }
+
+    return normalizeSrcdsRootInput(savedSrcdsPath).garrysmodPath;
 }

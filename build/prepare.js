@@ -42,30 +42,6 @@ function resolveLocalLanguageServerSource(assetName) {
     return candidates.find(path => existsSync(path));
 }
 
-async function downloadDebuggerDepends() {
-    await Promise.all([
-        downloadTo(
-            `${config.emmyDebuggerUrl}/${config.emmyDebuggerVersion}/linux-x64.zip`,
-            "temp/linux-x64.zip"
-        ),
-        downloadTo(
-            `${config.emmyDebuggerUrl}/${config.emmyDebuggerVersion}/darwin-arm64.zip`,
-            "temp/darwin-arm64.zip"
-        ),
-        downloadTo(
-            `${config.emmyDebuggerUrl}/${config.emmyDebuggerVersion}/darwin-x64.zip`,
-            "temp/darwin-x64.zip"
-        ),
-        downloadTo(
-            `${config.emmyDebuggerUrl}/${config.emmyDebuggerVersion}/win32-x86.zip`,
-            "temp/win32-x86.zip"
-        ),
-        downloadTo(
-            `${config.emmyDebuggerUrl}/${config.emmyDebuggerVersion}/win32-x64.zip`,
-            "temp/win32-x64.zip"
-        )
-    ]);
-}
 
 async function resolveLanguageServerSource(assetName) {
     const forceRemoteLanguageServer = hasFlag("--remote-ls");
@@ -118,16 +94,6 @@ async function build() {
     }
 
     const languageServerSource = await resolveLanguageServerSource(languageServerAssetName);
-    await downloadDebuggerDepends();
-
-    // linux
-    await decompress("temp/linux-x64.zip", "debugger/emmy/linux/");
-    // mac
-    await decompress("temp/darwin-x64.zip", "debugger/emmy/mac/x64/");
-    await decompress("temp/darwin-arm64.zip", "debugger/emmy/mac/arm64/");
-    // win
-    await decompress("temp/win32-x86.zip", "debugger/emmy/windows/x86/");
-    await decompress("temp/win32-x64.zip", "debugger/emmy/windows/x64/");
 
     await installLanguageServerFromSource(languageServerSource, languageServerAssetName);
 }

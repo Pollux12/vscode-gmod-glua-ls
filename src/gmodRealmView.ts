@@ -4,13 +4,15 @@ import { GMOD_REALMS, GmodRealm } from './debugger/gmod_debugger/GmodDebugContro
 const REALM_LABELS: Record<GmodRealm, string> = {
     server: 'Server',
     client: 'Client',
-    menu: 'Menu',
+    shared: 'Shared',
 };
 
+// descriptions now focus on where Lua code will execute rather than mentioning breakHere,
+// since the debugger only ever runs on the server and the setting simply controls execution realm
 const REALM_DESCRIPTIONS: Record<GmodRealm, string> = {
-    server: 'RunLua / BreakHere targets server-side Lua',
-    client: 'RunLua / BreakHere targets client-side Lua',
-    menu: 'RunLua / BreakHere targets menu-state Lua',
+    server: 'Execute Lua on the server',
+    client: 'Execute Lua on connected clients',
+    shared: 'Execute Lua on both server and clients',
 };
 
 interface RealmQuickPickItem extends vscode.QuickPickItem {
@@ -43,7 +45,8 @@ export class GmodRealmStatusBar implements vscode.Disposable {
 
     refresh(): void {
         const activeRealm = this.getCurrentRealm();
-        this.statusBarItem.text = `$(broadcast) GMod: ${REALM_LABELS[activeRealm]}`;
+        // emphasize that this setting controls the Lua execution realm
+        this.statusBarItem.text = `$(broadcast) GMod Lua: ${REALM_LABELS[activeRealm]}`;
         this.statusBarItem.tooltip = REALM_DESCRIPTIONS[activeRealm];
     }
 
@@ -93,7 +96,7 @@ export function registerGmodRealmView(
             }
 
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select GMod Execution Realm'
+                placeHolder: 'Select GMod Lua Execution Realm'
             });
 
             if (selected) {
