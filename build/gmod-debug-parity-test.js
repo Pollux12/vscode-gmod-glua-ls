@@ -161,6 +161,31 @@ async function run() {
     const setVariableResult = await session.nextResponse()
     assert.strictEqual(setVariableResult.success, true)
     assert.strictEqual(setVariableResult.body.value, '42')
+
+    // --- evaluation behaviour ------------------------------------------------
+    // when not paused, eval should be rejected with an explanatory message
+    const evalResponse1 = makeResponse('evaluate')
+    session.evaluateRequest(evalResponse1, { expression: '1+1', context: 'repl' })
+    const evalResult1 = await session.nextResponse()
+    assert.strictEqual(evalResult1.success, false)
+    assert.match(evalResult1.message, /paused/i)
+    // no output event is emitted for this error; the text is shown via the response
+
+    // when paused it should go through _debug_client.eval
+    session._isPaused = true
+    let evalCalled = false
+    session._debug_client = {
+      eval(params) {
+        evalCalled = true
+        return Promise.resolve({ result: [4], params })
+      },
+    }
+    const evalResponse2 = makeResponse('evaluate')
+    session.evaluateRequest(evalResponse2, { expression: '=2+2', context: 'repl', frameId: 0 })
+    const evalResult2 = await session.nextResponse()
+    assert.strictEqual(evalResult2.success, true)
+    assert.strictEqual(evalResult2.body.result, '4')
+    assert(evalCalled, 'Expected eval() to be invoked when paused')
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true })
   }

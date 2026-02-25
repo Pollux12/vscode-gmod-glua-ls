@@ -1085,8 +1085,19 @@ export class GmodDebugSession extends DebugSession {
       const expression = args.expression.trim()
 
       if (args.context === 'repl') {
+        // When unpaused there is no stack frame available for LRDB `eval`, so we have to show an error for any eval attempt
         const explicitLuaPrefix = /^(lua|eval)\s+/i
         const explicitCommandPrefix = /^con\s+/i
+        const isConsole = explicitCommandPrefix.test(expression)
+        const isLuaPrefix = expression.startsWith('=') || explicitLuaPrefix.test(expression)
+        if (!this._isPaused && !isConsole && !isLuaPrefix) {
+          response.success = false
+          response.message =
+            'Evaluation is only available when execution is paused; pause the debugger or use Run Lua.'
+          this.sendResponse(response)
+          return
+        }
+
         let command = expression
         let luaExpression: string | undefined
         const frameScopedEvaluation = this._isPaused && typeof args.frameId === 'number' && Number.isFinite(args.frameId)
