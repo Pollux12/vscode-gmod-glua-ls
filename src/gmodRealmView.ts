@@ -46,7 +46,7 @@ export class GmodRealmStatusBar implements vscode.Disposable {
     refresh(): void {
         const activeRealm = this.getCurrentRealm();
         // emphasize that this setting controls the Lua execution realm
-        this.statusBarItem.text = `$(broadcast) GMod Lua: ${REALM_LABELS[activeRealm]}`;
+        this.statusBarItem.text = `$(broadcast) Realm: ${REALM_LABELS[activeRealm]}`;
         this.statusBarItem.tooltip = REALM_DESCRIPTIONS[activeRealm];
     }
 

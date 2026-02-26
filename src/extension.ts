@@ -135,6 +135,7 @@ export async function deactivate(): Promise<void> {
 function registerCommands(context: vscode.ExtensionContext): void {
     const commandEntries: CommandEntry[] = [
         // Server commands
+        { id: 'gluals.startServer', handler: startServerCommand },
         { id: 'gluals.stopServer', handler: stopServer },
         { id: 'gluals.restartServer', handler: restartServer },
         { id: 'gluals.showServerMenu', handler: showServerMenu },
@@ -627,6 +628,10 @@ function showReferences(uri: string, pos: IServerPosition, locations: IServerLoc
                 new vscode.Position(loc.range.end.line, loc.range.end.character)
             )));
     vscode.commands.executeCommand("editor.action.showReferences", u, p, vscodeLocations);
+}
+
+async function startServerCommand(): Promise<void> {
+    await startServer();
 }
 
 async function stopServer(): Promise<void> {

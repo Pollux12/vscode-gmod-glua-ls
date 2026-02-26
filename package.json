@@ -37,6 +37,10 @@
                 "title": "Restart Lua Server"
             },
             {
+                "command": "gluals.startServer",
+                "title": "Start GLua Language Server"
+            },
+            {
                 "command": "gluals.stopServer",
                 "title": "Stop GLua Language Server"
             },
