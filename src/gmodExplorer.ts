@@ -20,6 +20,8 @@ interface ItemData {
     scType?: ScriptedClassType;
     // scriptedClass
     className?: string;
+    startLine?: number;
+    startCharacter?: number;
     // resourceCategory
     rcType?: ResourceCategory;
     // resourceGroup
@@ -28,10 +30,27 @@ interface ItemData {
     uri?: vscode.Uri;
 }
 
+interface LsPosition {
+    line: number;
+    character: number;
+}
+
+interface LsRange {
+    start: LsPosition;
+    end: LsPosition;
+}
+
 interface LsScriptedClassEntry {
     uri: string;
     classType: string;
     className: string;
+    range?: LsRange | null;
+}
+
+interface ScriptedClassFileEntry {
+    uri: vscode.Uri;
+    startLine?: number;
+    startCharacter?: number;
 }
 
 function mapLsClassTypeToScriptedClassType(classType: string): ScriptedClassType | undefined {
@@ -102,6 +121,28 @@ export class GmodExplorerItem extends vscode.TreeItem {
                 } else {
                     this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('symbol-class');
                 }
+                if (
+                    d.scType === 'vgui'
+                    && d.uri
+                    && typeof d.startLine === 'number'
+                    && typeof d.startCharacter === 'number'
+                ) {
+                    this.command = {
+                        command: 'vscode.open',
+                        title: 'Open Panel Definition',
+                        arguments: [
+                            d.uri,
+                            {
+                                selection: new vscode.Range(
+                                    d.startLine,
+                                    d.startCharacter,
+                                    d.startLine,
+                                    d.startCharacter,
+                                ),
+                            },
+                        ],
+                    };
+                }
                 break;
             case 'resourceCategory':
                 this.iconPath = new vscode.ThemeIcon('folder');
@@ -170,7 +211,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodExplorerItem | undefined | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
-    private scriptedClassCache?: Map<ScriptedClassType, Map<string, vscode.Uri[]>>;
+    private scriptedClassCache?: Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>;
     private resourceCache?: Map<ResourceCategory, Map<string, vscode.Uri[]>>;
 
     refresh(): void {
@@ -224,16 +265,30 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
         if (d.type === 'scriptedClassType' && d.scType) {
             const cache = await this.getScriptedClassCache();
-            const classMap = cache.get(d.scType) ?? new Map<string, vscode.Uri[]>();
+            const classMap = cache.get(d.scType) ?? new Map<string, ScriptedClassFileEntry[]>();
             const classItems = [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) =>
-                new GmodExplorerItem({
-                    type: 'scriptedClass',
-                    label: className,
-                    collapsible: files.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-                    scType: d.scType,
-                    className,
-                    uri: files[0],
-                })
+                {
+                    const firstFile = files[0];
+                    const isVguiDefinition = d.scType === 'vgui'
+                        && files.length === 1
+                        && typeof firstFile?.startLine === 'number'
+                        && typeof firstFile?.startCharacter === 'number';
+
+                    return new GmodExplorerItem({
+                        type: 'scriptedClass',
+                        label: className,
+                        collapsible: isVguiDefinition
+                            ? vscode.TreeItemCollapsibleState.None
+                            : files.length > 0
+                                ? vscode.TreeItemCollapsibleState.Collapsed
+                                : vscode.TreeItemCollapsibleState.None,
+                        scType: d.scType,
+                        className,
+                        uri: firstFile?.uri,
+                        startLine: firstFile?.startLine,
+                        startCharacter: firstFile?.startCharacter,
+                    });
+                }
             );
 
             if (d.scType === 'weapons') {
@@ -251,8 +306,8 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         if (d.type === 'scriptedClass' && d.scType && d.className) {
             const cache = await this.getScriptedClassCache();
             const files = cache.get(d.scType)?.get(d.className) ?? [];
-            return files.sort((a, b) => a.fsPath.localeCompare(b.fsPath)).map((uri) =>
-                new GmodExplorerItem({ type: 'file', label: path.basename(uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri })
+            return files.sort((a, b) => a.uri.fsPath.localeCompare(b.uri.fsPath)).map((file) =>
+                new GmodExplorerItem({ type: 'file', label: path.basename(file.uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri: file.uri })
             );
         }
 
@@ -315,7 +370,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     private async resolveRepresentativeUri(data: ItemData): Promise<vscode.Uri | undefined> {
         if (data.type === 'scriptedClass' && data.scType && data.className) {
             const cache = await this.getScriptedClassCache();
-            return cache.get(data.scType)?.get(data.className)?.[0];
+            return cache.get(data.scType)?.get(data.className)?.[0]?.uri;
         }
 
         if (data.type === 'scriptedClassType' && data.scType) {
@@ -326,7 +381,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             }
             for (const files of classMap.values()) {
                 if (files.length > 0) {
-                    return files[0];
+                    return files[0].uri;
                 }
             }
             return undefined;
@@ -353,22 +408,22 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         return undefined;
     }
 
-    private async getScriptedClassCache(): Promise<Map<ScriptedClassType, Map<string, vscode.Uri[]>>> {
+    private async getScriptedClassCache(): Promise<Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>> {
         if (this.scriptedClassCache) {
             return this.scriptedClassCache;
         }
 
-        const cache = new Map<ScriptedClassType, Map<string, vscode.Uri[]>>();
+        const cache = new Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>();
         const LIMIT = 500;
 
         const scanType = async (scType: ScriptedClassType, pattern: string, exclude?: string) => {
             const files = await vscode.workspace.findFiles(pattern, exclude ?? '**/node_modules/**', LIMIT);
-            const classMap = new Map<string, vscode.Uri[]>();
+            const classMap = new Map<string, ScriptedClassFileEntry[]>();
             for (const uri of files) {
                 const className = extractClassName(uri, scType);
                 if (className) {
                     const existing = classMap.get(className) ?? [];
-                    existing.push(uri);
+                    existing.push({ uri });
                     classMap.set(className, existing);
                 }
             }
@@ -384,7 +439,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         ]);
 
         // VGUI panel classes are discovered from LS metadata, not folder patterns.
-        cache.set('vgui', cache.get('vgui') ?? new Map<string, vscode.Uri[]>());
+        cache.set('vgui', cache.get('vgui') ?? new Map<string, ScriptedClassFileEntry[]>());
 
         // Glob scan remains authoritative; LS entries only fill in classes missed by globs.
         const lsEntries = await fetchLsScriptedClasses();
@@ -394,15 +449,34 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 continue;
             }
 
-            const classMap = cache.get(scriptedClassType) ?? new Map<string, vscode.Uri[]>();
+            const classMap = cache.get(scriptedClassType) ?? new Map<string, ScriptedClassFileEntry[]>();
             if (scriptedClassType !== 'vgui' && classMap.has(lsEntry.className)) {
                 continue;
             }
 
             const uri = parseLsUri(lsEntry.uri);
             const files = classMap.get(lsEntry.className) ?? [];
-            if (uri && !files.some((existingUri) => existingUri.toString() === uri.toString())) {
-                files.push(uri);
+            if (uri) {
+                const existingIndex = files.findIndex((existingFile) => existingFile.uri.toString() === uri.toString());
+                const startLine = lsEntry.range?.start?.line;
+                const startCharacter = lsEntry.range?.start?.character;
+                const hasStart = typeof startLine === 'number' && typeof startCharacter === 'number';
+
+                if (existingIndex >= 0) {
+                    if (hasStart) {
+                        files[existingIndex] = {
+                            ...files[existingIndex],
+                            startLine,
+                            startCharacter,
+                        };
+                    }
+                } else {
+                    files.push({
+                        uri,
+                        startLine: hasStart ? startLine : undefined,
+                        startCharacter: hasStart ? startCharacter : undefined,
+                    });
+                }
             }
 
             classMap.set(lsEntry.className, files);

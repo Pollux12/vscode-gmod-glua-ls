@@ -180,6 +180,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gmodEntityExplorer.loadMore', handler: loadMoreGmodEntityExplorer },
         { id: 'gluals.gmod.explorer.copyRelativePath', handler: copyGmodExplorerRelativePath },
         { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
+        { id: 'gluals.gmod.explorer.copyClassName', handler: copyGmodExplorerClassName },
         { id: 'gluals.gmod.explorer.revealInExplorer', handler: revealGmodExplorerItemInExplorer },
     ];
 
@@ -998,6 +999,17 @@ async function copyGmodExplorerAbsolutePath(item?: GmodExplorerItem): Promise<vo
 
     await vscode.env.clipboard.writeText(uri.fsPath);
     vscode.window.showInformationMessage(`Copied absolute path: ${uri.fsPath}`);
+}
+
+async function copyGmodExplorerClassName(item?: GmodExplorerItem): Promise<void> {
+    const className = item?.data?.className;
+    if (!className) {
+        vscode.window.showWarningMessage('No class name available for this item.');
+        return;
+    }
+
+    await vscode.env.clipboard.writeText(className);
+    vscode.window.showInformationMessage(`Copied class name: ${className}`);
 }
 
 async function revealGmodExplorerItemInExplorer(item?: GmodExplorerItem): Promise<void> {

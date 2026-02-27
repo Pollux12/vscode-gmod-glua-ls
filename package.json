@@ -260,6 +260,12 @@
                 "icon": "$(copy)"
             },
             {
+                "command": "gluals.gmod.explorer.copyClassName",
+                "title": "Explorer: Copy Class Name",
+                "category": "GLuaLS",
+                "icon": "$(copy)"
+            },
+            {
                 "command": "gluals.gmod.explorer.revealInExplorer",
                 "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
@@ -710,16 +716,6 @@
                     "group": "navigation@1"
                 },
                 {
-                    "command": "gluals.gmod.onboarding.start",
-                    "when": "view == gluals.gmodExplorer",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "gluals.gmod.diagnostics.repair",
-                    "when": "view == gluals.gmodExplorer",
-                    "group": "navigation@3"
-                },
-                {
                     "command": "gmodErrors.clear",
                     "when": "view == gmodErrors",
                     "group": "navigation@1"
@@ -839,6 +835,11 @@
                     "group": "navigation@3"
                 },
                 {
+                    "command": "gluals.gmod.explorer.copyClassName",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClass",
+                    "group": "navigation@0"
+                },
+                {
                     "command": "gluals.gmod.explorer.copyRelativePath",
                     "when": "view == gluals.gmodExplorer && viewItem == scriptedClass",
                     "group": "navigation@1"
@@ -855,21 +856,6 @@
                 },
                 {
                     "command": "gluals.gmod.explorer.copyRelativePath",
-                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "gluals.gmod.explorer.copyAbsolutePath",
-                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "gluals.gmod.explorer.revealInExplorer",
-                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
-                    "group": "navigation@3"
-                },
-                {
-                    "command": "gluals.gmod.explorer.copyRelativePath",
                     "when": "view == gluals.gmodExplorer && viewItem == resourceGroup",
                     "group": "navigation@1"
                 },
@@ -881,21 +867,6 @@
                 {
                     "command": "gluals.gmod.explorer.revealInExplorer",
                     "when": "view == gluals.gmodExplorer && viewItem == resourceGroup",
-                    "group": "navigation@3"
-                },
-                {
-                    "command": "gluals.gmod.explorer.copyRelativePath",
-                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "gluals.gmod.explorer.copyAbsolutePath",
-                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "gluals.gmod.explorer.revealInExplorer",
-                    "when": "view == gluals.gmodExplorer && viewItem == resourceCategory",
                     "group": "navigation@3"
                 }
             ],

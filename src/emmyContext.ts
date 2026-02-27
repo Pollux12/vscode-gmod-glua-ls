@@ -228,6 +228,16 @@ export class EmmyContext implements vscode.Disposable {
 
         items.push(
             {
+                label: '$(rocket) Run Setup Wizard',
+                description: 'Run guided GMod setup checks',
+                detail: 'Execute onboarding for debugger mapping, realm, and MCP health',
+            },
+            {
+                label: '$(tools) Run Diagnostics & Repair',
+                description: 'Detect and fix common GMod setup issues',
+                detail: 'Run diagnostics and select repair actions for detected problems',
+            },
+            {
                 label: '$(info) Show Server Info',
                 description: 'Display server information',
                 detail: 'Show detailed server status and configuration',
@@ -260,6 +270,10 @@ export class EmmyContext implements vscode.Disposable {
             await vscode.commands.executeCommand('gluals.stopServer');
         } else if (selected.label.includes('Start')) {
             await vscode.commands.executeCommand('gluals.startServer');
+        } else if (selected.label.includes('Setup Wizard')) {
+            await vscode.commands.executeCommand('gluals.gmod.onboarding.start');
+        } else if (selected.label.includes('Diagnostics & Repair')) {
+            await vscode.commands.executeCommand('gluals.gmod.diagnostics.repair');
         } else if (selected.label.includes('Server Info')) {
             this.showServerInfo();
         } else if (selected.label.includes('Output')) {
