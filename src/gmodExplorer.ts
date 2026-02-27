@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { extensionContext } from './extension';
 
-export type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins';
+export type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins' | 'vgui';
 type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
 type GmodExplorerItemType =
     | 'category'
@@ -46,6 +46,8 @@ function mapLsClassTypeToScriptedClassType(classType: string): ScriptedClassType
             return 'stools';
         case 'PLUGIN':
             return 'plugins';
+        case 'VGUI':
+            return 'vgui';
         default:
             return undefined;
     }
@@ -88,10 +90,18 @@ export class GmodExplorerItem extends vscode.TreeItem {
                 this.iconPath = new vscode.ThemeIcon('list-tree');
                 break;
             case 'scriptedClassType':
-                this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('folder-library');
+                if (d.scType === 'vgui') {
+                    this.iconPath = new vscode.ThemeIcon('window');
+                } else {
+                    this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('folder-library');
+                }
                 break;
             case 'scriptedClass':
-                this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('symbol-class');
+                if (d.scType === 'vgui') {
+                    this.iconPath = new vscode.ThemeIcon('window');
+                } else {
+                    this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('symbol-class');
+                }
                 break;
             case 'resourceCategory':
                 this.iconPath = new vscode.ThemeIcon('folder');
@@ -181,6 +191,12 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         if (!element) {
             return [
                 new GmodExplorerItem({ type: 'category', label: 'Scripted Classes', collapsible: vscode.TreeItemCollapsibleState.Expanded }),
+                new GmodExplorerItem({
+                    type: 'scriptedClassType',
+                    label: 'VGUI Panels',
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    scType: 'vgui',
+                }),
                 new GmodExplorerItem({ type: 'category', label: 'Resources', collapsible: vscode.TreeItemCollapsibleState.Collapsed }),
             ];
         }
@@ -213,7 +229,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 new GmodExplorerItem({
                     type: 'scriptedClass',
                     label: className,
-                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    collapsible: files.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
                     scType: d.scType,
                     className,
                     uri: files[0],
@@ -367,6 +383,9 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             scanType('plugins', '{**/plugins/*/*.lua,**/plugins/*.lua}', '**/node_modules/**'),
         ]);
 
+        // VGUI panel classes are discovered from LS metadata, not folder patterns.
+        cache.set('vgui', cache.get('vgui') ?? new Map<string, vscode.Uri[]>());
+
         // Glob scan remains authoritative; LS entries only fill in classes missed by globs.
         const lsEntries = await fetchLsScriptedClasses();
         for (const lsEntry of lsEntries) {
@@ -376,12 +395,17 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             }
 
             const classMap = cache.get(scriptedClassType) ?? new Map<string, vscode.Uri[]>();
-            if (classMap.has(lsEntry.className)) {
+            if (scriptedClassType !== 'vgui' && classMap.has(lsEntry.className)) {
                 continue;
             }
 
             const uri = parseLsUri(lsEntry.uri);
-            classMap.set(lsEntry.className, uri ? [uri] : []);
+            const files = classMap.get(lsEntry.className) ?? [];
+            if (uri && !files.some((existingUri) => existingUri.toString() === uri.toString())) {
+                files.push(uri);
+            }
+
+            classMap.set(lsEntry.className, files);
             cache.set(scriptedClassType, classMap);
         }
 

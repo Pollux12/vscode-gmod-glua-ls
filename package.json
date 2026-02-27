@@ -1592,6 +1592,16 @@
                         "scope": "resource",
                         "markdownDescription": "Lua execution realm used by debugger control commands (`runLua`, `runFile`, `breakHere`, `waitIDE`)."
                     },
+                    "gluals.gmod.vgui.codeLensEnabled": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Enable Code Lenses for VGUI panel definitions"
+                    },
+                    "gluals.gmod.vgui.inlayHintEnabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable Inlay Hints for VGUI panel definitions"
+                    },
                     "gluals.gmod.debugger.autoUpdateRdb": {
                         "type": "boolean",
                         "default": true,
