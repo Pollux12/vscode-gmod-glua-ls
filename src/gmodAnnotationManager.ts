@@ -5,13 +5,13 @@ import * as https from 'https';
 import { spawn } from 'child_process';
 
 /**
- * Manages Garry's Mod EmmyLua annotations
- * Handles downloading and updating from the emmylua-annotations branch
+ * Manages Garry's Mod GLuaLS annotations
+ * Handles downloading and updating from the gluals-annotations branch
  */
 export class GmodAnnotationManager {
     private readonly REPO_URL = 'https://github.com/Pollux12/gmod-luals-addon.git';
-    private readonly BRANCH = 'emmylua-annotations';
-    private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/emmylua-annotations/__metadata.json';
+    private readonly BRANCH = 'gluals-annotations';
+    private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/gluals-annotations/__metadata.json';
     private readonly UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
     private readonly UPDATE_CHECK_STATE_KEY = 'gmodAnnotations.lastUpdateCheck';
     private readonly context: vscode.ExtensionContext;
@@ -170,7 +170,7 @@ export class GmodAnnotationManager {
 
             if (new Date(remoteMetadata.lastUpdate) > new Date(localMetadata.lastUpdate)) {
                 const action = await vscode.window.showInformationMessage(
-                    'GMod EmmyLua annotations update available.',
+                    'GMod GLuaLS annotations update available.',
                     'Update Now',
                     'Later'
                 );
@@ -217,7 +217,7 @@ export class GmodAnnotationManager {
             );
 
             console.log('GMod annotations downloaded successfully');
-            vscode.window.showInformationMessage('GMod EmmyLua annotations downloaded successfully');
+            vscode.window.showInformationMessage('GMod GLuaLS annotations downloaded successfully');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Failed to download GMod annotations:', errorMessage);

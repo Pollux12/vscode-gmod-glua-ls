@@ -547,7 +547,7 @@ function resolveExecutablePath(
     if (!executablePath) {
         // Use bundled language server
         const platform = os.platform();
-        const executableName = platform === 'win32' ? 'emmylua_ls.exe' : 'emmylua_ls';
+        const executableName = platform === 'win32' ? 'glua_ls.exe' : 'glua_ls';
         executablePath = path.join(context.extensionPath, 'server', executableName);
         // Make executable on Unix-like systems
         if (platform !== 'win32') {
@@ -564,7 +564,7 @@ function resolveExecutablePath(
 
 function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string | undefined {
     const platform = os.platform();
-    const executableName = platform === 'win32' ? 'emmylua_ls.exe' : 'emmylua_ls';
+    const executableName = platform === 'win32' ? 'glua_ls.exe' : 'glua_ls';
     const envPath = process.env['EMMY_DEV_LS_PATH']?.trim();
 
     const candidates: string[] = [];
@@ -1230,7 +1230,7 @@ interface GmodSetupIssue {
 }
 
 function getBundledServerExecutablePath(): string {
-    const executableName = os.platform() === 'win32' ? 'emmylua_ls.exe' : 'emmylua_ls';
+    const executableName = os.platform() === 'win32' ? 'glua_ls.exe' : 'glua_ls';
     return path.join(extensionContext.vscodeContext.extensionPath, 'server', executableName);
 }
 

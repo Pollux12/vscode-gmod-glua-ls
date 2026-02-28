@@ -12,8 +12,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { target: win32-x64,  file: emmylua_ls-win32-x64.zip }
-          - { target: linux-x64,  file: emmylua_ls-linux-x64-glibc.2.17.tar.gz }
+          - { target: win32-x64,  file: glua_ls-win32-x64.zip }
+          - { target: linux-x64,  file: glua_ls-linux-x64-glibc.2.17.tar.gz }
 
     runs-on: ubuntu-latest
 

@@ -57,15 +57,15 @@ The extension chooses the language server executable in this order:
 1. `emmylua.ls.executablePath` (if set)
 2. **Dev fallback** (Extension Development Host mode):
    - `EMMY_DEV_LS_PATH` (if set)
-   - `../emmylua-analyzer-rust/target/debug/emmylua_ls(.exe)`
-   - `../emmylua-analyzer-rust/target/release/emmylua_ls(.exe)`
-3. Bundled `server/emmylua_ls(.exe)` from this extension package
+   - `../emmylua-analyzer-rust/target/debug/glua_ls(.exe)`
+   - `../emmylua-analyzer-rust/target/release/glua_ls(.exe)`
+3. Bundled `server/glua_ls(.exe)` from this extension package
 
 ### Enable dev fallback
 
 - Start this extension using VS Code's **Run Extension** (`F5`).
 - Build your local server first (for example in sibling repo `emmylua-analyzer-rust`):
-  - `cargo build -p emmylua_ls`
+  - `cargo build -p glua_ls`
 - Optional: set `EMMY_DEV_LS_PATH` to point to a specific local binary.
 
 No extra extension setting is required for dev fallback when running in extension development mode.
@@ -95,7 +95,7 @@ npm run package:release
 ```
 
 - `npm run package:dev`
-  - builds your local `../emmylua-analyzer-rust/target/release/emmylua_ls.exe`
+  - builds your local `../emmylua-analyzer-rust/target/release/glua_ls.exe`
   - bundles it into `VSCode-EmmyLua-dev-win32-x64.vsix`
 - `npm run package:release`
   - forces download from configured release source in `build/config.json`
@@ -104,7 +104,7 @@ npm run package:release
 Manual packaging commands (same behavior):
 
 ```bash
-node ./build/prepare.js emmylua_ls-win32-x64.zip
+node ./build/prepare.js glua_ls-win32-x64.zip
 npx vsce package --target win32-x64
 ```
 
@@ -112,8 +112,8 @@ npx vsce package --target win32-x64
 
 - `--local-ls <path>`
 - `EMMY_LOCAL_LS_PATH`
-- `../emmylua-analyzer-rust/target/release/emmylua_ls(.exe)`
-- `../emmylua-analyzer-rust/target/debug/emmylua_ls(.exe)`
+- `../emmylua-analyzer-rust/target/release/glua_ls(.exe)`
+- `../emmylua-analyzer-rust/target/debug/glua_ls(.exe)`
 - Download from `build/config.json` release URL
 
 To skip local lookup and always use GitHub release, pass:
@@ -123,22 +123,22 @@ To skip local lookup and always use GitHub release, pass:
 Use this command to force local binary usage (Windows example):
 
 ```bash
-node ./build/prepare.js emmylua_ls-win32-x64.zip --local-ls ../emmylua-analyzer-rust/target/release/emmylua_ls.exe
+node ./build/prepare.js glua_ls-win32-x64.zip --local-ls ../emmylua-analyzer-rust/target/release/glua_ls.exe
 ```
 
 Use this command to force remote release usage:
 
 ```bash
-node ./build/prepare.js emmylua_ls-win32-x64.zip --remote-ls
+node ./build/prepare.js glua_ls-win32-x64.zip --remote-ls
 ```
 
 Use a different asset name/target for other platforms:
 
-- `emmylua_ls-win32-arm64.zip` → `--target win32-arm64`
-- `emmylua_ls-linux-x64-glibc.2.17.tar.gz` → `--target linux-x64`
-- `emmylua_ls-linux-aarch64-glibc.2.17.tar.gz` → `--target linux-arm64`
-- `emmylua_ls-darwin-x64.tar.gz` → `--target darwin-x64`
-- `emmylua_ls-darwin-arm64.tar.gz` → `--target darwin-arm64`
+- `glua_ls-win32-arm64.zip` → `--target win32-arm64`
+- `glua_ls-linux-x64-glibc.2.17.tar.gz` → `--target linux-x64`
+- `glua_ls-linux-aarch64-glibc.2.17.tar.gz` → `--target linux-arm64`
+- `glua_ls-darwin-x64.tar.gz` → `--target darwin-x64`
+- `glua_ls-darwin-arm64.tar.gz` → `--target darwin-arm64`
 
 ### Install VSIX locally
 

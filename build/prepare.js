@@ -22,7 +22,7 @@ function hasFlag(flagName) {
 }
 
 function getLanguageServerExecutableName(assetName) {
-    return assetName.includes("win32") ? "emmylua_ls.exe" : "emmylua_ls";
+    return assetName.includes("win32") ? "glua_ls.exe" : "glua_ls";
 }
 
 function resolveLocalLanguageServerSource(assetName) {
@@ -83,7 +83,7 @@ async function installLanguageServerFromSource(sourcePath, assetName) {
 
 async function build() {
     if (!languageServerAssetName) {
-        throw new Error("Missing language server asset name. Example: node ./build/prepare.js emmylua_ls-win32-x64.zip");
+        throw new Error("Missing language server asset name. Example: node ./build/prepare.js glua_ls-win32-x64.zip");
     }
 
     if (!existsSync("temp")) {
