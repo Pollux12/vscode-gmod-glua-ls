@@ -1783,6 +1783,59 @@
                     ]
                 }
             }
+        ],
+        "walkthroughs": [
+            {
+                "id": "gmodSetup",
+                "title": "Get Started with Garry's Mod LS",
+                "description": "Setup the Garry's Mod language server and debugger.",
+                "steps": [
+                    {
+                        "id": "welcomeOnboard",
+                        "title": "Diagnostic Wizard",
+                        "description": "Run the diagnostic wizard to verify workspace paths and dependencies.\n\n[Run Wizard](command:gluals.gmod.onboarding.start)",
+                        "media": {
+                            "markdown": "res/walkthrough/welcome.md"
+                        },
+                        "completionEvents": [
+                            "onCommand:gluals.gmod.onboarding.start"
+                        ]
+                    },
+                    {
+                        "id": "installAnnotations",
+                        "title": "Install Type Annotations",
+                        "description": "Download GMod API annotations to enable autocomplete and type hints.\n\n[Download Annotations](command:gluals.gmod.updateAnnotations)",
+                        "media": {
+                            "markdown": "res/walkthrough/annotations.md"
+                        },
+                        "completionEvents": [
+                            "onCommand:gluals.gmod.updateAnnotations"
+                        ]
+                    },
+                    {
+                        "id": "configureDebugger",
+                        "title": "Setup Live Debugging",
+                        "description": "Install the debugger module to the local Garry's Mod instance.\n\n[Configure Debugger](command:gluals.gmod.configureDebugger)",
+                        "media": {
+                            "markdown": "res/walkthrough/debugger.md"
+                        },
+                        "completionEvents": [
+                            "onCommand:gluals.gmod.configureDebugger"
+                        ]
+                    },
+                    {
+                        "id": "extensionSettings",
+                        "title": "Open Settings Panel",
+                        "description": "Open the Settings Panel to configure `.gluarc.json` formatting and diagnostic behaviors.\n\n[Open GLua Settings](command:gluals.gmod.openSettings)",
+                        "media": {
+                            "markdown": "res/walkthrough/settings.md"
+                        },
+                        "completionEvents": [
+                            "onCommand:gluals.gmod.openSettings"
+                        ]
+                    }
+                ]
+            }
         ]
     },
     "scripts": {
