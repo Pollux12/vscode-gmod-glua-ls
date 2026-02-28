@@ -2,10 +2,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { downloadFile } from '../../netHelpers';
 import {
     cleanupLegacyInitInjection,
     DEFAULT_RDB_PORT,
-    downloadFile,
     fetchLatestRelease,
     getStoredGarrysmodPath,
     GmRdbRelease,
@@ -23,8 +23,6 @@ interface VersionCheckResult {
 }
 
 export class GmodRdbUpdater {
-    private readonly UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-    private readonly LAST_PROMPT_STATE_KEY = 'gmodRdbUpdater.lastPromptAt';
     private readonly SKIP_EXPECTED_VERSION_KEY = 'gmodRdbUpdater.skipExpectedVersion';
 
     private activeUpdate: Promise<void> | undefined;
@@ -52,10 +50,6 @@ export class GmodRdbUpdater {
         }
 
         if (this.isSkippedExpectedVersion()) {
-            return;
-        }
-
-        if (this.isPromptRateLimited()) {
             return;
         }
 
@@ -97,8 +91,6 @@ export class GmodRdbUpdater {
     }
 
     public async promptForUpdate(moduleVersion: string): Promise<void> {
-        await this.context.globalState.update(this.LAST_PROMPT_STATE_KEY, Date.now());
-
         const action = await vscode.window.showInformationMessage(
             `gm_rdb module version mismatch detected (connected: ${moduleVersion}, expected: ${EXPECTED_GM_RDB_VERSION}).`,
             'Update Now',
@@ -169,9 +161,13 @@ export class GmodRdbUpdater {
                     const destinationPath = path.join(binDir, asset.name);
 
                     try {
-                        await downloadFile(asset.browser_download_url, tempFilePath);
+                        await downloadFile(asset.browser_download_url, tempFilePath, progress);
+
+                        progress.report({ message: `Installing ${asset.name}...` });
                         await fs.promises.mkdir(binDir, { recursive: true });
                         await fs.promises.copyFile(tempFilePath, destinationPath);
+
+                        progress.report({ message: 'Update complete!' });
                     } finally {
                         fs.rmSync(tempDir, { recursive: true, force: true });
                     }
@@ -226,11 +222,6 @@ export class GmodRdbUpdater {
         return vscode.workspace
             .getConfiguration('gluals.gmod.debugger')
             .get<boolean>('autoUpdateRdb', true);
-    }
-
-    private isPromptRateLimited(): boolean {
-        const lastPrompt = this.context.globalState.get<number>(this.LAST_PROMPT_STATE_KEY, 0);
-        return Date.now() - lastPrompt < this.UPDATE_CHECK_INTERVAL_MS;
     }
 
     private isSkippedExpectedVersion(): boolean {

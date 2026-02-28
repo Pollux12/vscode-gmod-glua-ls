@@ -1,9 +1,8 @@
 import * as fs from 'fs';
-import * as http from 'http';
-import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { fetchJson, downloadFile } from '../../netHelpers';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
 const LEGACY_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.garrysmodPath';
@@ -183,83 +182,16 @@ function detectGmRdb(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
-export function fetchLatestRelease(): Promise<GmRdbRelease | null> {
-    return new Promise((resolve) => {
-        const request = https.get(
-            {
-                hostname: 'api.github.com',
-                path: `/repos/${GM_RDB_REPO}/releases/latest`,
-                headers: {
-                    'User-Agent': 'gluals-extension',
-                    Accept: 'application/vnd.github.v3+json',
-                },
+export async function fetchLatestRelease(): Promise<GmRdbRelease | null> {
+    try {
+        return await fetchJson<GmRdbRelease>(`https://api.github.com/repos/${GM_RDB_REPO}/releases/latest`, {
+            headers: {
+                Accept: 'application/vnd.github.v3+json',
             },
-            (response) => {
-                if (response.statusCode !== 200) {
-                    resolve(null);
-                    return;
-                }
-
-                let data = '';
-                response.on('data', (chunk: string) => {
-                    data += chunk;
-                });
-
-                response.on('end', () => {
-                    try {
-                        resolve(JSON.parse(data) as GmRdbRelease);
-                    } catch {
-                        resolve(null);
-                    }
-                });
-            }
-        );
-
-        request.on('error', () => resolve(null));
-        request.setTimeout(8000, () => {
-            request.destroy();
-            resolve(null);
         });
-    });
-}
-
-export function downloadFile(url: string, destinationPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const attempt = (downloadUrl: string, redirectsLeft: number) => {
-            const parsedUrl = new URL(downloadUrl);
-            const protocol = parsedUrl.protocol === 'https:' ? https : http;
-            protocol
-                .get(downloadUrl, { headers: { 'User-Agent': 'gluals-extension' } }, (response) => {
-                    if ((response.statusCode === 301 || response.statusCode === 302) && response.headers.location && redirectsLeft > 0) {
-                        attempt(response.headers.location, redirectsLeft - 1);
-                        return;
-                    }
-
-                    if (response.statusCode !== 200) {
-                        reject(new Error(`HTTP ${response.statusCode} downloading ${downloadUrl}`));
-                        return;
-                    }
-
-                    const output = fs.createWriteStream(destinationPath);
-                    response.pipe(output);
-                    output.on('finish', () => {
-                        output.close();
-                        resolve();
-                    });
-                    output.on('error', (error) => {
-                        fs.unlink(destinationPath, () => undefined);
-                        reject(error);
-                    });
-                    response.on('error', (error) => {
-                        fs.unlink(destinationPath, () => undefined);
-                        reject(error);
-                    });
-                })
-                .on('error', reject);
-        };
-
-        attempt(url, 5);
-    });
+    } catch {
+        return null;
+    }
 }
 
 function buildSharedAutorunLua(port: number): string {
@@ -508,11 +440,15 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
 
             progress.report({ message: `Downloading ${dllName} (${release.tag_name})…` });
             fs.mkdirSync(binDir, { recursive: true });
-            await downloadFile(asset.browser_download_url, destinationPath);
+            await downloadFile(asset.browser_download_url, destinationPath, progress);
 
             progress.report({ message: 'Writing shared debugger autorun file…' });
             writeAutorunFile(garrysmodPath, port);
+
+            progress.report({ message: 'Cleaning up legacy initializations…' });
             cleanupLegacyInitInjection(garrysmodPath);
+
+            progress.report({ message: 'Installation complete!' });
         }
     );
 

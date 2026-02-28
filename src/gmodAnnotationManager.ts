@@ -1,60 +1,24 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as https from 'https';
-import { spawn } from 'child_process';
+import { fetchJson, downloadAndExtractZip } from './netHelpers';
 
 /**
  * Manages Garry's Mod GLuaLS annotations
  * Handles downloading and updating from the gluals-annotations branch
  */
 export class GmodAnnotationManager {
-    private readonly REPO_URL = 'https://github.com/Pollux12/gmod-luals-addon.git';
-    private readonly BRANCH = 'gluals-annotations';
+    private readonly ZIP_URL = 'https://github.com/Pollux12/gmod-luals-addon/archive/refs/heads/gluals-annotations.zip';
+    private readonly ZIP_INNER_FOLDER = 'gmod-luals-addon-gluals-annotations';
     private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/gluals-annotations/__metadata.json';
-    private readonly UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-    private readonly UPDATE_CHECK_STATE_KEY = 'gmodAnnotations.lastUpdateCheck';
-    private readonly context: vscode.ExtensionContext;
     private readonly annotationsPath: string;
 
     constructor(context: vscode.ExtensionContext) {
-        this.context = context;
         // Store annotations in extension's global storage
         this.annotationsPath = path.join(
             context.globalStorageUri.fsPath,
             'gmod-annotations'
         );
-    }
-
-    /**
-     * Run a git command with all I/O piped (no terminal windows).
-     * Rejects with a message that includes captured stderr on failure.
-     */
-    private runGit(args: string[], cwd?: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const proc = spawn('git', args, {
-                cwd,
-                stdio: ['ignore', 'pipe', 'pipe'],
-                shell: false,
-                windowsHide: true,
-            });
-
-            let stderr = '';
-            proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-
-            proc.on('error', reject);
-            proc.on('close', (code) => {
-                if (code === 0) {
-                    resolve();
-                } else {
-                    const detail = stderr.trim();
-                    reject(new Error(
-                        `git ${args.join(' ')} failed with exit code ${code}` +
-                        (detail ? `\n${detail}` : '')
-                    ));
-                }
-            });
-        });
     }
 
     /**
@@ -80,7 +44,7 @@ export class GmodAnnotationManager {
      * Check if annotations are already downloaded
      */
     private annotationsExist(): boolean {
-        return fs.existsSync(this.annotationsPath) && fs.existsSync(path.join(this.annotationsPath, '.git'));
+        return fs.existsSync(this.annotationsPath) && fs.existsSync(path.join(this.annotationsPath, '__metadata.json'));
     }
 
     /**
@@ -107,44 +71,10 @@ export class GmodAnnotationManager {
     }
 
     /**
-     * Fetch JSON from a URL using Node's https module with a timeout.
-     * Returns undefined on any error (network failure, bad status, parse error).
-     */
-    private fetchJson<T>(url: string, timeoutMs: number): Promise<T | undefined> {
-        return new Promise((resolve) => {
-            const req = https.get(url, (res) => {
-                if (res.statusCode !== 200) {
-                    res.resume();
-                    resolve(undefined);
-                    return;
-                }
-                let data = '';
-                res.on('data', (chunk: string) => { data += chunk; });
-                res.on('end', () => {
-                    try {
-                        resolve(JSON.parse(data) as T);
-                    } catch {
-                        resolve(undefined);
-                    }
-                });
-            });
-            req.setTimeout(timeoutMs, () => { req.destroy(); resolve(undefined); });
-            req.on('error', () => resolve(undefined));
-        });
-    }
-
-    /**
      * Check if a newer version of annotations is available on the remote branch.
-     * Rate-limited to once per 24 hours. Runs as a background task.
+     * Runs as a background task.
      */
     private async checkForUpdates(): Promise<void> {
-        const lastCheck = this.context.globalState.get<number>(this.UPDATE_CHECK_STATE_KEY, 0);
-        if (Date.now() - lastCheck < this.UPDATE_CHECK_INTERVAL_MS) {
-            return;
-        }
-
-        // Update the timestamp before the network call so concurrent activations don't all fire
-        await this.context.globalState.update(this.UPDATE_CHECK_STATE_KEY, Date.now());
 
         try {
             const localMetadataPath = path.join(this.annotationsPath, '__metadata.json');
@@ -156,15 +86,12 @@ export class GmodAnnotationManager {
                 fs.readFileSync(localMetadataPath, 'utf-8')
             ) as { lastUpdate?: string };
 
-            const remoteMetadata = await this.fetchJson<{ lastUpdate?: string }>(
-                this.REMOTE_METADATA_URL,
-                10_000
-            );
-            if (!remoteMetadata) {
+            const remoteMetadata = await fetchJson<{ lastUpdate?: string }>(this.REMOTE_METADATA_URL, { timeoutMs: 10000 });
+            if (!remoteMetadata || !remoteMetadata.lastUpdate) {
                 return;
             }
 
-            if (!localMetadata.lastUpdate || !remoteMetadata.lastUpdate) {
+            if (!localMetadata.lastUpdate) {
                 return;
             }
 
@@ -184,38 +111,30 @@ export class GmodAnnotationManager {
     }
 
     /**
-     * Download annotations from git repository
+     * Download or update annotations by downloading the zip file and extracting it
+     */
+    private async downloadAnnotationsZip(): Promise<void> {
+        console.log(`Downloading annotations zip from ${this.ZIP_URL}...`);
+
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Downloading GMod annotations...',
+                cancellable: false,
+            },
+            async (progress) => {
+                await downloadAndExtractZip(this.ZIP_URL, this.annotationsPath, this.ZIP_INNER_FOLDER, progress);
+                progress.report({ message: 'Download complete!' });
+            }
+        );
+    }
+
+    /**
+     * Download annotations
      */
     private async downloadAnnotations(): Promise<void> {
         try {
-            // Ensure parent directory exists
-            const parentDir = path.dirname(this.annotationsPath);
-            if (!fs.existsSync(parentDir)) {
-                fs.mkdirSync(parentDir, { recursive: true });
-            }
-
-            // Clone the specific branch
-            console.log(`Cloning ${this.BRANCH} branch from ${this.REPO_URL}...`);
-
-            await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: 'Downloading GMod annotations...',
-                    cancellable: false,
-                },
-                async (progress) => {
-                    progress.report({ message: 'Cloning repository...' });
-
-                    if (fs.existsSync(this.annotationsPath)) {
-                        fs.rmSync(this.annotationsPath, { recursive: true, force: true });
-                    }
-
-                    await this.runGit(['clone', '--depth', '1', '--branch', this.BRANCH, this.REPO_URL, this.annotationsPath]);
-
-                    progress.report({ message: 'Download complete!' });
-                }
-            );
-
+            await this.downloadAnnotationsZip();
             console.log('GMod annotations downloaded successfully');
             vscode.window.showInformationMessage('GMod GLuaLS annotations downloaded successfully');
         } catch (error) {
@@ -232,30 +151,8 @@ export class GmodAnnotationManager {
      * Update annotations to latest version
      */
     public async updateAnnotations(): Promise<void> {
-        if (!this.annotationsExist()) {
-            await this.downloadAnnotations();
-            return;
-        }
-
         try {
-            await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: 'Updating GMod annotations...',
-                    cancellable: false,
-                },
-                async (progress) => {
-                    progress.report({ message: 'Fetching updates...' });
-
-                    // For a shallow clone, fetch the latest then hard-reset to it.
-                    // fetch+checkout+pull --ff-only fails on shallow repos (exit 128).
-                    await this.runGit(['fetch', '--depth', '1', 'origin', this.BRANCH], this.annotationsPath);
-                    await this.runGit(['reset', '--hard', `origin/${this.BRANCH}`], this.annotationsPath);
-
-                    progress.report({ message: 'Update complete!' });
-                }
-            );
-
+            await this.downloadAnnotationsZip();
             vscode.window.showInformationMessage('GMod annotations updated successfully');
 
             // Suggest restarting the language server
