@@ -13,6 +13,16 @@
             },
             "group": {
                 "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "type": "npm",
+            "script": "package:dev:win32-x64",
+            "label": "vscode-gmod-glua-ls: Dev Build",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
                 "isDefault": true
             }
         }
