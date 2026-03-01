@@ -573,8 +573,8 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
     }
 
     candidates.push(
-        path.resolve(context.extensionPath, '..', 'emmylua-analyzer-rust', 'target', 'debug', executableName),
-        path.resolve(context.extensionPath, '..', 'emmylua-analyzer-rust', 'target', 'release', executableName)
+        path.resolve(context.extensionPath, '..', 'gmod-glua-ls', 'target', 'debug', executableName),
+        path.resolve(context.extensionPath, '..', 'gmod-glua-ls', 'target', 'release', executableName)
     );
 
     for (const candidatePath of candidates) {

@@ -33,8 +33,8 @@ function resolveLocalLanguageServerSource(assetName) {
     const candidates = [
         cliLocalPath,
         envLocalPath,
-        `../emmylua-analyzer-rust/target/release/${executableName}`,
-        `../emmylua-analyzer-rust/target/debug/${executableName}`,
+        `../gmod-glua-ls/target/release/${executableName}`,
+        `../gmod-glua-ls/target/debug/${executableName}`,
     ]
         .filter(Boolean)
         .map(path => resolve(path));
