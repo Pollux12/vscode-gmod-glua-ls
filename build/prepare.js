@@ -10,7 +10,7 @@ const languageServerAssetName = args[2];
 const RELEASE_CHANNELS = new Set(["stable", "prerelease"]);
 
 const GITHUB_RELEASES_API =
-    "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases";
+    "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases?per_page=100";
 const BASE_GITHUB_API_HEADERS = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -31,11 +31,6 @@ function hasFlag(flagName) {
 }
 
 function getGitHubToken() {
-    const cliToken = getArgValue("--github-token")?.trim();
-    if (cliToken) {
-        return cliToken;
-    }
-
     const envToken = process.env.GITHUB_TOKEN?.trim();
     return envToken || undefined;
 }

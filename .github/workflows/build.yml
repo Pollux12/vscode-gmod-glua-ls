@@ -24,16 +24,20 @@ jobs:
     - name: Resolve channel and tag metadata
       id: release_meta
       shell: bash
+      env:
+        GH_EVENT_NAME: ${{ github.event_name }}
+        GH_EVENT_ACTION: ${{ github.event.action }}
+        GH_RELEASE_TAG: ${{ github.event.release.tag_name }}
       run: |
         CHANNEL="stable"
         TAG_NAME=""
         IS_PUBLISH_EVENT="false"
 
-        if [[ "${{ github.event_name }}" == "release" && "${{ github.event.action }}" == "released" ]]; then
+        if [[ "$GH_EVENT_NAME" == "release" && "$GH_EVENT_ACTION" == "released" ]]; then
           CHANNEL="stable"
-          TAG_NAME="${{ github.event.release.tag_name }}"
+          TAG_NAME="$GH_RELEASE_TAG"
           IS_PUBLISH_EVENT="true"
-        elif [[ "${{ github.event_name }}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        elif [[ "$GH_EVENT_NAME" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           CHANNEL="prerelease"
           TAG_NAME="${GITHUB_REF_NAME}"
           IS_PUBLISH_EVENT="true"
@@ -97,8 +101,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Build
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        node ./build/prepare.js ${{ matrix.file }} --channel ${{ steps.release_meta.outputs.channel }} --github-token "${{ secrets.GITHUB_TOKEN }}"
+        node ./build/prepare.js ${{ matrix.file }} --channel ${{ steps.release_meta.outputs.channel }}
         npx vsce package -o vscode-gmod-ls-${{ matrix.target }}.vsix --target ${{ matrix.target }}
     - name: Upload
       uses: actions/upload-artifact@v4
@@ -114,13 +120,17 @@ jobs:
       - name: Resolve channel and tag metadata
         id: release_meta
         shell: bash
+        env:
+          GH_EVENT_NAME: ${{ github.event_name }}
+          GH_EVENT_ACTION: ${{ github.event.action }}
+          GH_RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           CHANNEL="stable"
           TAG_NAME=""
 
-          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.action }}" == "released" ]]; then
+          if [[ "$GH_EVENT_NAME" == "release" && "$GH_EVENT_ACTION" == "released" ]]; then
             CHANNEL="stable"
-            TAG_NAME="${{ github.event.release.tag_name }}"
+            TAG_NAME="$GH_RELEASE_TAG"
           else
             CHANNEL="prerelease"
             TAG_NAME="${GITHUB_REF_NAME}"
