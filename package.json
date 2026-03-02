@@ -1862,8 +1862,9 @@
         "@vscode/vsce": "2.26.1",
         "decompress-targz": "4.1.1",
         "download": "^7.1.0",
-        "eslint": "^8.11.0",
+        "eslint": "^9",
         "filecopy": "^4.0.2",
+        "globals": "^16",
         "typescript": "^4.0.2"
     },
     "dependencies": {
