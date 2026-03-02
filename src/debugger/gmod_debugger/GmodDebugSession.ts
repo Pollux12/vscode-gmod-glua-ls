@@ -1123,37 +1123,41 @@ export class GmodDebugSession extends DebugSession {
             chunk: luaExpression,
             depth: 0,
           }
-          this._debug_client.eval(requestParam).then((res) => {
-            if (res.result instanceof Array) {
-              let ret = ''
-              ret = res.result.map((v) => stringify_v2(v)).join('\t')
-              let varRef = 0
-              if (res.result.length == 1) {
-                const refobj = res.result[0]
-                const typename = typeof refobj
-                if (refobj && typename == 'object') {
-                  varRef = this._variableHandles.create({
-                    type: 'eval',
-                    params: requestParam,
-                  })
+          this._debug_client.eval(requestParam)
+            .then((res) => {
+              if (res.result instanceof Array) {
+                let ret = ''
+                ret = res.result.map((v) => stringify_v2(v)).join('\t')
+                let varRef = 0
+                if (res.result.length == 1) {
+                  const refobj = res.result[0]
+                  const typename = typeof refobj
+                  if (refobj && typename == 'object') {
+                    varRef = this._variableHandles.create({
+                      type: 'eval',
+                      params: requestParam,
+                    })
+                  }
                 }
+
+                response.body = {
+                  result: ret,
+                  variablesReference: varRef,
+                }
+              } else {
+                response.body = {
+                  result: '',
+                  variablesReference: 0,
+                }
+
+                response.success = false
               }
 
-              response.body = {
-                result: ret,
-                variablesReference: varRef,
-              }
-            } else {
-              response.body = {
-                result: '',
-                variablesReference: 0,
-              }
-
-              response.success = false
-            }
-
-            this.sendResponse(response)
-          })
+              this.sendResponse(response)
+            })
+            .catch((err: Error) => {
+              this.sendErrorResponse(response, 1001, err.message || 'Request failed')
+            })
           return
         }
 
@@ -1197,37 +1201,41 @@ export class GmodDebugSession extends DebugSession {
         chunk: chunk,
         depth: 0,
       }
-      this._debug_client.eval(requestParam).then((res) => {
-        if (res.result instanceof Array) {
-          let ret = ''
-          ret = res.result.map((v) => stringify_v2(v)).join('\t')
-          let varRef = 0
-          if (res.result.length == 1) {
-            const refobj = res.result[0]
-            const typename = typeof refobj
-            if (refobj && typename == 'object') {
-              varRef = this._variableHandles.create({
-                type: 'eval',
-                params: requestParam,
-              })
+      this._debug_client.eval(requestParam)
+        .then((res) => {
+          if (res.result instanceof Array) {
+            let ret = ''
+            ret = res.result.map((v) => stringify_v2(v)).join('\t')
+            let varRef = 0
+            if (res.result.length == 1) {
+              const refobj = res.result[0]
+              const typename = typeof refobj
+              if (refobj && typename == 'object') {
+                varRef = this._variableHandles.create({
+                  type: 'eval',
+                  params: requestParam,
+                })
+              }
             }
+
+            response.body = {
+              result: ret,
+              variablesReference: varRef,
+            }
+          } else {
+            response.body = {
+              result: '',
+              variablesReference: 0,
+            }
+
+            response.success = false
           }
 
-          response.body = {
-            result: ret,
-            variablesReference: varRef,
-          }
-        } else {
-          response.body = {
-            result: '',
-            variablesReference: 0,
-          }
-
-          response.success = false
-        }
-
-        this.sendResponse(response)
-      })
+          this.sendResponse(response)
+        })
+        .catch((err: Error) => {
+          this.sendErrorResponse(response, 1001, err.message || 'Request failed')
+        })
     } catch(e) {
       response.success = false
       if (typeof e === "string") {
@@ -1806,16 +1814,20 @@ export class GmodDebugSession extends DebugSession {
         scope: varScope,
         stackNo: stackNo
       }
-      this._debug_client.setVar(params).then((res) => {
-        response.success = res.result
-        if(response.success) {
-          const body: DebugProtocol.SetVariableResponse['body'] = {
-            value: args.value
+      this._debug_client.setVar(params)
+        .then((res) => {
+          response.success = res.result
+          if(response.success) {
+            const body: DebugProtocol.SetVariableResponse['body'] = {
+              value: args.value
+            }
+            response.body = body
           }
-          response.body = body
-        }
-        this.sendResponse(response)
-      })
+          this.sendResponse(response)
+        })
+        .catch((err: Error) => {
+          this.sendErrorResponse(response, 1001, err.message || 'Request failed')
+        })
     } catch(e) {
       response.success = false
       if (typeof e === "string") {
