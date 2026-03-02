@@ -39,10 +39,12 @@ export async function fetchJson<T>(url: string, options?: FetchOptions): Promise
 export async function downloadFile(
     url: string,
     destinationPath: string,
-    progress?: vscode.Progress<{ message?: string; increment?: number }>
+    progress?: vscode.Progress<{ message?: string; increment?: number }>,
+    options?: FetchOptions
 ): Promise<void> {
     const response = await fetch(url, {
-        headers: { 'User-Agent': 'vscode-gmod-glua-ls' },
+        timeout: options?.timeoutMs ?? 30000,
+        headers: { 'User-Agent': 'vscode-gmod-glua-ls', ...options?.headers },
     });
 
     if (!response.ok || !response.body) {
@@ -137,6 +139,13 @@ export async function downloadAndExtractZip(
         }
 
         const zip = new AdmZip(tempZipPath);
+        const resolvedTempDir = path.resolve(tempDir);
+        for (const entry of zip.getEntries()) {
+            const entryDest = path.resolve(resolvedTempDir, entry.entryName);
+            if (!entryDest.startsWith(resolvedTempDir + path.sep) && entryDest !== resolvedTempDir) {
+                throw new Error(`Zip entry path traversal rejected: ${entry.entryName}`);
+            }
+        }
         zip.extractAllTo(tempDir, true);
 
         const extractedFolderPath = path.join(tempDir, innerFolderName);

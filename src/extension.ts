@@ -552,7 +552,7 @@ function resolveExecutablePath(
         // Make executable on Unix-like systems
         if (platform !== 'win32') {
             try {
-                fs.chmodSync(executablePath, '777');
+                fs.chmodSync(executablePath, 0o755);
             } catch (error) {
                 console.warn(`Failed to chmod language server:`, error);
             }
@@ -581,7 +581,7 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
         if (fs.existsSync(candidatePath)) {
             if (platform !== 'win32') {
                 try {
-                    fs.chmodSync(candidatePath, '777');
+                    fs.chmodSync(candidatePath, 0o755);
                 } catch (error) {
                     console.warn(`Failed to chmod dev language server:`, error);
                 }

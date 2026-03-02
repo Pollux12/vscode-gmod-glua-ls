@@ -197,11 +197,17 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to load GLua settings UI: ${message}`);
+            const safeMessage = message
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
             this.panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
+<head><meta http-equiv="Content-Security-Policy" content="default-src 'none';"></head>
 <body>
     <h2>Failed to load GLua settings UI</h2>
-    <p>${message}</p>
+    <p>${safeMessage}</p>
 </body>
 </html>`;
             return false;

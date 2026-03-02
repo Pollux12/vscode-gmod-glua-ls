@@ -831,9 +831,9 @@
                     const descEl = row.querySelector('.setting-description');
                     const pathText = row.dataset.path || "";
 
-                    // Reset
-                    if (labelEl) labelEl.innerHTML = labelEl.textContent;
-                    if (descEl) descEl.innerHTML = descEl.textContent;
+                    // Reset (use textContent setter to safely strip any <mark> highlights)
+                    if (labelEl) { const raw = labelEl.textContent ?? ''; labelEl.textContent = raw; }
+                    if (descEl) { const raw = descEl.textContent ?? ''; descEl.textContent = raw; }
 
                     const labelText = labelEl ? labelEl.textContent : "";
                     const descText = descEl ? descEl.textContent : "";
@@ -899,10 +899,16 @@
             }, 55);
         }
 
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
         function highlightElement(el, query) {
-            const text = el.textContent;
-            const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-            el.innerHTML = text.replace(regex, '<mark>$1</mark>');
+            const text = el.textContent ?? '';
+            const escapedText = escapeHtml(text);
+            const escapedQuery = escapeHtml(query);
+            const regex = new RegExp(`(${escapeRegExp(escapedQuery)})`, 'gi');
+            el.innerHTML = escapedText.replace(regex, '<mark>$1</mark>');
         }
 
         function escapeRegExp(string) {

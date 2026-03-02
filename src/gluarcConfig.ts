@@ -13,9 +13,15 @@ function hasOwnKey(target: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(target, key);
 }
 
+const UNSAFE_PATH_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafePath(path: string[]): boolean {
+    return path.every((segment) => !UNSAFE_PATH_KEYS.has(segment));
+}
+
 function deleteNestedValue(target: Record<string, unknown>, path: string[], depth: number): boolean {
     const key = path[depth];
-    if (!hasOwnKey(target, key)) {
+    if (UNSAFE_PATH_KEYS.has(key) || !hasOwnKey(target, key)) {
         return false;
     }
 
@@ -104,7 +110,7 @@ export async function writeGluarcConfig(
  * If deleting a key leaves the parent object empty, also removes the parent (cleanup empty sections).
  */
 export function setNestedValue(obj: Record<string, unknown>, path: string[], value: unknown): void {
-    if (path.length === 0) {
+    if (path.length === 0 || !isSafePath(path)) {
         return;
     }
 
