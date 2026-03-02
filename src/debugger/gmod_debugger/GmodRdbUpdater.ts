@@ -6,7 +6,7 @@ import { downloadFile } from '../../netHelpers';
 import {
     cleanupLegacyInitInjection,
     DEFAULT_RDB_PORT,
-    fetchLatestRelease,
+    fetchReleaseForCurrentExtensionChannel,
     getStoredGarrysmodPath,
     GmRdbRelease,
     promptForGarrysmodPath,
@@ -143,8 +143,8 @@ export class GmodRdbUpdater {
                     cancellable: false,
                 },
                 async (progress) => {
-                    progress.report({ message: 'Fetching latest gm_rdb release...' });
-                    const release = await fetchLatestRelease();
+                    progress.report({ message: 'Fetching gm_rdb release for current extension channel...' });
+                    const release = await fetchReleaseForCurrentExtensionChannel();
                     if (!release) {
                         throw new Error('Failed to fetch gm_rdb release metadata.');
                     }

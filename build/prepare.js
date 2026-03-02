@@ -7,6 +7,15 @@ import { downloadTo } from "./util.js";
 
 const args = process.argv;
 const languageServerAssetName = args[2];
+const RELEASE_CHANNELS = new Set(["stable", "prerelease"]);
+
+const GITHUB_RELEASES_API =
+    "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases";
+const BASE_GITHUB_API_HEADERS = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "vscode-gmod-glua-ls-build",
+};
 
 function getArgValue(flagName) {
     const flagIndex = args.indexOf(flagName);
@@ -19,6 +28,41 @@ function getArgValue(flagName) {
 
 function hasFlag(flagName) {
     return args.includes(flagName);
+}
+
+function getGitHubToken() {
+    const cliToken = getArgValue("--github-token")?.trim();
+    if (cliToken) {
+        return cliToken;
+    }
+
+    const envToken = process.env.GITHUB_TOKEN?.trim();
+    return envToken || undefined;
+}
+
+function getGitHubApiHeaders() {
+    const token = getGitHubToken();
+    if (!token) {
+        console.warn(
+            "Warning: No GitHub token provided for GitHub API requests. Proceeding unauthenticated and may hit rate limits."
+        );
+        return BASE_GITHUB_API_HEADERS;
+    }
+
+    return {
+        ...BASE_GITHUB_API_HEADERS,
+        Authorization: `Bearer ${token}`,
+    };
+}
+
+function getReleaseChannel() {
+    const channel = getArgValue("--channel") ?? "stable";
+    if (!RELEASE_CHANNELS.has(channel)) {
+        throw new Error(
+            `Invalid --channel '${channel}'. Expected one of: stable, prerelease`
+        );
+    }
+    return channel;
 }
 
 function getLanguageServerExecutableName(assetName) {
@@ -54,6 +98,21 @@ async function resolveLanguageServerSource(assetName) {
     }
 
     const downloadPath = `temp/${assetName}`;
+
+    if (getReleaseChannel() === "prerelease") {
+        try {
+            const prereleaseAssetUrl = await resolveLatestPreReleaseAssetUrl(assetName);
+            console.log(`Downloading pre-release language server from ${prereleaseAssetUrl}`);
+            await downloadTo(prereleaseAssetUrl, downloadPath);
+            return downloadPath;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(
+                `ERROR: --channel prerelease was specified but no pre-release of gmod-glua-ls was found. Cannot build pre-release extension. (${errorMessage})`
+            );
+        }
+    }
+
     console.log(`Downloading language server from ${config.newLanguageServerUrl}/${config.newLanguageServerVersion}/${assetName}`);
     await downloadTo(
         `${config.newLanguageServerUrl}/${config.newLanguageServerVersion}/${assetName}`,
@@ -61,6 +120,42 @@ async function resolveLanguageServerSource(assetName) {
     );
 
     return downloadPath;
+}
+
+async function resolveLatestPreReleaseAssetUrl(assetName) {
+    const response = await fetch(GITHUB_RELEASES_API, {
+        headers: getGitHubApiHeaders(),
+    });
+
+    if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status} ${response.statusText}`);
+    }
+
+    const releases = await response.json();
+    if (!Array.isArray(releases)) {
+        throw new Error("GitHub API response was not an array of releases");
+    }
+
+    const preRelease = releases.find((release) => {
+        return release?.prerelease === true && Array.isArray(release.assets);
+    });
+
+    if (!preRelease) {
+        throw new Error("No pre-release found in gmod-glua-ls releases list");
+    }
+
+    const asset = preRelease.assets.find(
+        (entry) => entry?.name === assetName && typeof entry.browser_download_url === "string"
+    );
+
+    if (!asset) {
+        throw new Error(
+            `Pre-release ${preRelease.tag_name} does not include asset ${assetName}`
+        );
+    }
+
+    console.log(`Using pre-release language server ${preRelease.tag_name}`);
+    return asset.browser_download_url;
 }
 
 async function installLanguageServerFromSource(sourcePath, assetName) {
@@ -85,6 +180,9 @@ async function build() {
     if (!languageServerAssetName) {
         throw new Error("Missing language server asset name. Example: node ./build/prepare.js glua_ls-win32-x64.zip");
     }
+
+    const channel = getReleaseChannel();
+    console.log(`Using release channel: ${channel}`);
 
     if (!existsSync("temp")) {
         mkdirSync("temp");

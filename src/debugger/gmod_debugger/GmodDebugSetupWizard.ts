@@ -8,6 +8,11 @@ const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
 const LEGACY_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.garrysmodPath';
 const GMOD_DEBUGGER_TYPE = 'gluals_gmod';
 const GM_RDB_REPO = 'Pollux12/gm_rdb';
+const EXTENSION_ID = 'Pollux.gmod-glua-ls';
+const GITHUB_RELEASE_HEADERS = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+};
 export const DEFAULT_RDB_PORT = 21111;
 const LEGACY_LOADER_START_MARKER = '-- gm_rdb debugger loader (added by GLuaLS)';
 const LEGACY_LOADER_END_MARKER = '-- end gm_rdb';
@@ -44,6 +49,7 @@ export interface ReleaseAsset {
 
 export interface GmRdbRelease {
     tag_name: string;
+    prerelease?: boolean;
     assets: ReleaseAsset[];
 }
 
@@ -182,16 +188,67 @@ function detectGmRdb(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
+function isPreReleaseExtension(): boolean {
+    const extension = vscode.extensions.getExtension(EXTENSION_ID);
+    if (!extension) {
+        return false;
+    }
+
+    const version = String(extension.packageJSON?.version ?? '');
+    const minorPart = version.split('.')[1];
+    const minor = parseInt(minorPart, 10);
+    if (!Number.isFinite(minor)) {
+        return false;
+    }
+
+    return minor % 2 !== 0;
+}
+
 export async function fetchLatestRelease(): Promise<GmRdbRelease | null> {
     try {
         return await fetchJson<GmRdbRelease>(`https://api.github.com/repos/${GM_RDB_REPO}/releases/latest`, {
-            headers: {
-                Accept: 'application/vnd.github.v3+json',
-            },
+            headers: GITHUB_RELEASE_HEADERS,
         });
     } catch {
         return null;
     }
+}
+
+async function fetchLatestPreRelease(): Promise<GmRdbRelease | null> {
+    try {
+        const releases = await fetchJson<GmRdbRelease[]>(`https://api.github.com/repos/${GM_RDB_REPO}/releases`, {
+            headers: GITHUB_RELEASE_HEADERS,
+        });
+
+        const preRelease = releases.find((release) => {
+            if (release?.prerelease !== true || !Array.isArray(release.assets) || release.assets.length === 0) {
+                return false;
+            }
+
+            return release.assets.some((asset) => {
+                return typeof asset?.name === 'string'
+                    && ALL_RDB_DLLS.includes(asset.name)
+                    && typeof asset?.browser_download_url === 'string';
+            });
+        }) ?? null;
+
+        return preRelease;
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchReleaseForCurrentExtensionChannel(): Promise<GmRdbRelease | null> {
+    if (isPreReleaseExtension()) {
+        const preRelease = await fetchLatestPreRelease();
+        if (preRelease) {
+            return preRelease;
+        }
+
+        console.warn('No gm_rdb pre-release release with assets is available yet. Falling back to latest stable release.');
+    }
+
+    return fetchLatestRelease();
 }
 
 function buildSharedAutorunLua(port: number): string {
@@ -424,8 +481,8 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
             cancellable: false,
         },
         async (progress) => {
-            progress.report({ message: 'Fetching latest release…' });
-            const release = await fetchLatestRelease();
+            progress.report({ message: 'Fetching gm_rdb release…' });
+            const release = await fetchReleaseForCurrentExtensionChannel();
             if (!release) {
                 throw new Error(
                     'No releases found for gm_rdb (https://github.com/Pollux12/gm_rdb). Build it manually and place the DLL/SO in garrysmod/lua/bin/.'

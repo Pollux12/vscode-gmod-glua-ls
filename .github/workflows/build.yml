@@ -5,7 +5,9 @@ on:
     branches:
       - main
     tags:
-      - "*.*.*"
+      - "v*.*.*"
+  release:
+    types: [released]
 
 jobs:
   build:
@@ -19,10 +21,75 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Resolve channel and tag metadata
+      id: release_meta
+      shell: bash
+      run: |
+        CHANNEL="stable"
+        TAG_NAME=""
+        IS_PUBLISH_EVENT="false"
+
+        if [[ "${{ github.event_name }}" == "release" && "${{ github.event.action }}" == "released" ]]; then
+          CHANNEL="stable"
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          IS_PUBLISH_EVENT="true"
+        elif [[ "${{ github.event_name }}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          CHANNEL="prerelease"
+          TAG_NAME="${GITHUB_REF_NAME}"
+          IS_PUBLISH_EVENT="true"
+        fi
+
+        TAG_VERSION="${TAG_NAME#v}"
+
+        echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+        echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+        echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "is_publish_event=${IS_PUBLISH_EVENT}" >> "$GITHUB_OUTPUT"
+    - name: Validate pre-release tag parity
+      if: steps.release_meta.outputs.channel == 'prerelease'
+      shell: bash
+      run: |
+        TAG_VERSION="${{ steps.release_meta.outputs.tag_version }}"
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$TAG_VERSION"
+
+        if [[ -z "$MINOR" || ! "$MINOR" =~ ^[0-9]+$ ]]; then
+          echo "Failed to parse minor version from tag version '$TAG_VERSION'."
+          exit 1
+        fi
+
+        if (( MINOR % 2 == 0 )); then
+          echo "Tag has even minor version ($MINOR), but odd minor is required for pre-release publishing. See version convention docs."
+          exit 1
+        fi
     - name: Set up Node 20.x
       uses: actions/setup-node@v4
       with:
         node-version: 20.x
+    - name: Set extension version for channel
+      if: steps.release_meta.outputs.is_publish_event == 'true'
+      shell: bash
+      run: |
+        npm version "${{ steps.release_meta.outputs.tag_version }}" --no-git-tag-version
+
+        if [[ "${{ steps.release_meta.outputs.channel }}" == "stable" ]]; then
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          if [[ -z "$MINOR" || ! "$MINOR" =~ ^[0-9]+$ ]]; then
+            echo "Failed to parse minor version from package version '$CURRENT_VERSION'."
+            exit 1
+          fi
+
+          if (( MINOR % 2 != 0 )); then
+            STABLE_VERSION="${MAJOR}.$((MINOR + 1)).0"
+            npm version "$STABLE_VERSION" --no-git-tag-version
+            echo "Promoted odd minor version $CURRENT_VERSION to stable version $STABLE_VERSION"
+          else
+            echo "Version $CURRENT_VERSION already has an even minor; keeping as-is for stable channel"
+          fi
+        fi
+
+        echo "Extension version for this build: $(node -p "require('./package.json').version")"
     - name: Install yarn
       run: npm install -g yarn
     - name: Install dependencies
@@ -31,7 +98,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Build
       run: |
-        node ./build/prepare.js ${{ matrix.file }}
+        node ./build/prepare.js ${{ matrix.file }} --channel ${{ steps.release_meta.outputs.channel }} --github-token "${{ secrets.GITHUB_TOKEN }}"
         npx vsce package -o vscode-gmod-ls-${{ matrix.target }}.vsix --target ${{ matrix.target }}
     - name: Upload
       uses: actions/upload-artifact@v4
@@ -42,9 +109,79 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [build]
-    if: success() && startsWith(github.ref, 'refs/tags/')
+    if: success() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'release' && github.event.action == 'released'))
     steps:
+      - name: Resolve channel and tag metadata
+        id: release_meta
+        shell: bash
+        run: |
+          CHANNEL="stable"
+          TAG_NAME=""
+
+          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.action }}" == "released" ]]; then
+            CHANNEL="stable"
+            TAG_NAME="${{ github.event.release.tag_name }}"
+          else
+            CHANNEL="prerelease"
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
+
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+      - name: Ensure GitHub pre-release exists for tag pushes
+        if: steps.release_meta.outputs.channel == 'prerelease'
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: ${{ steps.release_meta.outputs.tag_name }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tag = process.env.TAG_NAME;
+
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              await github.rest.repos.updateRelease({
+                owner,
+                repo,
+                release_id: existing.data.id,
+                tag_name: tag,
+                name: tag,
+                prerelease: true,
+                draft: false,
+              });
+              core.info(`Updated release ${tag} to pre-release.`);
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name: tag,
+                prerelease: true,
+                draft: false,
+              });
+              core.info(`Created pre-release ${tag}.`);
+            }
       - uses: actions/download-artifact@v4
-      - run: npx vsce publish --packagePath $(find vscode-gmod-ls* -iname "*.vsix")
+      - name: Publish to VS Code Marketplace
+        shell: bash
+        run: |
+          PACKAGE_PATHS=$(find vscode-gmod-ls* -iname "*.vsix")
+
+          if [[ -z "${PACKAGE_PATHS}" ]]; then
+            echo "No VSIX package found to publish."
+            exit 1
+          fi
+
+          if [[ "${{ steps.release_meta.outputs.channel }}" == "prerelease" ]]; then
+            npx vsce publish --pre-release --packagePath ${PACKAGE_PATHS}
+          else
+            npx vsce publish --packagePath ${PACKAGE_PATHS}
+          fi
         env:
           VSCE_PAT: ${{ secrets.VSCE_ACCESS_TOKEN }}
