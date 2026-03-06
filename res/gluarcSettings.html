@@ -7,18 +7,19 @@
             content="default-src 'none'; style-src {{cspSource}} 'nonce-{{nonce}}'; script-src 'nonce-{{nonce}}';"
         />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>GLua Settings</title>
+        <title>Garry's Mod Language Server</title>
         <style nonce="{{nonce}}">
             :root {
-                --container-padding: 20px;
-                --sidebar-width: 220px;
+                --container-padding: 32px 48px;
+                --sidebar-width: 250px;
+                --section-content-inset: 24px;
             }
 
             body {
-                background-color: var(--vscode-editor-background);
+                background-color: var(--vscode-settings-editorBackground, var(--vscode-editor-background));
                 color: var(--vscode-editor-foreground);
                 font-family: var(--vscode-font-family);
-                font-size: var(--vscode-font-size);
+                font-size: var(--vscode-font-size, 13px);
                 margin: 0;
                 padding: 0;
                 display: flex;
@@ -29,19 +30,23 @@
             /* Sidebar */
             .sidebar {
                 width: var(--sidebar-width);
-                background-color: var(--vscode-sideBar-background);
-                color: var(--vscode-sideBar-foreground);
-                border-right: 1px solid var(--vscode-sideBar-border);
+                background-color: var(--vscode-settings-editorBackground, var(--vscode-editor-background));
+                color: var(--vscode-foreground);
+                border-right: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
                 overflow-y: auto;
                 flex-shrink: 0;
-                padding-top: 12px;
+                padding-top: 28px;
+                display: flex;
+                flex-direction: column;
             }
 
             .sidebar-header {
-                padding: 0 20px 10px;
-                font-weight: bold;
+                padding: 0 28px 12px;
+                font-weight: 600;
                 text-transform: uppercase;
-                font-size: 0.8em;
+                font-size: 11px;
+                letter-spacing: 0.05em;
+                color: var(--vscode-sideBarTitle-foreground, var(--vscode-foreground));
                 opacity: 0.7;
             }
 
@@ -52,58 +57,92 @@
             }
 
             .category-item {
-                padding: 10px 16px;
+                margin: 2px 16px;
+                padding: 6px 12px;
+                border-radius: 5px;
                 cursor: pointer;
                 user-select: none;
-                border-left: 2px solid transparent;
-                transition:
-                    background-color 0.12s ease,
-                    color 0.12s ease,
-                    border-left-color 0.12s ease;
+                font-size: 13px;
+                color: var(--vscode-foreground);
+                transition: background-color 0.1s, color 0.1s;
+                display: flex;
+                align-items: center;
             }
 
             .category-item:hover {
                 background-color: var(--vscode-list-hoverBackground);
+                color: var(--vscode-list-hoverForeground);
             }
 
             .category-item.active {
                 background-color: var(--vscode-list-activeSelectionBackground);
                 color: var(--vscode-list-activeSelectionForeground);
-                border-left-color: var(
-                    --vscode-activityBarBadge-background,
-                    var(--vscode-focusBorder)
-                );
+                font-weight: 500;
             }
 
             /* Content Area */
             .content {
                 flex-grow: 1;
-                /* padding: var(--container-padding); removed, moved to .settings-body */
-                overflow: hidden; /* Changed from overflow-y: auto to allow flex column layout */
+                overflow: hidden;
                 display: flex;
                 flex-direction: column;
+                background-color: var(--vscode-settings-editorBackground, var(--vscode-editor-background));
             }
 
             .header {
-                padding: 20px 20px 10px 20px;
-                background-color: var(--vscode-editor-background);
+                padding: 24px 48px 16px;
+                background-color: var(--vscode-settings-editorBackground, var(--vscode-editor-background));
                 flex-shrink: 0;
-                border-bottom: 1px solid var(--vscode-panel-border);
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
                 display: flex;
                 flex-direction: column;
-                gap: 10px;
+                gap: 20px;
+                z-index: 10;
+            }
+
+            .header-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .header-title {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 400;
+                letter-spacing: 0;
+                color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
+            }
+
+            .search-container {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                width: 100%;
+                max-width: 640px;
             }
 
             .search-wrapper {
                 position: relative;
-                max-width: 600px;
                 width: 100%;
             }
 
             .search-input {
                 width: 100%;
-                padding: 6px 30px 6px 8px;
-                border-radius: 3px;
+                padding: 8px 28px 8px 12px;
+                border-radius: 2px;
+                background-color: var(--vscode-settings-textInputBackground, var(--vscode-input-background));
+                color: var(--vscode-settings-textInputForeground, var(--vscode-input-foreground));
+                border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
+                font-size: 14px;
+                font-family: inherit;
+                transition: border-color 0.1s, outline 0.1s;
+            }
+
+            .search-input:focus {
+                outline: 1px solid var(--vscode-focusBorder);
+                outline-offset: -1px;
+                border-color: var(--vscode-focusBorder);
             }
 
             .search-clear {
@@ -112,45 +151,54 @@
                 top: 50%;
                 transform: translateY(-50%);
                 cursor: pointer;
-                width: 16px;
-                height: 16px;
-                line-height: 16px;
+                width: 18px;
+                height: 18px;
+                line-height: 18px;
                 text-align: center;
-                border-radius: 50%;
-                font-size: 12px;
-                background: var(--vscode-icon-foreground);
-                color: var(--vscode-input-background);
+                border-radius: 3px;
+                font-size: 14px;
+                color: var(--vscode-input-placeholderForeground);
                 display: none;
+                transition: color 0.1s, background-color 0.1s;
             }
 
             .search-clear:hover {
-                opacity: 0.8;
+                color: var(--vscode-input-foreground);
+                background-color: var(--vscode-list-hoverBackground);
             }
 
             .search-results-info {
-                font-size: 0.9em;
+                font-size: 12px;
                 color: var(--vscode-descriptionForeground);
-                height: 1.2em; /* fixed height to avoid layout jump */
+                height: 16px;
+                line-height: 16px;
+                margin-left: 2px;
             }
 
             .reload-server-btn {
-                background-color: var(--vscode-button-background);
-                color: var(--vscode-button-foreground);
-                border: 1px solid transparent;
-                border-radius: 3px;
+                background-color: transparent;
+                color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 4px;
                 min-height: 28px;
-                padding: 0 12px;
+                padding: 4px 12px;
                 cursor: pointer;
-                font: inherit;
+                font-weight: 500;
+                font-size: 13px;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.2s;
             }
 
             .reload-server-btn:hover {
-                background-color: var(--vscode-button-hoverBackground);
+                background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+                color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
             }
 
             .reload-server-btn:focus-visible {
                 outline: 1px solid var(--vscode-focusBorder);
-                outline-offset: 1px;
+                outline-offset: 2px;
             }
 
             .settings-body {
@@ -158,6 +206,14 @@
                 overflow-y: auto;
                 scroll-behavior: smooth;
                 padding: var(--container-padding);
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .settings-container {
+                max-width: 1200px;
+                width: 100%;
             }
 
             .no-results-state {
@@ -167,36 +223,30 @@
                 justify-content: center;
                 text-align: center;
                 color: var(--vscode-descriptionForeground);
-                font-size: 0.95em;
-                border: 1px dashed var(--vscode-panel-border);
-                border-radius: 4px;
+                font-size: 14px;
+                border: 1px dashed var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 8px;
                 margin-top: 16px;
             }
 
             .workspace-config-banner {
-                margin-bottom: 20px;
-                padding: 10px 12px;
-                font-size: 0.9em;
+                margin-bottom: 32px;
+                padding: 14px 20px;
+                font-size: 13px;
+                line-height: 1.5;
                 color: var(--vscode-descriptionForeground);
-                background-color: var(
-                    --vscode-editorInfo-background,
-                    var(
-                        --vscode-textBlockQuote-background,
-                        var(--vscode-editor-selectionHighlightBackground)
-                    )
-                );
-                border-left: 3px solid
-                    var(
-                        --vscode-notificationsInfoIcon-foreground,
-                        var(--vscode-editorInfo-foreground)
-                    );
-                border-radius: 2px;
+                background-color: var(--vscode-textBlockQuote-background);
+                border-radius: 4px;
+                border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+                border-left: 4px solid var(--vscode-textBlockQuote-border, var(--vscode-focusBorder));
             }
 
             .workspace-config-banner strong {
                 display: block;
                 margin-bottom: 4px;
-                color: var(--vscode-editor-foreground);
+                color: var(--vscode-foreground);
+                font-size: 14px;
+                font-weight: 500;
             }
 
             mark {
@@ -208,41 +258,78 @@
             }
 
             h2 {
-                margin-top: 0;
-                padding-bottom: 10px;
-                border-bottom: 1px solid var(--vscode-settings-headerForeground);
-                color: var(--vscode-settings-headerForeground);
-                font-size: 1.5em;
+                margin: 0;
+                padding: 0;
+                border: none;
+                color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
+                font-size: 20px;
+                font-weight: 500;
+                letter-spacing: 0;
             }
 
             section {
-                margin-bottom: 40px;
-                scroll-margin-top: 20px;
+                margin-bottom: 56px;
+                scroll-margin-top: 32px;
+                width: 100%;
+            }
+
+            .section-heading {
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                margin-bottom: 0;
+                padding: 18px var(--section-content-inset) 16px;
+                background-color: var(--vscode-textBlockQuote-background);
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-bottom: 0;
+                border-radius: 8px 8px 0 0;
             }
 
             .section-description {
-                margin-bottom: 20px;
+                margin: 0;
                 color: var(--vscode-descriptionForeground);
+                font-size: 13px;
+                line-height: 1.6;
+                max-width: 800px;
+            }
+
+            .section-body {
+                background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 8px;
+                box-shadow: 0 4px 12px -2px var(--vscode-widget-shadow);
+                overflow: hidden;
+            }
+
+            .section-heading + .section-body {
+                border-top: 0;
+                border-radius: 0 0 8px 8px;
             }
 
             /* Settings Rows */
             .setting-row {
-                padding: 12px 16px;
+                padding: 20px var(--section-content-inset);
                 display: grid;
-                gap: 8px;
-                border-bottom: 1px solid var(--vscode-panel-border);
+                gap: 16px;
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                margin-bottom: 0;
+                transition: background-color 0.15s linear;
                 opacity: 1;
-                transition: opacity 0.05s linear;
             }
 
             .setting-row.is-filtered-out {
-                opacity: 0;
+                display: none;
+            }
+
+            .setting-row:last-child {
+                border-bottom: none;
             }
 
             .setting-row-inline {
-                grid-template-columns: minmax(0, 1fr) auto;
-                align-items: center;
-                column-gap: 16px;
+                grid-template-columns: minmax(0, 1fr) 320px;
+                align-items: start;
+                column-gap: 48px;
             }
 
             .setting-row-stacked {
@@ -250,7 +337,7 @@
             }
 
             .setting-row:hover {
-                background-color: var(--vscode-settings-rowHoverBackground);
+                background-color: var(--vscode-list-hoverBackground);
             }
 
             .setting-text {
@@ -259,7 +346,10 @@
 
             .setting-label {
                 font-weight: 500;
+                font-size: 14px;
+                color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
                 margin: 0;
+                display: block;
             }
 
             .setting-label-row {
@@ -269,48 +359,42 @@
             .setting-input-container {
                 width: 100%;
                 min-width: 0;
+                display: flex;
+                flex-direction: column;
             }
 
             .setting-row-inline .setting-input-container {
-                width: auto;
-                min-width: 180px;
-                max-width: 260px;
-                justify-self: end;
+                width: 100%;
+                max-width: 100%;
+                justify-self: stretch;
+                margin-top: 2px;
             }
 
             .setting-description {
-                font-size: 0.9em;
+                font-size: 13px;
                 color: var(--vscode-descriptionForeground);
-                margin-top: 3px;
+                margin-top: 8px;
                 margin-bottom: 0;
+                line-height: 1.5;
             }
 
             .setting-key-hint {
-                font-size: 0.8em;
-                color: var(--vscode-descriptionForeground);
-                margin-top: 4px;
-                opacity: 0.85;
-                font-family: var(
-                    --vscode-editor-font-family,
-                    var(--vscode-font-family)
-                );
+                font-size: 12px;
+                color: var(--vscode-textLink-foreground);
+                margin-top: 8px;
+                opacity: 0.9;
+                font-family: var(--vscode-editor-font-family, monospace);
             }
 
             .formatter-note {
-                margin: 0 0 12px;
-                padding: 8px 10px;
-                border-left: 3px solid
-                    var(
-                        --vscode-notificationsInfoIcon-foreground,
-                        var(--vscode-focusBorder)
-                    );
-                background-color: var(
-                    --vscode-editorInfo-background,
-                    var(--vscode-editor-selectionHighlightBackground)
-                );
+                margin: 20px var(--section-content-inset) 0 var(--section-content-inset);
+                padding: 12px 16px;
+                border-left: 4px solid var(--vscode-textBlockQuote-border, var(--vscode-focusBorder));
+                background-color: var(--vscode-textBlockQuote-background);
                 color: var(--vscode-descriptionForeground);
-                border-radius: 2px;
-                font-size: 0.9em;
+                border-radius: 4px;
+                border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+                font-size: 13px;
             }
 
             .formatter-note-hidden {
@@ -318,29 +402,69 @@
             }
 
             .formatter-group {
-            margin-bottom: 24px;
-        }
+                background-color: transparent;
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                overflow: hidden;
+            }
 
-        .formatter-group summary {
-            margin: 0;
-            padding: 10px 0;
-            font-size: 1.1em;
-            font-weight: 500;
-            color: var(--vscode-settings-headerForeground);
-            border-bottom: 1px solid var(--vscode-panel-border);
-            user-select: none;
-            cursor: pointer;
-        }
+            .formatter-group:last-child {
+                border-bottom: none;
+            }
 
-        .formatter-group summary:hover {
-            color: var(--vscode-foreground);
-        }
+            .formatter-group summary {
+                margin: 0;
+                padding: 20px var(--section-content-inset);
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
+                background-color: transparent;
+                user-select: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                transition: background-color 0.2s;
+                border-bottom: 1px solid transparent;
+            }
 
-        .formatter-group-content {
-            padding: 8px 0;
-        }
+            .formatter-group summary::-webkit-details-marker {
+                display: none;
+            }
 
-        /* Format Layout & Preview Panel */
+            .formatter-group summary::marker {
+                content: "";
+            }
+
+            .formatter-group summary::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                margin-right: 12px;
+                border-right: 1.5px solid currentColor;
+                border-bottom: 1.5px solid currentColor;
+                transform: rotate(-45deg);
+                transition: transform 0.15s ease;
+                flex-shrink: 0;
+                opacity: 0.85;
+            }
+
+            .formatter-group summary:hover {
+                background-color: var(--vscode-list-hoverBackground);
+            }
+
+            .formatter-group[open] summary {
+                background-color: var(--vscode-list-hoverBackground, transparent);
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+            }
+
+            .formatter-group[open] summary::before {
+                transform: rotate(45deg);
+            }
+
+            .formatter-group-content {
+                background-color: transparent;
+            }
+
+        /* Format Layout & Preview */
         .format-layout {
             display: block;
         }
@@ -349,72 +473,80 @@
             width: 100%;
         }
 
-        .format-preview-column {
-            position: fixed;
-            bottom: 24px;
-            right: 32px;
-            width: 440px;
-            z-index: 100;
-            pointer-events: none;
-            transition: opacity 0.15s ease, transform 0.15s ease;
-            opacity: 0;
-            transform: translateY(10px);
-            display: flex; /* controlled via js */
-        }
-
-        .format-preview-column.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .format-preview-panel {
-            width: 100%;
-            border: 1px solid var(--vscode-widget-border);
-            border-radius: 8px;
-            background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        .setting-label-row-with-action {
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            pointer-events: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
 
-            .format-preview-header {
-                padding: 10px 14px;
-                background-color: var(--vscode-sideBar-background);
-                border-bottom: 1px solid var(--vscode-panel-border);
-                font-weight: 600;
-                font-size: 0.85em;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                opacity: 0.8;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
+        .format-preview-toggle {
+            padding: 2px 10px;
+            border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+            border-radius: 999px;
+            background-color: transparent;
+            color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+            font-size: 0.8em;
+            font-weight: 500;
+            line-height: 1.4;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
 
-            .format-preview-content {
-                padding: 16px;
-                font-family: var(--vscode-editor-font-family, monospace);
-                font-size: var(--vscode-editor-font-size, 13px);
-                line-height: 1.5;
-                white-space: pre-wrap;
-                word-break: break-all;
-                color: var(--vscode-editor-foreground);
-                background-color: var(--vscode-editor-background);
-                min-height: 160px;
-                max-height: 400px;
-                overflow-y: auto;
-                border-bottom: 1px solid var(--vscode-panel-border);
-            }
+        .format-preview-toggle:hover {
+            background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+        }
 
-            .format-preview-desc {
-                padding: 14px;
-                font-size: 0.9em;
-                color: var(--vscode-descriptionForeground);
-                background-color: var(--vscode-sideBar-background);
-                line-height: 1.4;
-            }
+        .format-preview-toggle[aria-expanded="true"] {
+            background-color: var(--vscode-button-secondaryBackground, var(--vscode-list-activeSelectionBackground));
+            color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+        }
+
+        .format-inline-preview {
+            grid-column: 1 / -1;
+            display: none;
+            margin-top: 8px;
+        }
+
+        .format-inline-preview.is-open {
+            display: block;
+        }
+
+        .format-inline-preview-panel {
+            width: 100%;
+            border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+            border-radius: 6px;
+            background-color: var(--vscode-editor-background);
+            box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+            overflow: hidden;
+        }
+
+        .format-inline-preview-header {
+            padding: 10px 16px;
+            background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+            border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--vscode-foreground);
+            opacity: 0.7;
+        }
+
+        .format-inline-preview-content {
+            padding: 16px;
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-size: var(--vscode-editor-font-size, 13px);
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: normal;
+            overflow-wrap: anywhere;
+            color: var(--vscode-editor-foreground);
+            background-color: var(--vscode-editor-background);
+            overflow-x: auto;
+            border-radius: 0 0 6px 6px;
+        }
 
             /* Syntax Highlighting (highlight.js theme mapped to VS Code colors) */
             .hljs-keyword { color: var(--vscode-symbolIcon-keywordForeground, #569cd6); }
@@ -442,15 +574,37 @@
             input[type="number"],
             select,
             textarea {
-                background-color: var(--vscode-input-background);
-                color: var(--vscode-input-foreground);
-                border: 1px solid var(--vscode-input-border);
-                border-radius: 3px;
-                padding: 4px 8px;
-                min-height: 24px;
+                background-color: var(--vscode-settings-textInputBackground, var(--vscode-input-background));
+                color: var(--vscode-settings-textInputForeground, var(--vscode-input-foreground));
+                border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
+                border-radius: 2px;
+                padding: 6px 12px;
+                min-height: 28px;
                 font-family: inherit;
                 width: 100%;
                 box-sizing: border-box;
+                font-size: 13px;
+                line-height: 1.4;
+                transition: border-color 0.2s, outline 0.2s;
+            }
+
+            select {
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                padding-right: 36px;
+                background-image:
+                    linear-gradient(45deg, transparent 50%, var(--vscode-input-foreground) 50%),
+                    linear-gradient(135deg, var(--vscode-input-foreground) 50%, transparent 50%);
+                background-position:
+                    calc(100% - 18px) calc(50% - 1px),
+                    calc(100% - 13px) calc(50% - 1px);
+                background-size: 5px 5px, 5px 5px;
+                background-repeat: no-repeat;
+            }
+
+            select::-ms-expand {
+                display: none;
             }
 
             input[type="text"]:focus,
@@ -458,7 +612,7 @@
             select:focus,
             textarea:focus {
                 outline: 1px solid var(--vscode-focusBorder);
-                outline-offset: 1px;
+                outline-offset: -1px;
                 border-color: var(--vscode-focusBorder);
             }
 
@@ -467,69 +621,12 @@
             }
 
             .input-validation-message {
-                margin-top: 4px;
-                font-size: 0.85em;
+                margin-top: 6px;
+                font-size: 12px;
                 color: var(
                     --vscode-inputValidation-errorForeground,
                     var(--vscode-editorError-foreground)
                 );
-            }
-
-            /* Checkbox */
-            .checkbox-wrapper {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .toggle-switch {
-                position: relative;
-                display: inline-flex;
-                width: 36px;
-                height: 20px;
-                flex-shrink: 0;
-            }
-
-            .toggle-switch input {
-                position: absolute;
-                opacity: 0;
-                width: 100%;
-                height: 100%;
-                margin: 0;
-                cursor: pointer;
-            }
-
-            .toggle-slider {
-                position: absolute;
-                inset: 0;
-                border-radius: 10px;
-                background-color: var(--vscode-input-border);
-                transition: background-color 0.12s ease;
-            }
-
-            .toggle-slider::before {
-                content: "";
-                position: absolute;
-                width: 14px;
-                height: 14px;
-                left: 3px;
-                top: 3px;
-                border-radius: 50%;
-                background-color: var(--vscode-editor-background);
-                transition: transform 0.12s ease;
-            }
-
-            .toggle-switch input:checked + .toggle-slider {
-                background-color: var(--vscode-button-background);
-            }
-
-            .toggle-switch input:checked + .toggle-slider::before {
-                transform: translateX(16px);
-            }
-
-            .toggle-switch input:focus-visible + .toggle-slider {
-                outline: 1px solid var(--vscode-focusBorder);
-                outline-offset: 1px;
             }
 
             /* Array / Chips */
@@ -537,18 +634,19 @@
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
-                margin-bottom: 8px;
+                margin-bottom: 12px;
             }
 
             .tag {
                 background-color: var(--vscode-badge-background);
                 color: var(--vscode-badge-foreground);
-                padding: 2px 8px;
-                border-radius: 3px;
+                padding: 4px 10px;
+                border-radius: 4px;
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                font-size: 0.9em;
+                font-size: 13px;
+                border: 1px solid var(--vscode-contrastBorder, transparent);
             }
 
             .tag-value {
@@ -568,34 +666,27 @@
 
             .add-btn,
             .delete-btn {
-                background-color: var(
-                    --vscode-button-secondaryBackground,
-                    var(--vscode-input-border)
-                );
-                color: var(
-                    --vscode-button-secondaryForeground,
-                    var(--vscode-editor-foreground)
-                );
-                border: 1px solid var(--vscode-panel-border);
-                border-radius: 3px;
-                min-height: 24px;
-                padding: 2px 10px;
+                background-color: var(--vscode-button-secondaryBackground, var(--vscode-input-background));
+                color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+                border: 1px solid var(--vscode-contrastBorder, var(--vscode-button-border, var(--vscode-panel-border)));
+                border-radius: 4px;
+                min-height: 28px;
+                padding: 6px 16px;
+                font-size: 13px;
                 cursor: pointer;
                 white-space: nowrap;
+                transition: background-color 0.2s;
             }
 
             .add-btn:hover,
             .delete-btn:hover {
-                background-color: var(
-                    --vscode-toolbar-hoverBackground,
-                    var(--vscode-list-hoverBackground)
-                );
+                background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
             }
 
             .remove-btn {
-                width: 18px;
-                height: 18px;
-                border: 1px solid var(--vscode-panel-border);
+                width: 20px;
+                height: 20px;
+                border: none;
                 border-radius: 4px;
                 background-color: transparent;
                 color: var(--vscode-editor-foreground);
@@ -605,29 +696,26 @@
                 justify-content: center;
                 padding: 0;
                 line-height: 1;
+                font-size: 16px;
+                opacity: 0.7;
+                transition: background-color 0.1s, opacity 0.1s, color 0.1s;
             }
 
             .remove-btn:hover {
-                border-color: var(--vscode-inputValidation-errorBorder);
-                background-color: var(
-                    --vscode-inputValidation-errorBackground,
-                    var(--vscode-list-hoverBackground)
-                );
-                color: var(
-                    --vscode-inputValidation-errorForeground,
-                    var(--vscode-editor-foreground)
-                );
+                background-color: var(--vscode-list-hoverBackground);
+                color: var(--vscode-inputValidation-errorForeground, var(--vscode-editorError-foreground));
+                opacity: 1;
             }
 
             .path-list-container {
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
+                gap: 12px;
             }
 
             .path-table {
-                border: 1px solid var(--vscode-panel-border);
-                border-radius: 4px;
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 6px;
                 overflow: hidden;
             }
 
@@ -636,12 +724,15 @@
                 grid-template-columns: minmax(0, 1fr) auto;
                 align-items: center;
                 gap: 8px;
-                padding: 6px 8px;
-                border-bottom: 1px solid var(--vscode-panel-border);
+                padding: 6px 12px;
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                font-size: 13px;
+                transition: background-color 0.1s;
+                min-height: 32px;
             }
 
             .path-row:nth-child(even) {
-                background-color: var(--vscode-sideBar-background);
+                background-color: var(--vscode-list-hoverBackground, transparent);
             }
 
             .path-row:last-child {
@@ -658,54 +749,69 @@
             }
 
             .path-empty {
-                padding: 10px 8px;
+                padding: 10px 12px;
                 color: var(--vscode-descriptionForeground);
                 font-style: italic;
             }
 
             .path-add-row {
-                display: flex;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
                 gap: 8px;
             }
 
-            .path-add-row input {
-                flex: 1;
+            .path-add-row input,
+            .path-add-row select {
+                width: 100%;
+            }
+
+            .path-add-row.is-map {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
             }
 
             /* Object / Array of Objects */
             .object-list-item {
-                border: 1px solid var(--vscode-widget-border);
-                padding: 8px;
-                margin-bottom: 8px;
-                background-color: var(
-                    --vscode-editorWidget-background,
-                    var(--vscode-sideBar-background)
-                );
+                border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+                padding: 12px;
+                margin-bottom: 12px;
+                background-color: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+                border-radius: 6px;
             }
 
             details {
-                border: 1px solid var(--vscode-widget-border);
-                padding: 8px;
+                border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+                padding: 12px;
+                border-radius: 6px;
+                background-color: var(--vscode-editorWidget-background, transparent);
             }
 
             summary {
                 cursor: pointer;
-                font-weight: bold;
+                font-weight: 600;
                 margin-bottom: 8px;
+            }
+
+            summary:focus-visible {
+                color: var(--vscode-list-activeSelectionForeground);
+                text-decoration: underline;
             }
 
             .toast {
                 position: fixed;
-                bottom: 20px;
-                right: 20px;
+                bottom: 24px;
+                right: 24px;
                 background-color: var(--vscode-button-background);
                 color: var(--vscode-button-foreground);
-                padding: 10px 20px;
+                padding: 12px 24px;
                 border-radius: 4px;
                 opacity: 0;
                 transition: opacity 0.3s;
                 pointer-events: none;
                 z-index: 1000;
+                box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+                font-weight: 500;
+                font-size: 13px;
+                border: 1px solid var(--vscode-contrastBorder, transparent);
             }
 
             .toast.show {
@@ -714,53 +820,58 @@
 
             /* Code block for Any/JSON */
             .json-input {
-                font-family: monospace;
+                font-family: var(--vscode-editor-font-family, monospace);
+                font-size: 13px;
                 min-height: 80px;
+                border-radius: 4px;
+                padding: 12px;
             }
 
             /* Severity table */
             .severity-table-container {
-                border: 1px solid var(--vscode-panel-border);
-                border-radius: 4px;
-                padding: 8px;
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 6px;
+                padding: 16px;
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
+                gap: 16px;
+                background-color: var(--vscode-editorWidget-background, transparent);
             }
 
             .severity-table-toolbar {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                gap: 10px;
+                gap: 12px;
                 flex-wrap: wrap;
             }
 
             .severity-overrides-count {
                 color: var(--vscode-descriptionForeground);
-                font-size: 0.9em;
+                font-size: 13px;
             }
 
             .severity-filter {
-                max-width: 260px;
+                max-width: 280px;
             }
 
             .severity-table-scroll {
-                max-height: 420px;
+                max-height: 480px;
                 overflow: auto;
-                border: 1px solid var(--vscode-panel-border);
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
                 border-radius: 4px;
             }
 
             .severity-table {
                 width: 100%;
                 border-collapse: collapse;
+                font-size: 13px;
             }
 
             .severity-table th,
             .severity-table td {
-                border-bottom: 1px solid var(--vscode-panel-border);
-                padding: 8px;
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                padding: 10px 16px;
                 text-align: left;
                 vertical-align: middle;
             }
@@ -770,15 +881,17 @@
                 top: 0;
                 z-index: 1;
                 background-color: var(--vscode-editor-background);
-                color: var(--vscode-settings-headerForeground);
+                color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
+                font-weight: 500;
             }
 
             .severity-table tbody tr:nth-child(even) {
-                background-color: var(--vscode-sideBar-background);
+                background-color: var(--vscode-list-hoverBackground, transparent);
             }
 
             .severity-table tbody tr:hover {
-                background-color: var(--vscode-list-hoverBackground);
+                background-color: var(--vscode-list-activeSelectionBackground);
+                color: var(--vscode-list-activeSelectionForeground);
             }
 
             .severity-code {
@@ -793,25 +906,14 @@
         <div class="sidebar">
             <div class="sidebar-header">Categories</div>
             <ul class="category-list" id="categoryList">
-                <!-- Generated Items -->
+
             </ul>
         </div>
 
         <div class="content">
             <div class="header">
-                <div
-                    style="
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 10px;
-                    "
-                >
-                    <h1
-                        style="margin: 0; font-size: 1.5em; font-weight: normal"
-                    >
-                        GLua Settings
-                    </h1>
+                <div class="header-top">
+                    <h1 class="header-title">Garry's Mod Language Server Settings</h1>
                     <button
                         id="reloadServerBtn"
                         class="reload-server-btn"
@@ -820,40 +922,45 @@
                         ↺ Restart Server
                     </button>
                 </div>
-                <div class="search-wrapper">
-                    <input
-                        type="text"
-                        id="searchInput"
-                        class="search-input"
-                        placeholder="Search settings..."
-                    />
-                    <span class="search-clear" id="searchClear">✕</span>
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            class="search-input"
+                            placeholder="Search settings..."
+                            spellcheck="false"
+                        />
+                        <span class="search-clear" id="searchClear">✕</span>
+                    </div>
+                    <div id="searchResultsInfo" class="search-results-info"></div>
                 </div>
-                <div id="searchResultsInfo" class="search-results-info"></div>
             </div>
             <div id="mainContent" class="settings-body">
-                <div
-                    class="workspace-config-banner"
-                    role="note"
-                    aria-label="Workspace configuration information"
-                >
-                    <strong>Workspace Configuration</strong>
-                    <div>
-                        These settings are saved to <code>.gluarc.json</code> in
-                        your workspace root. This is the GLua language server
-                        configuration — it is separate from your VS Code
-                        settings.
+                <div class="settings-container">
+                    <div
+                        class="workspace-config-banner"
+                        role="note"
+                        aria-label="Workspace configuration information"
+                    >
+                        <strong>Workspace Configuration</strong>
+                        <div>
+                            These settings are saved to <code>.gluarc.json</code> in
+                            your workspace root. This is the GLua language server
+                            configuration — it is separate from your VS Code
+                            settings.
+                        </div>
                     </div>
-                </div>
-                <div id="settingsSections">
-                    <!-- Generated Sections -->
-                </div>
-                <div
-                    id="noResultsState"
-                    class="no-results-state"
-                    aria-live="polite"
-                >
-                    🔍 No results<br />No settings match your search
+                    <div id="settingsSections">
+
+                    </div>
+                    <div
+                        id="noResultsState"
+                        class="no-results-state"
+                        aria-live="polite"
+                    >
+                        🔍 No results<br />No settings match your search
+                    </div>
                 </div>
             </div>
         </div>
@@ -1222,6 +1329,8 @@
             ignore_space_after_colon: "Do not normalize spacing after `:` in method call and definition syntax.",
             remove_call_expression_list_finish_comma: "Remove trailing commas that appear at the end of function call argument lists.",
             end_statement_with_semicolon: "Semicolon handling: 'keep' preserves existing, 'always' ensures every statement ends with one, 'same_line' adds between same-line statements, 'replace_with_newline' replaces semicolons with newlines, 'never' removes all."
+
+        };
 
         const FORMAT_PREVIEWS = {
             indent_style: "-----[ space ]-----\nfunction example()\n    print('hello')\nend\n\n-----[ tab ]-----\nfunction example()\n\tprint('hello')\nend",
@@ -1724,12 +1833,42 @@
 
                 const labelRow = document.createElement("div");
                 labelRow.className = "setting-label-row";
+                const hasPreview = Boolean(
+                    options.settingKey && FORMAT_PREVIEWS[options.settingKey],
+                );
+                if (hasPreview) {
+                    labelRow.classList.add("setting-label-row-with-action");
+                }
 
                 const labelEl = document.createElement("span");
                 labelEl.className = "setting-label";
                 labelEl.textContent = label;
 
                 labelRow.appendChild(labelEl);
+
+                let previewToggle = null;
+                let previewContainer = null;
+                if (hasPreview) {
+                    previewToggle = document.createElement("button");
+                    previewToggle.type = "button";
+                    previewToggle.className = "format-preview-toggle";
+                    previewToggle.textContent = "Preview";
+                    previewToggle.setAttribute("aria-expanded", "false");
+                    previewContainer = createInlineFormatPreview(options.settingKey);
+                    previewToggle.setAttribute("aria-controls", previewContainer.id);
+                    previewToggle.addEventListener("click", () => {
+                        const nextExpanded =
+                            previewToggle.getAttribute("aria-expanded") !== "true";
+                        collapseInlineFormatPreviews(previewContainer, previewToggle);
+                        setInlineFormatPreviewExpanded(
+                            previewContainer,
+                            previewToggle,
+                            nextExpanded,
+                        );
+                    });
+                    labelRow.appendChild(previewToggle);
+                }
+
                 textContainer.appendChild(labelRow);
 
                 if (description) {
@@ -1747,35 +1886,6 @@
                 }
 
 
-                if (options.settingKey) {
-                    row.addEventListener("mouseenter", (e) => {
-                        clearTimeout(window.__formatPreviewTimeout);
-                        if (typeof updateFormatPreview === "function") {
-                            updateFormatPreview(options.settingKey, true, row);
-                        }
-                    });
-                    row.addEventListener("mouseleave", () => {
-                        window.__formatPreviewTimeout = setTimeout(() => {
-                           if (typeof updateFormatPreview === "function") {
-                               updateFormatPreview(null, false, null);
-                           }
-                        }, 50);
-                    });
-                    row.addEventListener("focusin", (e) => {
-                        clearTimeout(window.__formatPreviewTimeout);
-                        if (typeof updateFormatPreview === "function") {
-                            updateFormatPreview(options.settingKey, true, row);
-                        }
-                    });
-                    row.addEventListener("focusout", () => {
-                        window.__formatPreviewTimeout = setTimeout(() => {
-                           if (typeof updateFormatPreview === "function") {
-                               updateFormatPreview(null, false, null);
-                           }
-                        }, 50);
-                    });
-                }
-
                 row.appendChild(textContainer);
 
                 const inputContainer = document.createElement("div");
@@ -1783,7 +1893,68 @@
                 inputContainer.appendChild(input);
                 row.appendChild(inputContainer);
 
+                if (previewContainer) {
+                    row.appendChild(previewContainer);
+                }
+
                 return row;
+            }
+
+            function setInlineFormatPreviewExpanded(
+                previewContainer,
+                previewToggle,
+                expanded,
+            ) {
+                if (!previewContainer || !previewToggle) {
+                    return;
+                }
+
+                previewContainer.classList.toggle("is-open", expanded);
+                previewToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                previewToggle.textContent = expanded ? "Hide Preview" : "Preview";
+            }
+
+            function collapseInlineFormatPreviews(exceptContainer, exceptToggle) {
+                document
+                    .querySelectorAll(".format-inline-preview.is-open")
+                    .forEach((container) => {
+                        if (container !== exceptContainer) {
+                            container.classList.remove("is-open");
+                        }
+                    });
+
+                document
+                    .querySelectorAll('.format-preview-toggle[aria-expanded="true"]')
+                    .forEach((button) => {
+                        if (button !== exceptToggle) {
+                            button.setAttribute("aria-expanded", "false");
+                            button.textContent = "Preview";
+                        }
+                    });
+            }
+
+            function createInlineFormatPreview(key) {
+                const container = document.createElement("div");
+                container.className = "format-inline-preview";
+                container.id = `formatPreview-${key}`;
+
+                const panel = document.createElement("div");
+                panel.className = "format-inline-preview-panel";
+
+                const header = document.createElement("div");
+                header.className = "format-inline-preview-header";
+                header.textContent = "Preview";
+                panel.appendChild(header);
+
+                const content = document.createElement("div");
+                content.className = "format-inline-preview-content";
+                content.innerHTML = highlightLua(
+                    FORMAT_PREVIEWS[key] || "-- No preview available for this setting.",
+                );
+                panel.appendChild(content);
+
+                container.appendChild(panel);
+                return container;
             }
 
             function renderFormatPresetInput() {
@@ -2059,63 +2230,24 @@
                 // Merge headers back in
                 let hIdx = 0;
                 const result = lines.map((line, i) => {
-                    if (processed[i] !== null) return processed[i];
-                    return highlightedLines[hIdx++] || '';
+                    if (processed[i] !== null) {
+                        if (highlightedLines[hIdx] === "") {
+                            hIdx += 1;
+                        }
+                        return processed[i];
+                    }
+
+                    const highlightedLine = highlightedLines[hIdx];
+                    hIdx += 1;
+                    return highlightedLine !== undefined ? highlightedLine : '';
                 });
 
                 return result.join('\n');
             }
 
-            function updateFormatPreview(key, show, targetElement) {
-                const previewColumn = document.querySelector(".format-preview-column");
-                const previewContent = document.getElementById("formatPreviewContent");
-                const previewDesc = document.getElementById("formatPreviewDesc");
-
-                if (!previewColumn || !previewContent) return;
-
-                if (!show || !key || !targetElement) {
-                    previewColumn.classList.remove("show");
-                    return;
-                }
-
-                previewColumn.classList.add("show");
-
-                // Position the floating preview panel directly above or near the row
-                const rect = targetElement.getBoundingClientRect();
-                const panelHeight = previewColumn.offsetHeight || 250;
-
-                previewColumn.style.left = Math.max(20, rect.right - 440) + "px";
-
-                let topPos = rect.top - panelHeight - 10;
-                if (topPos < 10) {
-                    // Try to place it immediately below instead if it overflows top of screen
-                    topPos = rect.bottom + 10;
-                }
-
-                previewColumn.style.top = topPos + "px";
-                previewColumn.style.bottom = "auto";
-                previewColumn.style.right = "auto";
-
-                let code = FORMAT_PREVIEWS[key];
-                if (!code) {
-                    code = "-- No preview available for this setting.";
-                }
-                previewContent.innerHTML = highlightLua(code);
-
-                if (previewDesc) {
-                    const desc = FORMAT_DESCRIPTIONS[key];
-                    if (desc) {
-                        previewDesc.textContent = desc;
-                        previewDesc.style.display = "block";
-                    } else {
-                        previewDesc.style.display = "none";
-                    }
-                }
-            }
-
             function renderFormatterSectionContent() {
                 const layout = document.createElement("div");
-                layout.className = "format-layout";
+                layout.className = "format-layout section-body";
 
                 const column = document.createElement("div");
                 column.className = "format-settings-column";
@@ -2155,32 +2287,6 @@
                 });
 
                 layout.appendChild(column);
-
-                const previewColumn = document.createElement("div");
-                previewColumn.className = "format-preview-column";
-
-                const previewPanel = document.createElement("div");
-                previewPanel.className = "format-preview-panel";
-
-                const previewHeader = document.createElement("div");
-                previewHeader.className = "format-preview-header";
-                previewHeader.textContent = "Live Preview";
-                previewPanel.appendChild(previewHeader);
-
-                const previewDesc = document.createElement("div");
-                previewDesc.className = "format-preview-desc";
-                previewDesc.id = "formatPreviewDesc";
-                previewDesc.style.display = "none";
-                previewPanel.appendChild(previewDesc);
-
-                const previewContent = document.createElement("div");
-                previewContent.className = "format-preview-content";
-                previewContent.id = "formatPreviewContent";
-                previewContent.textContent = "-- Select a format setting on the left to view a demonstration of its behavior here.";
-                previewPanel.appendChild(previewContent);
-
-                previewColumn.appendChild(previewPanel);
-                layout.appendChild(previewColumn);
 
                 return layout;
             }
@@ -2286,16 +2392,14 @@
                 if (
                     field.type === "boolean" ||
                     field.type === "number" ||
-                    field.type === "integer"
+                    field.type === "integer" ||
+                    field.type === "string" ||
+                    field.type === "enum"
                 ) {
                     return true;
                 }
 
-                return (
-                    (field.type === "string" || field.type === "enum") &&
-                    Array.isArray(field.enumValues) &&
-                    field.enumValues.length > 0
-                );
+                return false;
             }
 
             function getFieldTokens(field) {
@@ -2804,28 +2908,37 @@
                     const section = document.createElement("section");
                     section.id = categoryId;
 
+                    const sectionHeading = document.createElement("div");
+                    sectionHeading.className = "section-heading";
+
                     const h2 = document.createElement("h2");
                     h2.textContent = cat.label;
-                    section.appendChild(h2);
+                    sectionHeading.appendChild(h2);
 
                     if (cat.description) {
                         const desc = document.createElement("div");
                         desc.className = "section-description";
                         desc.textContent = cat.description;
-                        section.appendChild(desc);
+                        sectionHeading.appendChild(desc);
                     }
+
+                    section.appendChild(sectionHeading);
 
                     if (isFormatCategory) {
                         const behaviorNote = document.createElement("div");
                         behaviorNote.className = "workspace-config-banner";
                         behaviorNote.innerHTML = "<strong>Custom Overrides</strong><div>Editing any individual formatter option below will automatically switch the Preset to Custom.</div>";
-                        section.appendChild(behaviorNote);
 
-                        section.appendChild(renderFormatterSectionContent());
+                        const formatBody = renderFormatterSectionContent();
+                        formatBody.insertBefore(behaviorNote, formatBody.firstChild);
+                        section.appendChild(formatBody);
                     } else {
+                        const sectionBody = document.createElement("div");
+                        sectionBody.className = "section-body";
                         visibleFields.forEach((field) => {
-                            section.appendChild(createFieldWidget(field));
+                            sectionBody.appendChild(createFieldWidget(field));
                         });
+                        section.appendChild(sectionBody);
                     }
 
                     sectionsContent.appendChild(section);
@@ -2903,72 +3016,37 @@
 
                 // 1. Boolean
                 if (type === "boolean") {
+                    const select = document.createElement("select");
+
                     if (nullable) {
-                        const select = document.createElement("select");
                         const defaultOption = document.createElement("option");
                         defaultOption.value = "";
                         defaultOption.textContent = "Default (inherit)";
                         select.appendChild(defaultOption);
-
-                        const enabledOption = document.createElement("option");
-                        enabledOption.value = "true";
-                        enabledOption.textContent = "Enabled";
-                        select.appendChild(enabledOption);
-
-                        const disabledOption = document.createElement("option");
-                        disabledOption.value = "false";
-                        disabledOption.textContent = "Disabled";
-                        select.appendChild(disabledOption);
-
-                        // Set initial
-                        if (value === true) select.value = "true";
-                        else if (value === false) select.value = "false";
-                        else select.value = "";
-
-                        select.onchange = () => {
-                            if (select.value === "true") onChange(true);
-                            else if (select.value === "false") onChange(false);
-                            else onChange(null);
-                        };
-                        return select;
-                    } else {
-                        const wrapper = document.createElement("div");
-                        wrapper.className = "checkbox-wrapper";
-
-                        const toggle = document.createElement("label");
-                        toggle.className = "toggle-switch";
-
-                        const cb = document.createElement("input");
-                        cb.type = "checkbox";
-
-                        const slider = document.createElement("span");
-                        slider.className = "toggle-slider";
-
-                        const resolvedValue =
-                            value === undefined || value === null
-                                ? field.default === true
-                                : value === true;
-                        cb.checked = resolvedValue;
-
-                        cb.onchange = () => onChange(cb.checked);
-
-                        toggle.appendChild(cb);
-                        toggle.appendChild(slider);
-                        wrapper.appendChild(toggle);
-
-                        const label = document.createElement("span");
-                        label.textContent = cb.checked ? "Enabled" : "Disabled";
-                        cb.addEventListener(
-                            "change",
-                            () =>
-                                (label.textContent = cb.checked
-                                    ? "Enabled"
-                                    : "Disabled"),
-                        );
-
-                        wrapper.appendChild(label);
-                        return wrapper;
                     }
+
+                    const enabledOption = document.createElement("option");
+                    enabledOption.value = "true";
+                    enabledOption.textContent = "Enabled";
+                    select.appendChild(enabledOption);
+
+                    const disabledOption = document.createElement("option");
+                    disabledOption.value = "false";
+                    disabledOption.textContent = "Disabled";
+                    select.appendChild(disabledOption);
+
+                    if (value === true) select.value = "true";
+                    else if (value === false) select.value = "false";
+                    else if (nullable) select.value = "";
+                    else select.value = field.default === true ? "true" : "false";
+
+                    select.onchange = () => {
+                        if (select.value === "true") onChange(true);
+                        else if (select.value === "false") onChange(false);
+                        else onChange(null);
+                    };
+
+                    return select;
                 }
 
                 // 2. String / Enum
@@ -3219,7 +3297,7 @@
                     container.appendChild(table);
 
                     const addRow = document.createElement("div");
-                    addRow.className = "path-add-row";
+                    addRow.className = "path-add-row is-map";
 
                     const keyInput = document.createElement("input");
                     keyInput.type = "text";
@@ -3269,7 +3347,7 @@
                         keys.forEach((k) => {
                             const row = document.createElement("div");
                             row.className = "path-row";
-                            row.style.gridTemplateColumns = "1fr 1fr auto";
+                            row.style.gridTemplateColumns = "minmax(0, 1fr) minmax(0, 1fr) auto";
 
                             const keyCell = document.createElement("div");
                             keyCell.className = "path-cell";
