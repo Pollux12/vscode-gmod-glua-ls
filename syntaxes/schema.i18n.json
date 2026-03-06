@@ -24,6 +24,9 @@
         "en": "Await in sync",
         "zh-CN": "在同步上下文中使用 await。"
     },
+    "DiagnosticCode.call-non-callable": {
+        "en": "Call to a non-callable value"
+    },
     "DiagnosticCode.cast-type-mismatch": {
         "en": "cast-type-mismatch"
     },
@@ -78,6 +81,33 @@
     "DiagnosticCode.global-in-non-module": {
         "en": "Global variable defined in non-module scope"
     },
+    "DiagnosticCode.gmod-duplicate-system-registration": {
+        "en": "gmod-duplicate-system-registration"
+    },
+    "DiagnosticCode.gmod-invalid-hook-name": {
+        "en": "gmod-invalid-hook-name"
+    },
+    "DiagnosticCode.gmod-net-missing-network-counterpart": {
+        "en": "gmod-net-missing-network-counterpart"
+    },
+    "DiagnosticCode.gmod-net-read-write-order-mismatch": {
+        "en": "gmod-net-read-write-order-mismatch"
+    },
+    "DiagnosticCode.gmod-net-read-write-type-mismatch": {
+        "en": "gmod-net-read-write-type-mismatch"
+    },
+    "DiagnosticCode.gmod-realm-mismatch": {
+        "en": "gmod-realm-mismatch (strict realm mismatch)"
+    },
+    "DiagnosticCode.gmod-realm-mismatch-heuristic": {
+        "en": "gmod-realm-mismatch-heuristic (heuristic realm mismatch)"
+    },
+    "DiagnosticCode.gmod-unknown-net-message": {
+        "en": "gmod-unknown-net-message"
+    },
+    "DiagnosticCode.gmod-unknown-realm": {
+        "en": "gmod-unknown-realm (realm could not be resolved)"
+    },
     "DiagnosticCode.incomplete-signature-doc": {
         "en": "Incomplete signature doc",
         "zh-CN": "不完整的签名文档。"
@@ -85,6 +115,9 @@
     "DiagnosticCode.inject-field": {
         "en": "Inject Field",
         "zh-CN": "注入字段。"
+    },
+    "DiagnosticCode.invert-if": {
+        "en": "invert-if"
     },
     "DiagnosticCode.iter-variable-reassign": {
         "en": "Iter variable reassign",
@@ -199,6 +232,9 @@
         "en": "Unused",
         "zh-CN": "未使用的变量。"
     },
+    "DiagnosticCode.unused-self": {
+        "en": "Unused implicit self parameter"
+    },
     "DiagnosticSeveritySetting.error": {
         "en": "Represents an error diagnostic severity.",
         "zh-CN": "诊断严重性: 错误。"
@@ -214,6 +250,21 @@
     "DiagnosticSeveritySetting.warning": {
         "en": "Represents a warning diagnostic severity.",
         "zh-CN": "诊断严重性: 警告。"
+    },
+    "EmmyLibraryConfig.ignoreDir": {
+        "en": "Ignore directories within this library"
+    },
+    "EmmyLibraryConfig.ignoreGlobs": {
+        "en": "Ignore globs within this library. eg: [\"**/*.lua\"]"
+    },
+    "EmmyLibraryConfig.path": {
+        "en": "Library path"
+    },
+    "EmmyLibraryItem.anyOf.0": {
+        "en": "Simple library path string"
+    },
+    "EmmyLibraryItem.anyOf.1": {
+        "en": "Library configuration with path and ignore rules"
     },
     "EmmyrcCodeAction.insertSpace": {
         "en": "Add space after `---` comments when inserting `@diagnostic disable-next-line`.",
@@ -340,6 +391,234 @@
         "en": "Convert the filename to snake_case.",
         "zh-CN": "将文件名转换为蛇形(snake_case)命名。"
     },
+    "EmmyrcFormatConfigPrecedence.preferEditorconfig": {
+        "en": "Prefer discovered .editorconfig files over .gluarc formatter overrides."
+    },
+    "EmmyrcFormatConfigPrecedence.preferGluarc": {
+        "en": "Prefer .gluarc formatter overrides over discovered .editorconfig files."
+    },
+    "EmmyrcFormatPreset.cfc": {
+        "en": "Apply the built-in CFC (Clockwork Fighters Community) style preset: 4-space indentation, spaces inside parentheses, semicolons replaced with newlines."
+    },
+    "EmmyrcFormatPreset.custom": {
+        "en": "Apply no preset. Only the `styleOverrides` you configure explicitly take effect; everything else uses the formatter's compiled-in default."
+    },
+    "EmmyrcFormatPreset.default": {
+        "en": "Use EmmyLuaCodeStyle built-in defaults. No style overrides are applied."
+    },
+    "EmmyrcFormatStyleOverrides": {
+        "en": "Typed EmmyLuaCodeStyle overrides for built-in formatting."
+    },
+    "EmmyrcFormatStyleOverrides.align_array_table": {
+        "en": "Array table layout: `none` keeps items inline, `always` puts each item on its own line, `contain_curly` uses multiline only when a nested table is present."
+    },
+    "EmmyrcFormatStyleOverrides.align_call_args": {
+        "en": "Vertically align arguments of multi-line function calls to the opening parenthesis."
+    },
+    "EmmyrcFormatStyleOverrides.align_chain_expr": {
+        "en": "Align chained method / field expressions: `none` disables, `always` aligns all chains, `only_call_stmt` aligns only call statement chains."
+    },
+    "EmmyrcFormatStyleOverrides.align_continuous_assign_statement": {
+        "en": "Align consecutive assignment statements on their `=` sign (`true` aligns within a block, `always` aligns across blank lines, `false` disables)."
+    },
+    "EmmyrcFormatStyleOverrides.align_continuous_inline_comment": {
+        "en": "Align the `--` of inline comments across consecutive lines so they form a vertical column."
+    },
+    "EmmyrcFormatStyleOverrides.align_continuous_line_space": {
+        "en": "Maximum number of blank lines between consecutive statements before they are no longer considered part of the same aligned block."
+    },
+    "EmmyrcFormatStyleOverrides.align_continuous_rect_table_field": {
+        "en": "Align key-value fields in rectangular table literals so that `=` signs line up vertically (`true`, `false`, `always`)."
+    },
+    "EmmyrcFormatStyleOverrides.align_continuous_similar_call_args": {
+        "en": "Align arguments across similar consecutive function calls so that matching argument positions line up vertically."
+    },
+    "EmmyrcFormatStyleOverrides.align_function_params": {
+        "en": "Vertically align parameters in multi-line function declarations to the opening parenthesis."
+    },
+    "EmmyrcFormatStyleOverrides.align_if_branch": {
+        "en": "Vertically align `if` / `elseif` / `else` condition keywords."
+    },
+    "EmmyrcFormatStyleOverrides.allow_non_indented_comments": {
+        "en": "Allow comments that start at column 0 to remain un-indented even when inside an indented block."
+    },
+    "EmmyrcFormatStyleOverrides.auto_collapse_lines": {
+        "en": "Collapse short multi-statement blocks into a single line when they fit within `max_line_length`."
+    },
+    "EmmyrcFormatStyleOverrides.break_all_list_when_line_exceed": {
+        "en": "When a line exceeds `max_line_length`, break every item in the containing list onto its own line rather than only the overflowing item."
+    },
+    "EmmyrcFormatStyleOverrides.break_before_braces": {
+        "en": "Place the opening `{` of a table constructor on a new line instead of at the end of the preceding line."
+    },
+    "EmmyrcFormatStyleOverrides.break_multiline_call_expression_list": {
+        "en": "When a function call already spans multiple lines, put each argument and the closing `)` on their own lines."
+    },
+    "EmmyrcFormatStyleOverrides.call_arg_parentheses": {
+        "en": "How to handle parentheses around single-argument function calls with a string or table literal (`keep`, `remove`, `remove_table_only`, `remove_string_only`, `always`)."
+    },
+    "EmmyrcFormatStyleOverrides.continuation_indent": {
+        "en": "Number of extra spaces used for indenting continuation lines when a line is wrapped."
+    },
+    "EmmyrcFormatStyleOverrides.detect_end_of_line": {
+        "en": "Detect line endings from file content."
+    },
+    "EmmyrcFormatStyleOverrides.end_of_line": {
+        "en": "Line ending preference."
+    },
+    "EmmyrcFormatStyleOverrides.end_statement_with_semicolon": {
+        "en": "Semicolon handling: `keep` preserves existing, `always` adds to all statements, `same_line` adds between same-line statements, `replace_with_newline` replaces semicolons with newlines, `never` removes all."
+    },
+    "EmmyrcFormatStyleOverrides.ignore_space_after_colon": {
+        "en": "Do not normalize spacing after `:` in method call and definition syntax."
+    },
+    "EmmyrcFormatStyleOverrides.ignore_spaces_inside_function_call": {
+        "en": "When `true`, preserve existing spacing inside function call arguments instead of normalizing it."
+    },
+    "EmmyrcFormatStyleOverrides.indent_size": {
+        "en": "Number of spaces used for one indentation level."
+    },
+    "EmmyrcFormatStyleOverrides.indent_style": {
+        "en": "`tab` or `space` indentation mode."
+    },
+    "EmmyrcFormatStyleOverrides.insert_final_newline": {
+        "en": "Ensure file ends with a newline."
+    },
+    "EmmyrcFormatStyleOverrides.keep_indents_on_empty_lines": {
+        "en": "Keep indentation whitespace on otherwise blank lines instead of stripping it."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_comment": {
+        "en": "Line spacing after comments (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_do_statement": {
+        "en": "Line spacing after `do` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_expression_statement": {
+        "en": "Line spacing after expression statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_for_statement": {
+        "en": "Line spacing after `for` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_function_statement": {
+        "en": "Line spacing after function statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_if_statement": {
+        "en": "Line spacing after `if` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_local_or_assign_statement": {
+        "en": "Line spacing after local/assignment statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_repeat_statement": {
+        "en": "Line spacing after `repeat` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_after_while_statement": {
+        "en": "Line spacing after `while` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.line_space_around_block": {
+        "en": "Line spacing around blocks (`keep`, `fixed(n)`, `min(n)`, `max(n)`)."
+    },
+    "EmmyrcFormatStyleOverrides.max_line_length": {
+        "en": "Column limit before the formatter wraps items onto new lines. Set to `\"unset\"` to disable line length enforcement."
+    },
+    "EmmyrcFormatStyleOverrides.never_indent_before_if_condition": {
+        "en": "Do not add extra indentation to wrapped `if`/`elseif` condition expressions."
+    },
+    "EmmyrcFormatStyleOverrides.never_indent_comment_on_if_branch": {
+        "en": "Do not indent a lone comment that appears inside an `if` branch body."
+    },
+    "EmmyrcFormatStyleOverrides.quote_style": {
+        "en": "Preferred quote style for string literals. `none` preserves the original style."
+    },
+    "EmmyrcFormatStyleOverrides.remove_call_expression_list_finish_comma": {
+        "en": "Remove trailing commas that appear at the end of function call argument lists."
+    },
+    "EmmyrcFormatStyleOverrides.remove_redundant_condition_parentheses": {
+        "en": "Remove redundant parentheses around single-line condition expressions such as `if (x) then`."
+    },
+    "EmmyrcFormatStyleOverrides.space_after_comma": {
+        "en": "Add a space after commas in expressions and argument lists."
+    },
+    "EmmyrcFormatStyleOverrides.space_after_comma_in_for_statement": {
+        "en": "Add a space after commas in `for` loop range expressions."
+    },
+    "EmmyrcFormatStyleOverrides.space_after_comment_dash": {
+        "en": "Ensure a single space exists after the comment dash prefix (`--`)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_assign_operator": {
+        "en": "Spaces around assignment operators (`=`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (asymmetric spacing)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_concat_operator": {
+        "en": "Spaces around the concatenation operator (`..`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (space on left side only)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_logical_operator": {
+        "en": "Add spaces around logical operators (`and`, `or`, `not`)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_math_operator": {
+        "en": "Add spaces around math operators (`+`, `-`, `*`, `/`, `%`, `^`)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_table_append_operator": {
+        "en": "Add spaces around the table append operator (`#t + 1` style appends)."
+    },
+    "EmmyrcFormatStyleOverrides.space_around_table_field_list": {
+        "en": "Add spaces inside table braces, e.g. `{ a = 1 }` vs `{a = 1}`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_attribute": {
+        "en": "Add a space before Lua attribute annotations, e.g. `local x <const>`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_closure_open_parenthesis": {
+        "en": "Add a space before `(` in anonymous function expressions, e.g. `function ()`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_function_call_open_parenthesis": {
+        "en": "Add a space before `(` in function calls, e.g. `print ('hello')`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_function_call_single_arg": {
+        "en": "Space handling before a single string or table literal argument: `always`, `only_string`, `only_table`, or `none`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_function_open_parenthesis": {
+        "en": "Add a space before `(` in function declarations, e.g. `function foo ()`."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_inline_comment": {
+        "en": "Number of spaces to enforce before inline comments (`--`), or `\"keep\"` to preserve existing spacing."
+    },
+    "EmmyrcFormatStyleOverrides.space_before_open_square_bracket": {
+        "en": "Add a space before `[` in table index expressions, e.g. `t [key]`."
+    },
+    "EmmyrcFormatStyleOverrides.space_inside_function_call_parentheses": {
+        "en": "Add spaces inside function call parentheses, e.g. `print( 'hello' )`."
+    },
+    "EmmyrcFormatStyleOverrides.space_inside_function_param_list_parentheses": {
+        "en": "Add spaces inside function parameter list parentheses, e.g. `function foo( a, b )`."
+    },
+    "EmmyrcFormatStyleOverrides.space_inside_square_brackets": {
+        "en": "Add spaces inside square bracket index expressions, e.g. `t[ 1 ]`."
+    },
+    "EmmyrcFormatStyleOverrides.tab_width": {
+        "en": "Display width of a tab character in spaces, used for visual alignment calculations."
+    },
+    "EmmyrcFormatStyleOverrides.table_separator_style": {
+        "en": "Separator character used between table fields (`none`, `comma`, `semicolon`, `only_kv_colon`)."
+    },
+    "EmmyrcFormatStyleOverrides.trailing_table_separator": {
+        "en": "Whether to add or remove a trailing separator after the last field in a table (`keep`, `never`, `always`, `smart`)."
+    },
+    "EmmyrcGmod.annotationsPath": {
+        "en": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely."
+    },
+    "EmmyrcGmod.autoLoadAnnotations": {
+        "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
+    },
+    "EmmyrcGmodOutline.verbosity": {
+        "en": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals."
+    },
+    "EmmyrcGmodOutlineVerbosity.minimal": {
+        "en": "Show only functions, classes, VGUI panels, hooks, net receivers, timers, concommands."
+    },
+    "EmmyrcGmodOutlineVerbosity.normal": {
+        "en": "Show functions, classes, important tables, hooks, net receivers, timers, concommands, and\nnon-primitive variables. Hides `if`/`for`/`do` blocks."
+    },
+    "EmmyrcGmodOutlineVerbosity.verbose": {
+        "en": "Show everything (legacy behavior, includes control-flow blocks and all locals)."
+    },
     "EmmyrcHover.customDetail": {
         "en": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize"
     },
@@ -347,9 +626,14 @@
         "en": "Enable showing documentation on hover.",
         "zh-CN": "是否启用悬浮提示。"
     },
-    "EmmyrcInlayHint.enable": {
-        "en": "Enable inlay hints.",
-        "zh-CN": "是否启用内联提示。"
+    "EmmyrcInlayHint.closingEndHint": {
+        "en": "Show an inlay hint after closing `end` keywords indicating what block\nthey belong to (e.g. function name). Only shown when the block spans\nat least `closingEndHintMinLines` lines."
+    },
+    "EmmyrcInlayHint.closingEndHintControlFlow": {
+        "en": "Also show closing `end` hints for control flow blocks (if, while, do,\nfor). Only effective when `closingEndHint` is enabled."
+    },
+    "EmmyrcInlayHint.closingEndHintMinLines": {
+        "en": "Minimum number of lines a block must span before a closing `end` hint\nis shown."
     },
     "EmmyrcInlayHint.enumParamHint": {
         "en": "Show name of enumerator when passing a literal value to a function\nthat expects an enum.\n\nExample:\n\n```lua\n--- @enum Level\nlocal Foo = {\n   Info = 1,\n   Error = 2,\n}\n\n--- @param l Level\nfunction print_level(l) end\n\nprint_level(1 --[[ Hint: Level.Info ]])\n```",
@@ -412,11 +696,20 @@
         "en": "Also search for usages in strings.",
         "zh-CN": "缓存短字符串用于搜索。"
     },
+    "EmmyrcReformat.configPrecedence": {
+        "en": "Controls which takes precedence when both `.editorconfig` and `.gluarc.json` formatter settings apply to the same option: `preferEditorconfig` (default) or `preferGluarc`."
+    },
     "EmmyrcReformat.externalTool": {
-        "en": "Whether to enable external tool formatting."
+        "en": "External formatter tool configuration. When set, the specified program is used for formatting instead of the built-in formatter."
     },
     "EmmyrcReformat.externalToolRangeFormat": {
-        "en": "Whether to enable external tool range formatting."
+        "en": "External formatter for range formatting. When set, range format requests use this tool instead of the built-in formatter."
+    },
+    "EmmyrcReformat.preset": {
+        "en": "Built-in formatter preset. `default` uses EmmyLuaCodeStyle defaults. `cfc` applies the CFC style preset. `custom` applies no preset — only the `styleOverrides` you configure below take effect."
+    },
+    "EmmyrcReformat.styleOverrides": {
+        "en": "Per-key EmmyLuaCodeStyle style overrides applied on top of the selected preset. Keys not configured here inherit their value from the active preset."
     },
     "EmmyrcReformat.useDiff": {
         "en": "Whether to use the diff algorithm for formatting."
@@ -424,10 +717,6 @@
     "EmmyrcRuntime.extensions": {
         "en": "file Extensions. eg: .lua, .lua.txt",
         "zh-CN": "文件扩展名。例如：.lua, .lua.txt"
-    },
-    "EmmyrcRuntime.frameworkVersions": {
-        "en": "Framework versions.",
-        "zh-CN": "框架版本列表。"
     },
     "EmmyrcRuntime.nonstandardSymbol": {
         "en": "Non-standard symbols."
@@ -444,7 +733,7 @@
         "en": "Special symbols."
     },
     "EmmyrcRuntime.version": {
-        "en": "Lua version.",
+        "en": "Deprecated: GMod-only server always uses LuaJIT. Kept for config compatibility.",
         "zh-CN": "Lua 版本。"
     },
     "EmmyrcSemanticToken.enable": {
@@ -454,9 +743,8 @@
     "EmmyrcSemanticToken.renderDocumentationMarkup": {
         "en": "Render Markdown/RST in documentation. Set `doc.syntax` for this option to have effect."
     },
-    "EmmyrcSignature.detailSignatureHelper": {
-        "en": "Whether to enable signature help.",
-        "zh-CN": "是否启用签名帮助。"
+    "EmmyrcStrict.allowNullableAsNonNullable": {
+        "en": "Allow nullable types (T?) to be passed where non-nullable (T) is expected."
     },
     "EmmyrcStrict.arrayIndex": {
         "en": "Whether to enable strict mode array indexing.",
@@ -469,6 +757,9 @@
     "EmmyrcStrict.metaOverrideFileDefine": {
         "en": "meta define overrides file define",
         "zh-CN": "`---@meta`文件的定义完全覆盖真实文件的定义。"
+    },
+    "EmmyrcStrict.requireExportGlobal": {
+        "en": "This option limits the visibility of third-party libraries.\n\nWhen enabled, third-party libraries must use `---@export global` annotation to be importable (i.e., no diagnostic errors and visible in auto-import)."
     },
     "EmmyrcStrict.requirePath": {
         "en": "Whether to enable strict mode require path.",
@@ -491,12 +782,15 @@
         "zh-CN": "忽略的文件。例如：[\"**/*.lua\"]"
     },
     "EmmyrcWorkspace.library": {
-        "en": "Library paths. eg: \"/usr/local/share/lua/5.1\"",
+        "en": "Library paths. Can be a string path or an object with path and ignore rules.\neg: [\"/usr/local/share/lua/5.1\"] or [{\"path\": \"/usr/local/share/lua/5.1\", \"ignoreDir\": [\"test\"], \"ignoreGlobs\": [\"**/*.spec.lua\"]}]",
         "zh-CN": "库路径。例如：\"/usr/local/share/lua/5.1\""
     },
     "EmmyrcWorkspace.moduleMap": {
         "en": "Module map. key is regex, value is new module regex\neg: {\n    \"^(.*)$\": \"module_$1\"\n    \"^lib(.*)$\": \"script$1\"\n}",
         "zh-CN": "模块映射列表。key 是正则表达式，value 是新的模块正则表达式\n 例如：{\n    \"^(.*)$\": \"module_$1\"\n    \"^lib(.*)$\": \"script$1\"\n}"
+    },
+    "EmmyrcWorkspace.packageDirs": {
+        "en": "Package directories. Treat the parent directory as a `library`, but only add files from the specified directory.\neg: `/usr/local/share/lua/5.1/module`"
     },
     "EmmyrcWorkspace.reindexDuration": {
         "en": "Delay between changing a file and full project reindex, in milliseconds.",

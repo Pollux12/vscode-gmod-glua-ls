@@ -5,13 +5,16 @@ import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri } from './gluarcConfig';
 
+const SAVE_DEBOUNCE_MS = 5000;
+
 export class GluarcSettingsPanel implements vscode.Disposable {
     private static current: GluarcSettingsPanel | undefined;
 
     private config: Record<string, unknown> = {};
     private categories: Category[] = [];
-    private _selfWriting: boolean = false;
     private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    private _saveTimer: ReturnType<typeof setTimeout> | undefined;
+    private _isSelfWrite = false;
     private readonly _disposables: vscode.Disposable[] = [];
 
     static async createOrShow(context: vscode.ExtensionContext, targetUri?: vscode.Uri): Promise<void> {
@@ -125,6 +128,38 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     return;
                 }
 
+                if (message.type === 'saveNow') {
+                    this._flushSave();
+                    return;
+                }
+
+                if (message.type === 'resetAll') {
+                    const choice = await vscode.window.showWarningMessage(
+                        'Are you sure you want to reset all settings to their defaults? This cannot be undone.',
+                        { modal: true },
+                        'Reset All'
+                    );
+                    if (choice !== 'Reset All') {
+                        return;
+                    }
+                    this._cancelPendingSave();
+                    const schemaRef = this.config['$schema'];
+                    for (const key of Object.keys(this.config)) {
+                        delete this.config[key];
+                    }
+                    if (typeof schemaRef === 'string') {
+                        this.config['$schema'] = schemaRef;
+                    }
+                    this._isSelfWrite = true;
+                    await writeGluarcConfig(this.workspaceFolder, this.config);
+                    setTimeout(() => { this._isSelfWrite = false; }, 500);
+                    await this.panel.webview.postMessage({
+                        type: 'resetCompleted',
+                        config: this.config,
+                    });
+                    return;
+                }
+
                 if (message.type !== 'change') {
                     return;
                 }
@@ -133,13 +168,8 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     return;
                 }
 
-                this._selfWriting = true;
-                try {
-                    setNestedValue(this.config, message.path, message.value);
-                    await writeGluarcConfig(this.workspaceFolder, this.config);
-                } finally {
-                    this._selfWriting = false;
-                }
+                setNestedValue(this.config, message.path, message.value);
+                this._scheduleSave();
             });
             this._disposables.push(messageDisposable);
 
@@ -160,17 +190,22 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     }
 
     private _onExternalChange(): void {
+        if (this._isSelfWrite) {
+            return;
+        }
+
         if (this._debounceTimer) {
             clearTimeout(this._debounceTimer);
         }
 
         this._debounceTimer = setTimeout(async () => {
-            if (this._selfWriting) {
-                return;
-            }
-
             try {
-                this.config = await readGluarcConfig(this.workspaceFolder);
+                const updatedConfig = await readGluarcConfig(this.workspaceFolder);
+                if (JSON.stringify(updatedConfig) === JSON.stringify(this.config)) {
+                    return;
+                }
+
+                this.config = updatedConfig;
                 await this.panel.webview.postMessage({
                     type: 'configUpdated',
                     config: this.config,
@@ -179,6 +214,36 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 console.warn('[GLuaLS] Failed to reload .gluarc.json:', error instanceof Error ? error.message : error);
             }
         }, 300);
+    }
+
+    private _scheduleSave(): void {
+        if (this._saveTimer) {
+            clearTimeout(this._saveTimer);
+        }
+
+        this._saveTimer = setTimeout(() => {
+            void this._writeToDisk();
+        }, SAVE_DEBOUNCE_MS);
+    }
+
+    private _cancelPendingSave(): void {
+        if (this._saveTimer) {
+            clearTimeout(this._saveTimer);
+            this._saveTimer = undefined;
+        }
+    }
+
+    private _flushSave(): void {
+        this._cancelPendingSave();
+        void this._writeToDisk();
+    }
+
+    private async _writeToDisk(): Promise<void> {
+        this._saveTimer = undefined;
+        this._isSelfWrite = true;
+        await writeGluarcConfig(this.workspaceFolder, this.config);
+        setTimeout(() => { this._isSelfWrite = false; }, 500);
+        await this.panel.webview.postMessage({ type: 'saved' });
     }
 
     private setWebviewContent(): boolean {
@@ -191,11 +256,19 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             const hljsUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.file(path.join(this.context.extensionPath, 'res', 'hljs-lua.js'))
             );
+            const stylesUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.file(path.join(this.context.extensionPath, 'res', 'gluarcSettings', 'styles.css'))
+            );
+            const mainScriptUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.file(path.join(this.context.extensionPath, 'res', 'gluarcSettings', 'main.js'))
+            );
 
             const processedHtml = htmlTemplate
                 .replace(/\{\{nonce\}\}/g, nonce)
                 .replace(/\{\{cspSource\}\}/g, cspSource)
-                .replace(/\{\{hljsUri\}\}/g, hljsUri.toString());
+                .replace(/\{\{hljsUri\}\}/g, hljsUri.toString())
+                .replace(/\{\{stylesUri\}\}/g, stylesUri.toString())
+                .replace(/\{\{mainScriptUri\}\}/g, mainScriptUri.toString());
 
             this.panel.webview.html = processedHtml;
             return true;
@@ -220,6 +293,19 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     }
 
     dispose(): void {
+        // Flush any pending debounced save synchronously to prevent data loss
+        if (this._saveTimer) {
+            clearTimeout(this._saveTimer);
+            this._saveTimer = undefined;
+            try {
+                const gluarcUri = getGluarcUri(this.workspaceFolder);
+                const serialized = `${JSON.stringify(this.config, null, 2)}\n`;
+                fs.writeFileSync(gluarcUri.fsPath, serialized, 'utf8');
+            } catch {
+                // Best-effort: if sync write fails, changes are lost
+            }
+        }
+
         while (this._disposables.length > 0) {
             this._disposables.pop()?.dispose();
         }

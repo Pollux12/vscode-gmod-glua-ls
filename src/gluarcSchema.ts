@@ -455,6 +455,116 @@ export function resolveRef(schema: object, ref: string, seen: Set<string> = new 
 }
 
 /**
+ * Mapping of gmod sub-field keys to the target category they should appear in.
+ * Fields not listed here are dropped (hidden from UI).
+ */
+const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
+    enabled: 'runtime',
+    hookMappings: 'runtime',
+    autoLoadAnnotations: 'resource',
+    annotationsPath: 'resource',
+    defaultRealm: 'diagnostics',
+    detectRealmFromCalls: 'diagnostics',
+    detectRealmFromFilename: 'diagnostics',
+    dynamicFieldsGlobal: 'completion',
+    inferDynamicFields: 'completion',
+    fileParamDefaults: 'completion',
+    scriptedClassScopes: 'workspace',
+};
+
+/**
+ * Compound gmod fields whose children should be extracted and placed
+ * individually into target categories. Each entry maps
+ * `parentKey.childKey` to the target category.
+ * Parent fields not listed (e.g. `network.enabled`, `network.diagnostics.*`)
+ * are intentionally hidden because they duplicate the main diagnostics system.
+ */
+const GMOD_COMPOUND_REDISTRIBUTION: Record<string, Record<string, string>> = {
+    network: {
+        'completion.mismatchHints': 'completion',
+        'completion.smartReadSuggestions': 'completion',
+    },
+    outline: {
+        verbosity: 'codeLens',
+    },
+    vgui: {
+        codeLensEnabled: 'codeLens',
+        inlayHintEnabled: 'hint',
+    },
+};
+
+/**
+ * Remove the "gmod" category and redistribute its fields into the
+ * appropriate existing categories. Config JSON paths are preserved.
+ */
+function redistributeGmodFields(categories: Category[]): Category[] {
+    const gmodIndex = categories.findIndex(c => c.key === 'gmod');
+    if (gmodIndex === -1) {
+        return categories;
+    }
+
+    const gmodCategory = categories[gmodIndex];
+    const categoryMap = new Map(categories.map(c => [c.key, c]));
+
+    const addField = (targetKey: string, field: FieldDescriptor | undefined) => {
+        if (!field) return;
+        const target = categoryMap.get(targetKey);
+        if (target) {
+            target.fields.push(field);
+        }
+    };
+
+    // Move simple (non-compound) fields
+    for (const field of gmodCategory.fields) {
+        const target = GMOD_FIELD_REDISTRIBUTION[field.key];
+        if (target) {
+            addField(target, field);
+        }
+    }
+
+    // Extract children from compound fields
+    for (const [parentKey, childMap] of Object.entries(GMOD_COMPOUND_REDISTRIBUTION)) {
+        const parentField = gmodCategory.fields.find(f => f.key === parentKey);
+        if (!parentField?.properties) continue;
+
+        for (const [childPath, targetCategory] of Object.entries(childMap)) {
+            const segments = childPath.split('.');
+            let current: FieldDescriptor | undefined = parentField;
+            for (const seg of segments) {
+                current = current?.properties?.find(f => f.key === seg);
+            }
+            addField(targetCategory, current);
+        }
+    }
+
+    // Remove gmod category
+    categories.splice(gmodIndex, 1);
+    return categories;
+}
+
+/**
+ * Propagate category-level (or parent-level) default values down to
+ * individual field descriptors that lack their own explicit `default`.
+ * Walks nested `properties` recursively.
+ */
+function propagateDefaults(fields: FieldDescriptor[], parentDefault: unknown): void {
+    if (!parentDefault || typeof parentDefault !== 'object' || Array.isArray(parentDefault)) {
+        return;
+    }
+
+    const defaults = parentDefault as Record<string, unknown>;
+    for (const field of fields) {
+        if (field.default === undefined && defaults[field.key] !== undefined) {
+            field.default = defaults[field.key];
+        }
+
+        if (field.properties && field.default !== undefined) {
+            propagateDefaults(field.properties, field.default);
+        }
+    }
+}
+
+/**
  * Build top-level settings categories from an Emmyrc JSON schema.
  */
 export function buildCategories(schema: object): Category[] {
@@ -485,6 +595,12 @@ export function buildCategories(schema: object): Category[] {
             })
             : [buildFieldDescriptor(categoryKey, [categoryKey], categorySchemaObject, rootSchema)];
 
+        // Propagate category-level defaults to individual fields
+        const categoryDefault = categorySchemaObject['default'];
+        if (categoryDefault !== undefined) {
+            propagateDefaults(fields, categoryDefault);
+        }
+
         categories.push({
             key: categoryKey,
             label: getString(categorySchemaObject['title']) ?? getSchemaTitle(categoryKey, resolvedCategorySchema),
@@ -493,7 +609,7 @@ export function buildCategories(schema: object): Category[] {
         });
     }
 
-    return categories;
+    return redistributeGmodFields(categories);
 }
 
 /**

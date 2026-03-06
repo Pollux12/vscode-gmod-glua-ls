@@ -213,7 +213,7 @@
       "$ref": "#/$defs/EmmyrcStrict",
       "default": {
         "allowNullableAsNonNullable": true,
-        "arrayIndex": true,
+        "arrayIndex": false,
         "docBaseConstMatchBaseType": true,
         "metaOverrideFileDefine": true,
         "requireExportGlobal": false,
@@ -953,7 +953,8 @@
         "keep",
         "remove",
         "remove_table_only",
-        "remove_string_only"
+        "remove_string_only",
+        "always"
       ]
     },
     "EmmyrcFormatConfigPrecedence": {
@@ -1040,6 +1041,32 @@
         "none",
         "single",
         "double"
+      ]
+    },
+    "EmmyrcFormatSpaceAroundAssignOperator": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+        },
+        {
+          "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+        }
+      ]
+    },
+    "EmmyrcFormatSpaceAroundConcatOperator": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+        },
+        {
+          "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+        }
       ]
     },
     "EmmyrcFormatSpaceBeforeFunctionCallSingleArg": {
@@ -1137,10 +1164,14 @@
           "minimum": 0
         },
         "align_continuous_rect_table_field": {
-          "description": "Align key-value fields in rectangular table literals so that `=` signs line up vertically.",
-          "type": [
-            "boolean",
-            "null"
+          "description": "Align key-value fields in rectangular table literals so that `=` signs line up vertically (`true`, `false`, `always`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmmyrcFormatAlignContinuousAssignStatement"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "align_continuous_similar_call_args": {
@@ -1192,8 +1223,15 @@
             "null"
           ]
         },
+        "break_multiline_call_expression_list": {
+          "description": "When a function call already spans multiple lines, put each argument and the closing `)` on their own lines.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "call_arg_parentheses": {
-          "description": "How to handle parentheses around single-argument function calls with a string or table literal (`keep`, `remove`, `remove_table_only`, `remove_string_only`).",
+          "description": "How to handle parentheses around single-argument function calls with a string or table literal (`keep`, `remove`, `remove_table_only`, `remove_string_only`, `always`).",
           "anyOf": [
             {
               "$ref": "#/$defs/EmmyrcFormatCallArgParentheses"
@@ -1402,6 +1440,13 @@
             "null"
           ]
         },
+        "remove_redundant_condition_parentheses": {
+          "description": "Remove redundant parentheses around single-line condition expressions such as `if (x) then`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "space_after_comma": {
           "description": "Add a space after commas in expressions and argument lists.",
           "type": [
@@ -1427,7 +1472,7 @@
           "description": "Spaces around assignment operators (`=`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (asymmetric spacing).",
           "anyOf": [
             {
-              "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+              "$ref": "#/$defs/EmmyrcFormatSpaceAroundAssignOperator"
             },
             {
               "type": "null"
@@ -1438,7 +1483,7 @@
           "description": "Spaces around the concatenation operator (`..`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (space on left side only).",
           "anyOf": [
             {
-              "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+              "$ref": "#/$defs/EmmyrcFormatSpaceAroundConcatOperator"
             },
             {
               "type": "null"
@@ -2234,7 +2279,7 @@
         "arrayIndex": {
           "description": "Whether to enable strict mode array indexing.",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "docBaseConstMatchBaseType": {
           "description": "Base constant types defined in doc can match base types, allowing int to match `---@alias id 1|2|3`, same for string.",
