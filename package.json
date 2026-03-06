@@ -1872,6 +1872,7 @@
         "@vscode/debugprotocol": "^1.61.0",
         "adm-zip": "^0.5.16",
         "concat-map": "0.0.2",
+        "highlight.js": "^11.11.1",
         "iconv-lite": "^0.6.3",
         "node-fetch": "^2.7.0",
         "smart-buffer": "^4.0.1",

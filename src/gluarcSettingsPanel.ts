@@ -188,9 +188,14 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             const nonce = crypto.randomBytes(16).toString('base64');
             const cspSource = this.panel.webview.cspSource;
 
+            const hljsUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.file(path.join(this.context.extensionPath, 'res', 'hljs-lua.js'))
+            );
+
             const processedHtml = htmlTemplate
                 .replace(/\{\{nonce\}\}/g, nonce)
-                .replace(/\{\{cspSource\}\}/g, cspSource);
+                .replace(/\{\{cspSource\}\}/g, cspSource)
+                .replace(/\{\{hljsUri\}\}/g, hljsUri.toString());
 
             this.panel.webview.html = processedHtml;
             return true;
