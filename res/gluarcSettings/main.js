@@ -11,6 +11,7 @@ import {
 } from "./data.js";
 import { showToast, setupSearch, updateFilter } from "./search.js";
 import {
+    renderMappingTableEditor,
     renderMapEditor,
     renderObjectArrayEditor,
     renderScalarListEditor,
@@ -31,6 +32,7 @@ const vscode = acquireVsCodeApi();
 const currentState = {
     categories: [],
     config: {},
+    autoSaveEnabled: false,
 };
 
 let formatAutoSwitchedToCustom = false;
@@ -56,6 +58,7 @@ window.addEventListener("message", (event) => {
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             renderSettings();
             setupObservers();
@@ -66,13 +69,15 @@ window.addEventListener("message", (event) => {
             break;
         case "configUpdated":
             if (isDirty) {
-                showToast("External config changed — save or wait for auto-save");
+                updateAutoSaveEnabled(message.autoSaveEnabled);
+                showToast(getPendingExternalChangeMessage());
                 return;
             }
             currentState.config =
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             updateAllWidgetValues();
             showToast();
@@ -82,8 +87,12 @@ window.addEventListener("message", (event) => {
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             updateAllWidgetValues();
+            break;
+        case "settingsUpdated":
+            updateAutoSaveEnabled(message.autoSaveEnabled);
             break;
         case "saved":
             onSaved();
@@ -126,6 +135,22 @@ function getValue(path, defaultValue) {
 
 function sendChange(path, value) {
     vscode.postMessage({ type: "change", path, value });
+}
+
+function updateAutoSaveEnabled(enabled) {
+    currentState.autoSaveEnabled = Boolean(enabled);
+
+    if (saveButton) {
+        saveButton.title = currentState.autoSaveEnabled
+            ? "Save changes to .gluarc.json now, or wait for auto-save"
+            : "Save changes to .gluarc.json manually";
+    }
+}
+
+function getPendingExternalChangeMessage() {
+    return currentState.autoSaveEnabled
+        ? "External config changed — save now or wait for auto-save"
+        : "External config changed — save your local edits manually when you're ready";
 }
 
 function markDirty() {
@@ -691,6 +716,14 @@ function generateInput(field, value, onChange) {
 
     if (type === "object" && Array.isArray(field.properties) && field.properties.length > 0) {
         return renderObjectGroup(field, value, onChange);
+    }
+
+    if (
+        field.editor?.kind === "mappingTable" &&
+        type === "object" &&
+        field.additionalProperties
+    ) {
+        return renderMappingTableEditor(field, value, onChange);
     }
 
     if (type === "object" && field.additionalProperties) {

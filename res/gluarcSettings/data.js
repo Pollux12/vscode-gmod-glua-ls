@@ -137,7 +137,7 @@ const DESCRIPTION_OVERRIDES = {
     "completion.autoRequireSeparator":
         "The path separator used when generating require() paths in auto-import completions. Also used when rewriting require paths on file relocation.",
     "completion.postfix":
-        "The trigger character for postfix code snippets (e.g., `.if`, `.for`). Set to empty string to disable postfix completions.",
+        "The trigger character for postfix code snippets.",
     "hover.customDetail":
         "Controls the verbosity level of hover documentation (1–255). Leave empty for the default level. Higher values show more detail.",
     "references.fuzzySearch":

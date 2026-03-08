@@ -1552,6 +1552,12 @@
                         "default": "",
                         "description": "Path to a folder containing custom GLua scaffolding templates (.lua files). Built-in templates are used when custom ones are not found."
                     },
+                    "gluals.gmod.settingsAutoSave": {
+                        "type": "boolean",
+                        "default": false,
+                        "scope": "resource",
+                        "markdownDescription": "Automatically save changes made in the GLua Settings editor to the workspace .gluarc.json after a short delay. Disabled by default to reduce accidental overwrites; use the editor's manual save button when off."
+                    },
                     "gluals.gmod.debugRealm": {
                         "type": "string",
                         "enum": [

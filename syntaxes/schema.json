@@ -1696,6 +1696,7 @@
           "default": true
         },
         "fileParamDefaults": {
+          "description": "Parameter-name to type-name fallbacks for otherwise unresolved params.",
           "type": "object",
           "additionalProperties": {
             "type": "string"
@@ -1727,7 +1728,10 @@
             "victim": "Entity",
             "weapon": "Weapon",
             "wep": "Weapon"
-          }
+          },
+          "x-gluals-editor": "mappingTable",
+          "x-gluals-key-label": "Parameter",
+          "x-gluals-value-label": "Type"
         },
         "hookMappings": {
           "$ref": "#/$defs/EmmyrcGmodHookMappings",

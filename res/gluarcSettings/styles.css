@@ -803,8 +803,8 @@
             }
 
             .remove-btn {
-                width: 20px;
-                height: 20px;
+                width: 24px;
+                height: 24px;
                 border: none;
                 border-radius: 4px;
                 background-color: transparent;
@@ -815,8 +815,8 @@
                 justify-content: center;
                 padding: 0;
                 line-height: 1;
-                font-size: 16px;
-                opacity: 0.7;
+                font-size: 20px;
+                opacity: 0.85;
                 transition: background-color 0.1s, opacity 0.1s, color 0.1s;
             }
 
@@ -918,6 +918,227 @@
             .map-inputs-row input,
             .map-inputs-row select {
                 width: 100%;
+            }
+
+            .mapping-table-container {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                --mapping-table-source-width: 96px;
+                --mapping-table-actions-width: 96px;
+                --mapping-table-gap: 16px;
+                --mapping-table-inline-padding: 16px;
+            }
+
+            .mapping-table-note {
+                color: var(--vscode-descriptionForeground);
+                font-size: 12px;
+                line-height: 1.5;
+            }
+
+            .mapping-table-header,
+            .mapping-table-row,
+            .mapping-table-add-row {
+                display: grid;
+                grid-template-columns:
+                    minmax(0, 1fr)
+                    minmax(0, 1fr)
+                    var(--mapping-table-source-width)
+                    var(--mapping-table-actions-width);
+                column-gap: var(--mapping-table-gap);
+                align-items: center;
+                padding: 8px var(--mapping-table-inline-padding);
+                box-sizing: border-box;
+            }
+
+            .mapping-table-cell {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .mapping-table-shell {
+                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-radius: 4px;
+                overflow: auto;
+                max-height: 480px;
+                background-color: var(--vscode-editor-background);
+                position: relative;
+                scrollbar-gutter: stable;
+                overflow-anchor: none;
+            }
+
+            .mapping-table-header {
+                background-color: var(--vscode-editor-background);
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                position: sticky;
+                top: 0;
+                z-index: 2;
+            }
+
+            .mapping-table-add-row {
+                background-color: var(--vscode-editor-background);
+                border-top: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                position: sticky;
+                bottom: 0;
+                z-index: 2;
+            }
+
+            .mapping-table-heading {
+                color: var(--vscode-descriptionForeground);
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                justify-self: stretch;
+                text-align: left;
+            }
+
+            .mapping-table-heading.is-source,
+            .mapping-table-heading.is-actions {
+                justify-self: center;
+                text-align: center;
+                width: 100%;
+            }
+
+            .mapping-table-cell.is-actions {
+                display: flex;
+                justify-content: center;
+            }
+
+            .mapping-table-cell.is-source.is-empty {
+                min-height: 1px;
+            }
+
+            .mapping-table-body:empty {
+                display: none;
+            }
+
+            .mapping-table-row {
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                transform-origin: center top;
+            }
+
+            .mapping-table-row:last-child {
+                border-bottom: none;
+            }
+
+            .mapping-table-row:nth-child(even) {
+                background-color: var(--vscode-list-hoverBackground, transparent);
+            }
+
+            .mapping-table-row:hover {
+                background-color: var(--vscode-list-hoverBackground, transparent);
+            }
+
+            .mapping-table-row.is-inactive {
+                opacity: 0.72;
+            }
+
+            .mapping-table-row.is-overridden {
+                box-shadow: inset 3px 0 0 var(--vscode-settings-modifiedItemIndicator, #0c7d9d);
+            }
+
+            .mapping-table-row.is-entering {
+                animation: mapping-table-row-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            .mapping-table-row.is-removing {
+                pointer-events: none;
+                animation: mapping-table-row-exit 160ms ease forwards;
+            }
+
+            .mapping-table-badge {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                justify-self: stretch;
+                min-height: 22px;
+                padding: 0;
+                background-color: transparent;
+                color: var(--vscode-descriptionForeground);
+                font-size: 12px;
+                font-weight: 500;
+                text-align: center;
+                white-space: nowrap;
+            }
+
+            .mapping-table-badge.is-override {
+                background-color: transparent;
+                color: var(--vscode-textLink-foreground);
+            }
+
+            .mapping-table-badge.is-custom {
+                background-color: transparent;
+                color: var(--vscode-charts-orange, var(--vscode-editor-foreground));
+            }
+
+            .mapping-table-badge.is-removed {
+                background-color: transparent;
+                color: var(--vscode-inputValidation-warningForeground, var(--vscode-editor-foreground));
+            }
+
+            .mapping-table-badge.is-default,
+            .mapping-table-badge.is-built-in,
+            .mapping-table-badge.is-workspace {
+                background-color: transparent;
+            }
+
+            .mapping-table-actions {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                gap: 8px;
+            }
+
+            .mapping-table-add-row .mapping-table-actions {
+                justify-content: center;
+            }
+
+            .mapping-table-inline-btn {
+                background-color: transparent;
+                color: var(--vscode-descriptionForeground);
+                border: none;
+                border-radius: 4px;
+                min-height: 22px;
+                padding: 0 8px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: background-color 0.1s, color 0.1s;
+            }
+
+            .mapping-table-inline-btn:hover {
+                background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+                color: var(--vscode-editor-foreground);
+            }
+
+            .mapping-table-cell.is-key input,
+            .mapping-table-cell.is-value input,
+            .mapping-table-cell.is-key select,
+            .mapping-table-cell.is-value select {
+                width: 100%;
+            }
+
+            @keyframes mapping-table-row-enter {
+                0% {
+                    opacity: 0;
+                    transform: translateY(8px) scaleY(0.94);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0) scaleY(1);
+                }
+            }
+
+            @keyframes mapping-table-row-exit {
+                0% {
+                    opacity: 1;
+                    transform: translateY(0) scaleY(1);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translateY(-6px) scaleY(0.92);
+                }
             }
 
             /* Object / Array of Objects — compact */

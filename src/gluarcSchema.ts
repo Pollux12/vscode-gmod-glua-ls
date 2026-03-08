@@ -1,5 +1,13 @@
 export type FieldType = 'boolean' | 'string' | 'number' | 'integer' | 'array' | 'object' | 'enum' | 'any';
 
+export type FieldEditorKind = 'mappingTable';
+
+export interface FieldEditorDescriptor {
+    kind: FieldEditorKind;
+    keyLabel?: string;
+    valueLabel?: string;
+}
+
 export interface FieldDescriptor {
     key: string;
     path: string[];
@@ -11,6 +19,7 @@ export interface FieldDescriptor {
     properties?: FieldDescriptor[];
     additionalProperties?: FieldDescriptor;
     items?: FieldDescriptor;
+    editor?: FieldEditorDescriptor;
     nullable: boolean;
 }
 
@@ -296,6 +305,15 @@ function buildFieldDescriptorInternal(
 
     if ('default' in unwrapped.schemaDef) {
         descriptor.default = unwrapped.schemaDef['default'];
+    }
+
+    const editorKind = getString(unwrapped.schemaDef['x-gluals-editor']);
+    if (editorKind === 'mappingTable') {
+        descriptor.editor = {
+            kind: 'mappingTable',
+            keyLabel: getString(unwrapped.schemaDef['x-gluals-key-label']),
+            valueLabel: getString(unwrapped.schemaDef['x-gluals-value-label']),
+        };
     }
 
     if (enumInfo.values) {

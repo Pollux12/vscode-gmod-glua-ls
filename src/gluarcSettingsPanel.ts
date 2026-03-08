@@ -6,6 +6,8 @@ import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri } from './gluarcConfig';
 
 const SAVE_DEBOUNCE_MS = 5000;
+const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
+const SETTINGS_AUTO_SAVE_SECTION = 'gluals.gmod.settingsAutoSave';
 
 export class GluarcSettingsPanel implements vscode.Disposable {
     private static current: GluarcSettingsPanel | undefined;
@@ -14,6 +16,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     private categories: Category[] = [];
     private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
     private _saveTimer: ReturnType<typeof setTimeout> | undefined;
+    private _hasUnsavedChanges = false;
     private _isSelfWrite = false;
     private readonly _disposables: vscode.Disposable[] = [];
 
@@ -115,6 +118,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 type: 'init',
                 categories: this.categories,
                 config: this.config,
+                autoSaveEnabled: this._isAutoSaveEnabled(),
             });
 
             const messageDisposable = this.panel.webview.onDidReceiveMessage(async (msg: unknown) => {
@@ -152,10 +156,12 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     }
                     this._isSelfWrite = true;
                     await writeGluarcConfig(this.workspaceFolder, this.config);
+                    this._hasUnsavedChanges = false;
                     setTimeout(() => { this._isSelfWrite = false; }, 500);
                     await this.panel.webview.postMessage({
                         type: 'resetCompleted',
                         config: this.config,
+                        autoSaveEnabled: this._isAutoSaveEnabled(),
                     });
                     return;
                 }
@@ -169,7 +175,12 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 }
 
                 setNestedValue(this.config, message.path, message.value);
-                this._scheduleSave();
+                this._hasUnsavedChanges = true;
+                if (this._isAutoSaveEnabled()) {
+                    this._scheduleSave();
+                } else {
+                    this._cancelPendingSave();
+                }
             });
             this._disposables.push(messageDisposable);
 
@@ -182,6 +193,27 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 watcher.onDidChange(() => this._onExternalChange()),
                 watcher.onDidCreate(() => this._onExternalChange())
             );
+
+            const configurationDisposable = vscode.workspace.onDidChangeConfiguration((event) => {
+                if (!event.affectsConfiguration(SETTINGS_AUTO_SAVE_SECTION, this.workspaceFolder.uri)) {
+                    return;
+                }
+
+                const autoSaveEnabled = this._isAutoSaveEnabled();
+                if (autoSaveEnabled) {
+                    if (this._hasUnsavedChanges) {
+                        this._scheduleSave();
+                    }
+                } else {
+                    this._cancelPendingSave();
+                }
+
+                void this.panel.webview.postMessage({
+                    type: 'settingsUpdated',
+                    autoSaveEnabled,
+                });
+            });
+            this._disposables.push(configurationDisposable);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to open GLua settings: ${message}`);
@@ -206,9 +238,11 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 }
 
                 this.config = updatedConfig;
+                this._hasUnsavedChanges = false;
                 await this.panel.webview.postMessage({
                     type: 'configUpdated',
                     config: this.config,
+                    autoSaveEnabled: this._isAutoSaveEnabled(),
                 });
             } catch (error) {
                 console.warn('[GLuaLS] Failed to reload .gluarc.json:', error instanceof Error ? error.message : error);
@@ -240,10 +274,21 @@ export class GluarcSettingsPanel implements vscode.Disposable {
 
     private async _writeToDisk(): Promise<void> {
         this._saveTimer = undefined;
+        if (!this._hasUnsavedChanges) {
+            return;
+        }
+
         this._isSelfWrite = true;
         await writeGluarcConfig(this.workspaceFolder, this.config);
+        this._hasUnsavedChanges = false;
         setTimeout(() => { this._isSelfWrite = false; }, 500);
         await this.panel.webview.postMessage({ type: 'saved' });
+    }
+
+    private _isAutoSaveEnabled(): boolean {
+        return vscode.workspace
+            .getConfiguration('gluals', this.workspaceFolder.uri)
+            .get<boolean>(SETTINGS_AUTO_SAVE_KEY, false);
     }
 
     private setWebviewContent(): boolean {
@@ -294,7 +339,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
 
     dispose(): void {
         // Flush any pending debounced save synchronously to prevent data loss
-        if (this._saveTimer) {
+        if (this._saveTimer && this._isAutoSaveEnabled()) {
             clearTimeout(this._saveTimer);
             this._saveTimer = undefined;
             try {
