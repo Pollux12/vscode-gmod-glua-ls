@@ -29,9 +29,10 @@
         "autoRequireNamingConvention": "keep",
         "autoRequireSeparator": ".",
         "baseFunctionIncludesName": true,
-        "callSnippet": false,
+        "callSnippet": true,
         "enable": true,
-        "postfix": "@"
+        "postfix": "@",
+        "stagedCallSnippets": true
       }
     },
     "diagnostics": {
@@ -695,7 +696,8 @@
         "callSnippet": {
           "description": "Whether to use call snippets in completions.",
           "type": "boolean",
-          "default": false
+          "default": true,
+          "x-vscode-setting": true
         },
         "enable": {
           "description": "Enable autocompletion.",
@@ -726,6 +728,12 @@
               "null"
             ]
           }
+        },
+        "stagedCallSnippets": {
+          "description": "Whether to stage known API call snippets so autocomplete can guide\nthe user through the next relevant argument.",
+          "type": "boolean",
+          "default": true,
+          "x-vscode-setting": true
         }
       }
     },

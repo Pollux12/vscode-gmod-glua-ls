@@ -1,5 +1,6 @@
 import { LanguageConfiguration, IndentAction, IndentationRule, OnEnterRule } from 'vscode';
 import { ConfigurationManager } from './configManager';
+import { LUA_END_CLOSER_PATTERN, LUA_FUNCTION_BLOCK_START_PATTERNS } from './luaEnterPatterns';
 
 /**
  * Lua language configuration for VS Code
@@ -24,44 +25,14 @@ export class LuaLanguageConfiguration implements LanguageConfiguration {
      * Build on-enter rules for auto-indentation and annotation completion
      */
     private buildOnEnterRules(enableAnnotationCompletion: boolean): OnEnterRule[] {
-        const baseRules: OnEnterRule[] = [
-            // Function with end block
-            {
-                beforeText: /^\s*function\s+\w*\s*\(.*\)\s*$/,
-                afterText: /^\s*end\s*$/,
-                action: {
-                    indentAction: IndentAction.IndentOutdent,
-                    appendText: '\t'
-                }
-            },
-            // Local function assignment with end block
-            {
-                beforeText: /^\s*local\s+\w+\s*=\s*function\s*\(.*\)\s*$/,
-                afterText: /^\s*end\s*$/,
-                action: {
-                    indentAction: IndentAction.IndentOutdent,
-                    appendText: '\t'
-                }
-            },
-            // Anonymous function assignment with end block
-            {
-                beforeText: /^\s*.*\s*=\s*function\s*\(.*\)\s*$/,
-                afterText: /^\s*end\s*$/,
-                action: {
-                    indentAction: IndentAction.IndentOutdent,
-                    appendText: '\t'
-                }
-            },
-            // Local function declaration with end block
-            {
-                beforeText: /^\s*local\s+function\s+\w*\s*\(.*\)\s*$/,
-                afterText: /^\s*end\s*$/,
-                action: {
-                    indentAction: IndentAction.IndentOutdent,
-                    appendText: '\t'
-                }
+        const baseRules: OnEnterRule[] = LUA_FUNCTION_BLOCK_START_PATTERNS.map((beforeText) => ({
+            beforeText,
+            afterText: LUA_END_CLOSER_PATTERN,
+            action: {
+                indentAction: IndentAction.IndentOutdent,
+                appendText: '\t'
             }
-        ];
+        }));
 
         if (enableAnnotationCompletion) {
             const annotationRules: OnEnterRule[] = [

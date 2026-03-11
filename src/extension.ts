@@ -11,6 +11,7 @@ import { EmmyContext } from './emmyContext';
 import { IServerLocation, IServerPosition } from './lspExtension';
 import { onDidChangeConfiguration } from './annotator';
 import { ConfigurationManager } from './configManager';
+import { handleLuaSmartEnter } from './luaSmartEnter';
 import * as Annotator from './annotator';
 import { EmmyrcSchemaContentProvider } from './emmyrcSchemaContentProvider';
 import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
@@ -67,6 +68,7 @@ let gmodRealmProvider: GmodRealmStatusBar | undefined;
 let gmodErrorStore: GmodErrorStore | undefined;
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
+let languageConfigurationDisposable: vscode.Disposable | undefined;
 let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
@@ -141,6 +143,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.showServerMenu', handler: showServerMenu },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
+        { id: 'gluals.language.smartEnter', handler: handleLuaSmartEnter },
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
@@ -270,12 +273,21 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
  * Register language configuration
  */
 function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
-    const languageConfig = vscode.languages.setLanguageConfiguration(
+    refreshLanguageConfiguration();
+    context.subscriptions.push({
+        dispose: () => {
+            languageConfigurationDisposable?.dispose();
+            languageConfigurationDisposable = undefined;
+        }
+    });
+}
+
+function refreshLanguageConfiguration(): void {
+    languageConfigurationDisposable?.dispose();
+    languageConfigurationDisposable = vscode.languages.setLanguageConfiguration(
         'lua',
         new LuaLanguageConfiguration()
     );
-
-    context.subscriptions.push(languageConfig);
 }
 
 function registerDebugConfigurationProviders(context: vscode.ExtensionContext): void {
@@ -368,6 +380,9 @@ async function initializeExtension(): Promise<void> {
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
     if (e.affectsConfiguration('gluals')) {
         onDidChangeConfiguration();
+    }
+    if (e.affectsConfiguration('gluals.language.completeAnnotation')) {
+        refreshLanguageConfiguration();
     }
     if (e.affectsConfiguration('gluals.gmod.mcp')) {
         void restartGmodMcpHost(false);

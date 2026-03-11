@@ -14,9 +14,6 @@
         "Programming Languages",
         "Debuggers"
     ],
-    "activationEvents": [
-        "onLanguage:lua"
-    ],
     "keywords": [
         "lua",
         "emmylua",
@@ -48,6 +45,11 @@
                 "command": "gluals.showSyntaxTree",
                 "title": "Show Syntax Tree",
                 "icon": "$(symbol-structure)"
+            },
+            {
+                "command": "gluals.language.smartEnter",
+                "title": "Lua: Smart Enter",
+                "category": "GLuaLS"
             },
             {
                 "command": "gluals.gmod.updateAnnotations",
@@ -446,6 +448,13 @@
                     "Garry's Mod Lua"
                 ],
                 "configuration": "./language-configuration.json"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "gluals.language.smartEnter",
+                "key": "enter",
+                "when": "editorTextFocus && !editorReadonly && !suggestWidgetVisible && !inSnippetMode && editorLangId == lua && config.gluals.language.autoInsertEnd"
             }
         ],
         "breakpoints": [
@@ -984,6 +993,29 @@
                         "default": null,
                         "markdownDescription": "%config.emmylua.completion.autoRequire.description%"
                     },
+                    "gluals.completion.callSnippet": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.emmylua.completion.callSnippet.description%"
+                    },
                     "gluals.completion.baseFunctionIncludesName": {
                         "type": [
                             "boolean",
@@ -1029,6 +1061,29 @@
                         ],
                         "default": null,
                         "markdownDescription": "%config.emmylua.completion.enable.description%"
+                    },
+                    "gluals.completion.stagedCallSnippets": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.emmylua.completion.stagedCallSnippets.description%"
                     },
                     "gluals.completion.postfix": {
                         "default": null,
@@ -1529,6 +1584,12 @@
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "%config.emmylua.language.completeAnnotation.description%"
+                    },
+                    "gluals.language.autoInsertEnd": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "resource",
+                        "markdownDescription": "%config.emmylua.language.autoInsertEnd.description%"
                     },
                     "gluals.misc.autoInsertTripleDash": {
                         "type": "boolean",
