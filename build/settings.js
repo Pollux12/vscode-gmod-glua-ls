@@ -40,6 +40,18 @@ function toTitleCase(s) {
     return t.charAt(0).toUpperCase() + t.substr(1);
 }
 
+function canonicalizeTitle(title) {
+    if (typeof title !== "string") {
+        return title;
+    }
+
+    if (title.toLowerCase() === "gmod") {
+        return "GMod";
+    }
+
+    return title;
+}
+
 export function main() {
     const schema = readSchema();
     const definitions = schema.$defs || {};
@@ -213,17 +225,26 @@ function dumpPackageJson(rendered) {
     const configurationByTitleAlwaysLast = {};
 
     for (let i = 0; i < configuration.length; i++) {
-        const title = configuration[i].title;
+        const title = canonicalizeTitle(configuration[i].title);
+        const existing = configuration[i].properties;
+
         // Ensure Misc, Language Server and Colors stay at the end of config.
         if (["Misc", "Language Server", "Colors"].includes(title)) {
-            configurationByTitleAlwaysLast[title] = configuration[i].properties;
+            configurationByTitleAlwaysLast[title] = {
+                ...(configurationByTitleAlwaysLast[title] ?? {}),
+                ...existing,
+            };
         } else {
-            configurationByTitle[configuration[i].title] =
-                configuration[i].properties;
+            configurationByTitle[title] = {
+                ...(configurationByTitle[title] ?? {}),
+                ...existing,
+            };
         }
     }
 
-    for (const [title, items] of Object.entries(rendered)) {
+    for (const [rawTitle, items] of Object.entries(rendered)) {
+        const title = canonicalizeTitle(rawTitle);
+
         // Ensure Misc, Language Server and Colors stay at the end of config.
         if (["Misc", "Language Server", "Colors"].includes(title)) {
             configurationByTitleAlwaysLast[title] = {

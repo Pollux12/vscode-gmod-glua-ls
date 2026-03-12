@@ -16,7 +16,10 @@
     ],
     "keywords": [
         "lua",
-        "emmylua",
+        "gmod",
+        "glua",
+        "Garry's Mod",
+        "language server",
         "debugger"
     ],
     "repository": {
@@ -1677,23 +1680,8 @@
                 }
             },
             {
-                "title": "Gmod",
-                "order": 12,
-                "properties": {
-                    "gluals.gmod.templatePath": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "editPresentation": "singlelineText",
-                        "default": null,
-                        "markdownDescription": "%config.gluals.gmod.templatePath.description%"
-                    }
-                }
-            },
-            {
                 "title": "Colors",
-                "order": 13,
+                "order": 12,
                 "properties": {
                     "gluals.colors.parameter": {
                         "type": "string",
@@ -1728,7 +1716,7 @@
             },
             {
                 "title": "Misc",
-                "order": 14,
+                "order": 13,
                 "properties": {
                     "gluals.language.completeAnnotation": {
                         "type": "boolean",
@@ -1751,7 +1739,7 @@
             },
             {
                 "title": "Language Server",
-                "order": 15,
+                "order": 14,
                 "properties": {
                     "gluals.ls.startParameters": {
                         "type": "array",
