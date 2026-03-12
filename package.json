@@ -933,7 +933,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.codeAction.insertSpace.description%"
+                        "markdownDescription": "%config.gluals.codeAction.insertSpace.description%"
                     }
                 }
             },
@@ -962,7 +962,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.codeLens.enable.description%"
+                        "markdownDescription": "%config.gluals.codeLens.enable.description%"
                     }
                 }
             },
@@ -991,7 +991,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.completion.autoRequire.description%"
+                        "markdownDescription": "%config.gluals.completion.autoRequire.description%"
                     },
                     "gluals.completion.callSnippet": {
                         "type": [
@@ -1014,7 +1014,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.completion.callSnippet.description%"
+                        "markdownDescription": "%config.gluals.completion.callSnippet.description%"
                     },
                     "gluals.completion.baseFunctionIncludesName": {
                         "type": [
@@ -1037,7 +1037,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.completion.baseFunctionIncludesName.description%"
+                        "markdownDescription": "%config.gluals.completion.baseFunctionIncludesName.description%"
                     },
                     "gluals.completion.enable": {
                         "type": [
@@ -1060,7 +1060,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.completion.enable.description%"
+                        "markdownDescription": "%config.gluals.completion.enable.description%"
                     },
                     "gluals.completion.stagedCallSnippets": {
                         "type": [
@@ -1083,7 +1083,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.completion.stagedCallSnippets.description%"
+                        "markdownDescription": "%config.gluals.completion.stagedCallSnippets.description%"
                     },
                     "gluals.completion.postfix": {
                         "default": null,
@@ -1103,7 +1103,7 @@
                             "string",
                             "null"
                         ],
-                        "markdownDescription": "%config.emmylua.completion.postfix.description%"
+                        "markdownDescription": "%config.gluals.completion.postfix.description%"
                     }
                 }
             },
@@ -1118,7 +1118,7 @@
                         ],
                         "editPresentation": "singlelineText",
                         "default": null,
-                        "markdownDescription": "%config.emmylua.diagnostics.diagnosticInterval.description%"
+                        "markdownDescription": "%config.gluals.diagnostics.diagnosticInterval.description%"
                     }
                 }
             },
@@ -1147,7 +1147,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.documentColor.enable.description%"
+                        "markdownDescription": "%config.gluals.documentColor.enable.description%"
                     }
                 }
             },
@@ -1199,7 +1199,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.enumParamHint.description%"
+                        "markdownDescription": "%config.gluals.hint.enumParamHint.description%"
                     },
                     "gluals.hint.indexHint": {
                         "type": [
@@ -1222,7 +1222,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.indexHint.description%"
+                        "markdownDescription": "%config.gluals.hint.indexHint.description%"
                     },
                     "gluals.hint.localHint": {
                         "type": [
@@ -1245,7 +1245,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.localHint.description%"
+                        "markdownDescription": "%config.gluals.hint.localHint.description%"
                     },
                     "gluals.hint.metaCallHint": {
                         "type": [
@@ -1268,7 +1268,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.metaCallHint.description%"
+                        "markdownDescription": "%config.gluals.hint.metaCallHint.description%"
                     },
                     "gluals.hint.overrideHint": {
                         "type": [
@@ -1291,7 +1291,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.overrideHint.description%"
+                        "markdownDescription": "%config.gluals.hint.overrideHint.description%"
                     },
                     "gluals.hint.paramHint": {
                         "type": [
@@ -1314,7 +1314,62 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hint.paramHint.description%"
+                        "markdownDescription": "%config.gluals.hint.paramHint.description%"
+                    },
+                    "gluals.hint.closingEndHint": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.gluals.hint.closingEndHint.description%"
+                    },
+                    "gluals.hint.closingEndHintControlFlow": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.gluals.hint.closingEndHintControlFlow.description%"
+                    },
+                    "gluals.hint.closingEndHintMinLines": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "editPresentation": "singlelineText",
+                        "default": null,
+                        "markdownDescription": "%config.gluals.hint.closingEndHintMinLines.description%"
                     }
                 }
             },
@@ -1343,7 +1398,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.hover.enable.description%"
+                        "markdownDescription": "%config.gluals.hover.enable.description%"
                     }
                 }
             },
@@ -1372,7 +1427,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.inlineValues.enable.description%"
+                        "markdownDescription": "%config.gluals.inlineValues.enable.description%"
                     }
                 }
             },
@@ -1401,7 +1456,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.references.enable.description%"
+                        "markdownDescription": "%config.gluals.references.enable.description%"
                     },
                     "gluals.references.fuzzySearch": {
                         "type": [
@@ -1424,7 +1479,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.references.fuzzySearch.description%"
+                        "markdownDescription": "%config.gluals.references.fuzzySearch.description%"
                     },
                     "gluals.references.shortStringSearch": {
                         "type": [
@@ -1447,7 +1502,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.references.shortStringSearch.description%"
+                        "markdownDescription": "%config.gluals.references.shortStringSearch.description%"
                     }
                 }
             },
@@ -1476,7 +1531,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.semanticTokens.enable.description%"
+                        "markdownDescription": "%config.gluals.semanticTokens.enable.description%"
                     },
                     "gluals.semanticTokens.renderDocumentationMarkup": {
                         "type": [
@@ -1499,7 +1554,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.semanticTokens.renderDocumentationMarkup.description%"
+                        "markdownDescription": "%config.gluals.semanticTokens.renderDocumentationMarkup.description%"
                     }
                 }
             },
@@ -1528,7 +1583,7 @@
                             "%config.common.enum.off.description%"
                         ],
                         "default": null,
-                        "markdownDescription": "%config.emmylua.workspace.enableReindex.description%"
+                        "markdownDescription": "%config.gluals.workspace.enableReindex.description%"
                     },
                     "gluals.workspace.reindexDuration": {
                         "type": [
@@ -1537,71 +1592,13 @@
                         ],
                         "editPresentation": "singlelineText",
                         "default": null,
-                        "markdownDescription": "%config.emmylua.workspace.reindexDuration.description%"
-                    }
-                }
-            },
-            {
-                "title": "Colors",
-                "order": 11,
-                "properties": {
-                    "gluals.colors.parameter": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.parameter.description%"
-                    },
-                    "gluals.colors.global": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.global.description%"
-                    },
-                    "gluals.colors.local": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.local.description%"
-                    },
-                    "gluals.colors.mutable_underline": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ],
-                        "default": null,
-                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%",
-                        "markdownDeprecationMessage": "Use `gluals.colors.mutableUnderline` instead"
-                    },
-                    "gluals.colors.mutableUnderline": {
-                        "type": "boolean",
-                        "default": true,
-                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%"
-                    }
-                }
-            },
-            {
-                "title": "Misc",
-                "order": 12,
-                "properties": {
-                    "gluals.language.completeAnnotation": {
-                        "type": "boolean",
-                        "default": true,
-                        "markdownDescription": "%config.emmylua.language.completeAnnotation.description%"
-                    },
-                    "gluals.language.autoInsertEnd": {
-                        "type": "boolean",
-                        "default": true,
-                        "scope": "resource",
-                        "markdownDescription": "%config.emmylua.language.autoInsertEnd.description%"
-                    },
-                    "gluals.misc.autoInsertTripleDash": {
-                        "type": "boolean",
-                        "default": true,
-                        "markdownDescription": "%config.emmylua.language.completeAnnotation.description%",
-                        "deprecationMessage": "Use `gluals.language.completeAnnotation` instead"
+                        "markdownDescription": "%config.gluals.workspace.reindexDuration.description%"
                     }
                 }
             },
             {
                 "title": "GMod",
-                "order": 14,
+                "order": 11,
                 "properties": {
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
@@ -1609,9 +1606,13 @@
                         "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
                     },
                     "gluals.gmod.templatePath": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Path to a folder containing custom GLua scaffolding templates (.lua files). Built-in templates are used when custom ones are not found."
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "editPresentation": "singlelineText",
+                        "default": null,
+                        "markdownDescription": "%config.gluals.gmod.templatePath.description%"
                     },
                     "gluals.gmod.settingsAutoSave": {
                         "type": "boolean",
@@ -1672,6 +1673,79 @@
                         "maximum": 600,
                         "scope": "machine",
                         "markdownDescription": "Maximum authenticated MCP requests accepted per minute per client address."
+                    }
+                }
+            },
+            {
+                "title": "Gmod",
+                "order": 12,
+                "properties": {
+                    "gluals.gmod.templatePath": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "editPresentation": "singlelineText",
+                        "default": null,
+                        "markdownDescription": "%config.gluals.gmod.templatePath.description%"
+                    }
+                }
+            },
+            {
+                "title": "Colors",
+                "order": 13,
+                "properties": {
+                    "gluals.colors.parameter": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "%config.emmylua.colors.parameter.description%"
+                    },
+                    "gluals.colors.global": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "%config.emmylua.colors.global.description%"
+                    },
+                    "gluals.colors.local": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "%config.emmylua.colors.local.description%"
+                    },
+                    "gluals.colors.mutable_underline": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%",
+                        "markdownDeprecationMessage": "Use `gluals.colors.mutableUnderline` instead"
+                    },
+                    "gluals.colors.mutableUnderline": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%"
+                    }
+                }
+            },
+            {
+                "title": "Misc",
+                "order": 14,
+                "properties": {
+                    "gluals.language.completeAnnotation": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%config.emmylua.language.completeAnnotation.description%"
+                    },
+                    "gluals.language.autoInsertEnd": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "resource",
+                        "markdownDescription": "%config.emmylua.language.autoInsertEnd.description%"
+                    },
+                    "gluals.misc.autoInsertTripleDash": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%config.emmylua.language.completeAnnotation.description%",
+                        "deprecationMessage": "Use `gluals.language.completeAnnotation` instead"
                     }
                 }
             },

@@ -76,9 +76,9 @@ export function applyTemplate(template: string, vars: Record<string, string>): s
 }
 
 export async function loadTemplate(templateFile: string, context: vscode.ExtensionContext): Promise<string> {
-    const templatePathSetting = vscode.workspace
+    const templatePathSetting = (vscode.workspace
         .getConfiguration('gluals.gmod')
-        .get<string>('templatePath', '')
+        .get<string | null>('templatePath', null) ?? '')
         .trim();
 
     if (templatePathSetting.length > 0) {

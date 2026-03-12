@@ -481,6 +481,7 @@ const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
     hookMappings: 'runtime',
     autoLoadAnnotations: 'resource',
     annotationsPath: 'resource',
+    templatePath: 'workspace',
     defaultRealm: 'diagnostics',
     detectRealmFromCalls: 'diagnostics',
     detectRealmFromFilename: 'diagnostics',

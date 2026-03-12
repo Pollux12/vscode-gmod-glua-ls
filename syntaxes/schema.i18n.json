@@ -607,6 +607,9 @@
     "EmmyrcGmod.autoLoadAnnotations": {
         "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
     },
+    "EmmyrcGmod.templatePath": {
+        "en": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root."
+    },
     "EmmyrcGmodOutline.verbosity": {
         "en": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals."
     },
