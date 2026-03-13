@@ -861,7 +861,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
         sourceFileMap,
         stopOnEntry: false,
         stopOnError: false,
-        realm: '${config:gluals.gmod.debugRealm}',
+        realm: 'server',
     };
 
     if (requestPick.value === 'launch') {

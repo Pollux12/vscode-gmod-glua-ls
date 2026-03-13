@@ -613,7 +613,7 @@
                         },
                         "stopOnEntry": true,
                         "stopOnError": false,
-                        "realm": "${config:gluals.gmod.debugRealm}"
+                        "realm": "server"
                     }
                 ],
                 "configurationSnippets": [
@@ -632,7 +632,7 @@
                             },
                             "stopOnEntry": true,
                             "stopOnError": false,
-                            "realm": "${config:gluals.gmod.debugRealm}"
+                            "realm": "server"
                         }
                     },
                     {
@@ -653,7 +653,7 @@
                             },
                             "stopOnEntry": true,
                             "stopOnError": false,
-                            "realm": "${config:gluals.gmod.debugRealm}"
+                            "realm": "server"
                         }
                     }
                 ],
