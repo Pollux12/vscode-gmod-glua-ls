@@ -778,26 +778,10 @@ export function renderMappingTableEditor(field, value, onChange) {
             keyInput.addEventListener("change", applyRowChange);
             valueInput.addEventListener("change", applyRowChange);
 
-            if (isOverride) {
-                const resetBtn = document.createElement("button");
-                resetBtn.type = "button";
-                resetBtn.className = "mapping-table-inline-btn";
-                resetBtn.textContent = "Reset";
-                resetBtn.onclick = () => {
-                    const nextEntries = { ...rawEntries };
-                    delete nextEntries[key];
-                    const viewState = captureMappingTableViewState(shell);
-                    const shouldRenderLocally = commitEntries(nextEntries, viewState);
-                    if (shouldRenderLocally) {
-                        renderRows({ viewState });
-                    }
-                };
-                actions.appendChild(resetBtn);
-            }
-
             const actionBtn = document.createElement("button");
             actionBtn.type = "button";
             if (rowIsActive) {
+                actions.classList.add("mapping-table-row-actions");
                 actionBtn.className = "remove-btn";
                 actionBtn.textContent = "×";
                 actionBtn.setAttribute("aria-label", `Remove ${keyLabel.toLowerCase()} ${key}`);
@@ -850,6 +834,24 @@ export function renderMappingTableEditor(field, value, onChange) {
                 };
             }
             actions.appendChild(actionBtn);
+
+            if (isOverride) {
+                const resetBtn = document.createElement("button");
+                resetBtn.type = "button";
+                resetBtn.className = "mapping-table-row-reset";
+                resetBtn.textContent = "↺";
+                resetBtn.title = "Reset to default";
+                resetBtn.onclick = () => {
+                    const nextEntries = { ...rawEntries };
+                    delete nextEntries[key];
+                    const viewState = captureMappingTableViewState(shell);
+                    const shouldRenderLocally = commitEntries(nextEntries, viewState);
+                    if (shouldRenderLocally) {
+                        renderRows({ viewState });
+                    }
+                };
+                actions.appendChild(resetBtn);
+            }
 
             row.appendChild(createMappingTableCell("actions", actions));
             body.appendChild(row);
