@@ -1,6 +1,6 @@
 export type FieldType = 'boolean' | 'string' | 'number' | 'integer' | 'array' | 'object' | 'enum' | 'any';
 
-export type FieldEditorKind = 'mappingTable';
+export type FieldEditorKind = 'mappingTable' | 'scriptedClassTable';
 
 export interface FieldEditorDescriptor {
     kind: FieldEditorKind;
@@ -313,6 +313,10 @@ function buildFieldDescriptorInternal(
             kind: 'mappingTable',
             keyLabel: getString(unwrapped.schemaDef['x-gluals-key-label']),
             valueLabel: getString(unwrapped.schemaDef['x-gluals-value-label']),
+        };
+    } else if (editorKind === 'scriptedClassTable') {
+        descriptor.editor = {
+            kind: 'scriptedClassTable',
         };
     }
 

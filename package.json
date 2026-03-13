@@ -793,7 +793,7 @@
             "view/item/context": [
                 {
                     "command": "gluals.gmod.scaffold.new",
-                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassType",
+                    "when": "view == gluals.gmodExplorer && viewItem == scriptedClassTypeScaffoldable",
                     "group": "inline"
                 },
                 {

@@ -14,6 +14,7 @@ import {
     renderMappingTableEditor,
     renderMapEditor,
     renderObjectArrayEditor,
+    renderScriptedClassTableEditor,
     renderScalarListEditor,
 } from "./components/collectionEditors.js";
 import {
@@ -716,6 +717,13 @@ function generateInput(field, value, onChange) {
 
     if (type === "object" && Array.isArray(field.properties) && field.properties.length > 0) {
         return renderObjectGroup(field, value, onChange);
+    }
+
+    if (
+        field.editor?.kind === "scriptedClassTable" &&
+        type === "array"
+    ) {
+        return renderScriptedClassTableEditor(field, value, onChange);
     }
 
     if (

@@ -924,6 +924,812 @@ export function renderMappingTableEditor(field, value, onChange) {
     return container;
 }
 
+function normalizeStringArray(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter((entry) => entry.length > 0);
+}
+
+function normalizePathArray(value) {
+    return normalizeStringArray(value).map((segment) =>
+        segment.replace(/^[/\\]+|[/\\]+$/g, ""),
+    ).filter((segment) => segment.length > 0);
+}
+
+function normalizeScaffoldFiles(value) {
+    if (!value || typeof value !== "object" || !Array.isArray(value.files)) {
+        return [];
+    }
+
+    return value.files
+        .map((entry) => {
+            if (!entry || typeof entry !== "object") {
+                return null;
+            }
+
+            const filePath = typeof entry.path === "string" ? entry.path.trim() : "";
+            const template = typeof entry.template === "string" ? entry.template.trim() : "";
+            if (!filePath || !template) {
+                return null;
+            }
+
+            return { path: filePath, template };
+        })
+        .filter((entry) => entry !== null);
+}
+
+function normalizeScriptedClassDefinition(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+
+    const id = typeof value.id === "string" ? value.id.trim() : "";
+    if (!id) {
+        return null;
+    }
+
+    const definition = { id };
+    const label = typeof value.label === "string" ? value.label.trim() : "";
+    const classGlobal = typeof value.classGlobal === "string" ? value.classGlobal.trim() : "";
+    const parentId = typeof value.parentId === "string" ? value.parentId.trim() : "";
+    const icon = typeof value.icon === "string" ? value.icon.trim() : "";
+    const rootDir = typeof value.rootDir === "string" ? value.rootDir.trim() : "";
+    const path = normalizePathArray(value.path);
+    const include = normalizeStringArray(value.include);
+    const exclude = normalizeStringArray(value.exclude);
+    const scaffoldFiles = normalizeScaffoldFiles(value.scaffold);
+
+    if (label) definition.label = label;
+    if (path.length > 0) definition.path = path;
+    if (include.length > 0) definition.include = include;
+    if (exclude.length > 0) definition.exclude = exclude;
+    if (classGlobal) definition.classGlobal = classGlobal;
+    if (parentId) definition.parentId = parentId;
+    if (icon) definition.icon = icon;
+    if (rootDir) definition.rootDir = rootDir;
+    if (typeof value.disabled === "boolean") definition.disabled = value.disabled;
+    if (Array.isArray(value.scaffold?.files)) {
+        definition.scaffold = scaffoldFiles.length > 0 ? { files: scaffoldFiles } : { files: [] };
+    }
+
+    return definition;
+}
+
+function scriptedClassKeyForField(field) {
+    return Array.isArray(field.path) && field.path.length > 0
+        ? field.path.join(".")
+        : "scripted-class-table";
+}
+
+function cloneDefinition(definition) {
+    if (definition === undefined) {
+        return undefined;
+    }
+
+    return JSON.parse(JSON.stringify(definition));
+}
+
+function definitionsEqual(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function mergeScriptedClassDefinition(baseDefinition, overrideDefinition) {
+    const merged = cloneDefinition(baseDefinition);
+    [
+        "label",
+        "path",
+        "include",
+        "exclude",
+        "classGlobal",
+        "parentId",
+        "icon",
+        "rootDir",
+        "scaffold",
+    ].forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(overrideDefinition, key)) {
+            merged[key] = cloneDefinition(overrideDefinition[key]);
+        }
+    });
+    if (overrideDefinition.disabled === true) {
+        merged.disabled = true;
+    } else {
+        delete merged.disabled;
+    }
+    return merged;
+}
+
+function getScriptedClassDefaults(field) {
+    if (!Array.isArray(field.default)) {
+        return [];
+    }
+
+    return field.default
+        .map((entry) => normalizeScriptedClassDefinition(entry))
+        .filter((entry) => entry !== null);
+}
+
+function getScriptedClassRawState(value) {
+    const definitions = new Map();
+    const legacyGlobs = [];
+
+    if (!Array.isArray(value)) {
+        return { definitions, legacyGlobs };
+    }
+
+    value.forEach((entry) => {
+        if (typeof entry === "string") {
+            const trimmed = entry.trim();
+            if (trimmed) {
+                legacyGlobs.push(trimmed);
+            }
+            return;
+        }
+
+        const normalized = normalizeScriptedClassDefinition(entry);
+        if (normalized) {
+            definitions.set(normalized.id, normalized);
+        }
+    });
+
+    return { definitions, legacyGlobs };
+}
+
+function buildScriptedClassRows(defaults, rawDefinitions) {
+    const defaultsById = new Map(defaults.map((entry) => [entry.id, entry]));
+    const ids = [...new Set([...defaults.map((entry) => entry.id), ...rawDefinitions.keys()])];
+
+    return ids.map((id) => {
+        const defaultDefinition = defaultsById.get(id);
+        const rawDefinition = rawDefinitions.get(id);
+
+        if (rawDefinition?.disabled) {
+            return {
+                id,
+                defaultDefinition,
+                rawDefinition,
+                effectiveDefinition: defaultDefinition ?? rawDefinition,
+                status: defaultDefinition ? "removed" : "custom",
+            };
+        }
+
+        if (defaultDefinition && rawDefinition) {
+            return {
+                id,
+                defaultDefinition,
+                rawDefinition,
+                effectiveDefinition: mergeScriptedClassDefinition(defaultDefinition, rawDefinition),
+                status: "override",
+            };
+        }
+
+        if (defaultDefinition) {
+            return {
+                id,
+                defaultDefinition,
+                rawDefinition,
+                effectiveDefinition: defaultDefinition,
+                status: "default",
+            };
+        }
+
+        return {
+            id,
+            defaultDefinition,
+            rawDefinition,
+            effectiveDefinition: rawDefinition,
+            status: "custom",
+        };
+    });
+}
+
+function buildScriptedClassOverride(defaultDefinition, effectiveDefinition) {
+    const override = { id: defaultDefinition.id };
+
+    [
+        "label",
+        "path",
+        "include",
+        "exclude",
+        "classGlobal",
+        "parentId",
+        "icon",
+        "rootDir",
+        "scaffold",
+    ].forEach((key) => {
+        const defaultValue = defaultDefinition[key];
+        const effectiveValue = effectiveDefinition[key];
+        if (!definitionsEqual(defaultValue, effectiveValue)) {
+            override[key] = cloneDefinition(effectiveValue);
+        }
+    });
+
+    return Object.keys(override).length > 1 ? override : null;
+}
+
+function buildCustomScriptedClassPayload(effectiveDefinition) {
+    const payload = { id: effectiveDefinition.id };
+    [
+        "label",
+        "path",
+        "include",
+        "exclude",
+        "classGlobal",
+        "parentId",
+        "icon",
+        "rootDir",
+        "scaffold",
+    ].forEach((key) => {
+        if (effectiveDefinition[key] !== undefined) {
+            payload[key] = cloneDefinition(effectiveDefinition[key]);
+        }
+    });
+    return payload;
+}
+
+function createScriptedClassPayload(defaults, rawDefinitions, legacyGlobs) {
+    const defaultsById = new Map(defaults.map((entry) => [entry.id, entry]));
+    const entries = [];
+
+    legacyGlobs.forEach((glob) => entries.push(glob));
+
+    defaults.forEach((definition) => {
+        const rawDefinition = rawDefinitions.get(definition.id);
+        if (!rawDefinition) {
+            return;
+        }
+
+        if (rawDefinition.disabled) {
+            entries.push({ id: definition.id, disabled: true });
+            return;
+        }
+
+        const effectiveDefinition = mergeScriptedClassDefinition(definition, rawDefinition);
+        const override = buildScriptedClassOverride(definition, effectiveDefinition);
+        if (override) {
+            entries.push(override);
+        }
+    });
+
+    rawDefinitions.forEach((rawDefinition, id) => {
+        if (defaultsById.has(id) || rawDefinition.disabled) {
+            return;
+        }
+
+        entries.push(buildCustomScriptedClassPayload(rawDefinition));
+    });
+
+    return entries;
+}
+
+function parseLineList(text) {
+    return text
+        .split(/\r?\n/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+}
+
+function formatLineList(values) {
+    return Array.isArray(values) ? values.join("\n") : "";
+}
+
+function formatPathSegments(values) {
+    return Array.isArray(values) ? values.join("/") : "";
+}
+
+function inferScriptedClassRootDir(pathSegments) {
+    const normalized = normalizePathArray(pathSegments);
+    const pathSummary = normalized.join("/");
+    if (!pathSummary) {
+        return "";
+    }
+
+    return normalized[0]?.toLowerCase() === "plugins"
+        ? pathSummary
+        : `lua/${pathSummary}`;
+}
+
+function inferScriptedClassInclude(pathSegments) {
+    const pathSummary = normalizePathArray(pathSegments).join("/");
+    return pathSummary ? [`${pathSummary}/**`] : [];
+}
+
+function createScriptedClassCell(kind, content = null) {
+    const cell = document.createElement("div");
+    cell.className = `mapping-table-cell scripted-class-cell is-${kind}`;
+    if (typeof content === "string") {
+        cell.textContent = content;
+    } else if (content) {
+        cell.appendChild(content);
+    }
+    return cell;
+}
+
+function createScriptedClassTextInput(value, placeholder = "") {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = value ?? "";
+    input.placeholder = placeholder;
+    return input;
+}
+
+function createScriptedClassTextArea(value, placeholder = "") {
+    const textarea = document.createElement("textarea");
+    textarea.className = "json-input scripted-class-textarea";
+    textarea.value = value ?? "";
+    textarea.placeholder = placeholder;
+    return textarea;
+}
+
+function createScriptedClassSummary(definition, id) {
+    const summary = document.createElement("div");
+    summary.className = "scripted-class-summary";
+
+    const title = document.createElement("strong");
+    title.textContent = definition.label || id;
+    summary.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "scripted-class-summary-meta";
+    meta.textContent = id;
+    summary.appendChild(meta);
+
+    return summary;
+}
+
+function createScriptedClassBadge(status) {
+    const badge = document.createElement("span");
+    badge.className = "mapping-table-badge";
+
+    if (status === "removed") {
+        badge.textContent = "Removed";
+        badge.classList.add("is-removed");
+    } else if (status === "override") {
+        badge.textContent = "Override";
+        badge.classList.add("is-override");
+    } else if (status === "custom") {
+        badge.textContent = "Custom";
+        badge.classList.add("is-custom");
+    } else {
+        badge.textContent = "Default";
+        badge.classList.add("is-default");
+    }
+
+    return badge;
+}
+
+export function renderScriptedClassTableEditor(field, value, onChange) {
+    const defaults = getScriptedClassDefaults(field);
+    let { definitions: rawDefinitions, legacyGlobs } = getScriptedClassRawState(value);
+    const expandedRows = new Set();
+
+    const container = document.createElement("div");
+    container.className = "mapping-table-container scripted-class-table-container";
+
+    const note = document.createElement("div");
+    note.className = "mapping-table-note";
+    container.appendChild(note);
+
+    const shell = document.createElement("div");
+    shell.className = "mapping-table-shell scripted-class-table-shell";
+    container.appendChild(shell);
+
+    const header = document.createElement("div");
+    header.className = "mapping-table-header scripted-class-table-header";
+    [
+        { kind: "name", label: "Class" },
+        { kind: "global", label: "Global" },
+        { kind: "path", label: "Path" },
+        { kind: "source", label: "Source" },
+        { kind: "actions", label: "Actions" },
+    ].forEach(({ kind, label }) => {
+        const cell = createScriptedClassCell(kind, label);
+        cell.classList.add("mapping-table-heading");
+        header.appendChild(cell);
+    });
+    shell.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "mapping-table-body";
+    shell.appendChild(body);
+
+    const legacySection = document.createElement("div");
+    legacySection.className = "scripted-class-legacy-section";
+    container.appendChild(legacySection);
+
+    const addRow = document.createElement("div");
+    addRow.className = "mapping-table-add-row scripted-class-table-add-row";
+    const addIdInput = createScriptedClassTextInput("", "Definition id...");
+    const addLabelInput = createScriptedClassTextInput("", "Label...");
+    const addGlobalInput = createScriptedClassTextInput("", "Global...");
+    const addPathInput = createScriptedClassTextInput("", "Folder path...");
+    const addActions = document.createElement("div");
+    addActions.className = "mapping-table-actions";
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-btn";
+    addBtn.type = "button";
+    addBtn.textContent = "+ Add";
+    addActions.appendChild(addBtn);
+    addRow.appendChild(createScriptedClassCell("name", addIdInput));
+    addRow.appendChild(createScriptedClassCell("global", addGlobalInput));
+    addRow.appendChild(createScriptedClassCell("path", addPathInput));
+    addRow.appendChild(createScriptedClassCell("source", addLabelInput));
+    addRow.appendChild(createScriptedClassCell("actions", addActions));
+    shell.appendChild(addRow);
+
+    const commit = () => {
+        const payload = createScriptedClassPayload(defaults, rawDefinitions, legacyGlobs);
+        onChange(payload.length > 0 ? payload : null);
+    };
+
+    const rerender = (viewStateOptions = null) => {
+        const viewState = captureMappingTableViewState(shell, viewStateOptions ?? {});
+        render();
+        applyMappingTableViewState(shell, addIdInput, viewState);
+    };
+
+    const setDefinition = (id, nextDefinition) => {
+        if (nextDefinition) {
+            rawDefinitions.set(id, nextDefinition);
+        } else {
+            rawDefinitions.delete(id);
+        }
+        commit();
+        rerender();
+    };
+
+    const updateEffectiveDefinition = (row, updater) => {
+        const nextEffective = cloneDefinition(row.effectiveDefinition);
+        updater(nextEffective);
+
+        const defaultDefinition = row.defaultDefinition;
+        if (defaultDefinition) {
+            const nextOverride = buildScriptedClassOverride(defaultDefinition, nextEffective);
+            setDefinition(row.id, nextOverride);
+            return;
+        }
+
+        setDefinition(row.id, buildCustomScriptedClassPayload(nextEffective));
+    };
+
+    const renderDetailsPanel = (row) => {
+        const definition = row.effectiveDefinition;
+        const panel = document.createElement("div");
+        panel.className = "scripted-class-details";
+
+        const createField = (labelText, input) => {
+            const fieldWrapper = document.createElement("label");
+            fieldWrapper.className = "object-list-field scripted-class-detail-field";
+            const label = document.createElement("div");
+            label.className = "setting-label";
+            label.textContent = labelText;
+            fieldWrapper.appendChild(label);
+            fieldWrapper.appendChild(input);
+            panel.appendChild(fieldWrapper);
+            return input;
+        };
+
+        const labelInput = createField("Label", createScriptedClassTextInput(definition.label || ""));
+        labelInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.label = labelInput.value.trim() || row.id;
+            });
+        });
+
+        const classGlobalInput = createField("Global", createScriptedClassTextInput(definition.classGlobal || ""));
+        classGlobalInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = classGlobalInput.value.trim();
+                nextDefinition.classGlobal = nextValue || row.defaultDefinition?.classGlobal || row.id.toUpperCase();
+            });
+        });
+
+        const rootDirInput = createField("Root Directory", createScriptedClassTextInput(definition.rootDir || ""));
+        rootDirInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = rootDirInput.value.trim();
+                nextDefinition.rootDir = nextValue || row.defaultDefinition?.rootDir || inferScriptedClassRootDir(nextDefinition.path);
+            });
+        });
+
+        const parentIdInput = createField("Parent Id", createScriptedClassTextInput(definition.parentId || ""));
+        parentIdInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = parentIdInput.value.trim();
+                if (nextValue) {
+                    nextDefinition.parentId = nextValue;
+                } else {
+                    nextDefinition.parentId = "";
+                }
+            });
+        });
+
+        const iconInput = createField("Icon", createScriptedClassTextInput(definition.icon || ""));
+        iconInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = iconInput.value.trim();
+                if (nextValue) {
+                    nextDefinition.icon = nextValue;
+                } else {
+                    nextDefinition.icon = "";
+                }
+            });
+        });
+
+        const pathInput = createField("Path Segments", createScriptedClassTextInput(formatPathSegments(definition.path), "entities/custom"));
+        pathInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const previousPath = normalizePathArray(nextDefinition.path);
+                const previousDefaultRootDir = inferScriptedClassRootDir(previousPath);
+                const previousDefaultInclude = inferScriptedClassInclude(previousPath);
+                const nextPath = normalizePathArray(pathInput.value.split(/[\\/]+/));
+
+                nextDefinition.path = nextPath;
+
+                if (!nextDefinition.rootDir || nextDefinition.rootDir === previousDefaultRootDir) {
+                    nextDefinition.rootDir = inferScriptedClassRootDir(nextPath);
+                }
+
+                if (
+                    !Array.isArray(nextDefinition.include)
+                    || nextDefinition.include.length === 0
+                    || definitionsEqual(nextDefinition.include, previousDefaultInclude)
+                ) {
+                    nextDefinition.include = inferScriptedClassInclude(nextPath);
+                }
+            });
+        });
+
+        const includeInput = createField("Include Globs", createScriptedClassTextArea(formatLineList(definition.include), "folder/**"));
+        includeInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.include = parseLineList(includeInput.value);
+            });
+        });
+
+        const excludeInput = createField("Exclude Globs", createScriptedClassTextArea(formatLineList(definition.exclude), "folder/excluded/**"));
+        excludeInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextExclude = parseLineList(excludeInput.value);
+                if (nextExclude.length > 0) {
+                    nextDefinition.exclude = nextExclude;
+                } else {
+                    nextDefinition.exclude = [];
+                }
+            });
+        });
+
+        const scaffoldFiles = Array.isArray(definition.scaffold?.files) ? definition.scaffold.files : [];
+        const scaffoldInput = createField(
+            "Scaffold Files",
+            createScriptedClassTextArea(
+                scaffoldFiles.map((entry) => `${entry.path} => ${entry.template}`).join("\n"),
+                "{{name}}/shared.lua => ent_shared.lua",
+            ),
+        );
+        scaffoldInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextFiles = scaffoldInput.value
+                    .split(/\r?\n/)
+                    .map((entry) => entry.trim())
+                    .filter((entry) => entry.length > 0)
+                    .map((entry) => {
+                        const [filePath, template] = entry.split(/\s*=>\s*/, 2);
+                        return {
+                            path: filePath?.trim() || "",
+                            template: template?.trim() || "",
+                        };
+                    })
+                    .filter((entry) => entry.path && entry.template);
+
+                if (nextFiles.length > 0) {
+                    nextDefinition.scaffold = { files: nextFiles };
+                } else {
+                    nextDefinition.scaffold = { files: [] };
+                }
+            });
+        });
+
+        return panel;
+    };
+
+    const renderLegacySection = () => {
+        legacySection.innerHTML = "";
+
+        const headerEl = document.createElement("div");
+        headerEl.className = "scripted-class-legacy-header";
+        headerEl.textContent = "Legacy Include Globs";
+        legacySection.appendChild(headerEl);
+
+        const noteEl = document.createElement("div");
+        noteEl.className = "mapping-table-note";
+        noteEl.textContent = legacyGlobs.length === 0
+            ? "No legacy glob entries are stored."
+            : "String entries are preserved for backward compatibility, but object definitions are preferred.";
+        legacySection.appendChild(noteEl);
+
+        const list = document.createElement("div");
+        list.className = "path-table";
+        legacySection.appendChild(list);
+
+        legacyGlobs.forEach((glob, index) => {
+            list.appendChild(
+                createCollectionRow(
+                    [glob],
+                    () => {
+                        legacyGlobs = legacyGlobs.filter((_entry, entryIndex) => entryIndex !== index);
+                        commit();
+                        rerender();
+                    },
+                    `Remove legacy glob ${glob}`,
+                ),
+            );
+        });
+
+        const addLegacyRow = document.createElement("div");
+        addLegacyRow.className = "path-add-row";
+        const addLegacyInput = createScriptedClassTextInput("", "Add legacy glob...");
+        const addLegacyBtn = document.createElement("button");
+        addLegacyBtn.className = "add-btn";
+        addLegacyBtn.type = "button";
+        addLegacyBtn.textContent = "+ Add Glob";
+        addLegacyRow.appendChild(addLegacyInput);
+        addLegacyRow.appendChild(addLegacyBtn);
+        legacySection.appendChild(addLegacyRow);
+
+        const addLegacyGlob = () => {
+            const nextValue = addLegacyInput.value.trim();
+            if (!nextValue || legacyGlobs.includes(nextValue)) {
+                return;
+            }
+
+            legacyGlobs = [...legacyGlobs, nextValue];
+            addLegacyInput.value = "";
+            commit();
+            rerender({ keepBottomVisible: true });
+        };
+
+        addLegacyBtn.onclick = addLegacyGlob;
+        addLegacyInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                addLegacyGlob();
+            }
+        });
+    };
+
+    const render = () => {
+        note.textContent = rawDefinitions.size === 0 && legacyGlobs.length === 0
+            ? "Built-in scripted classes stay active until you add overrides, removals, or custom definitions. Path must match the real folder structure; include globs only decide which files are in scope."
+            : "Workspace changes are stored as overrides and removals so built-in updates still flow through. Keep Path aligned with the actual folders you want the explorer and analyzer to classify.";
+
+        body.innerHTML = "";
+
+        buildScriptedClassRows(defaults, rawDefinitions).forEach((row) => {
+            const definition = row.effectiveDefinition;
+            const summaryRow = document.createElement("div");
+            summaryRow.className = "mapping-table-row scripted-class-table-row";
+            if (row.status === "removed") {
+                summaryRow.classList.add("is-inactive");
+            }
+            if (row.status === "override") {
+                summaryRow.classList.add("is-overridden");
+            }
+
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "mapping-table-inline-btn scripted-class-expand-btn";
+            editBtn.textContent = expandedRows.has(row.id) ? "Hide" : "Edit";
+            editBtn.onclick = () => {
+                if (expandedRows.has(row.id)) {
+                    expandedRows.delete(row.id);
+                } else {
+                    expandedRows.add(row.id);
+                }
+                rerender();
+            };
+
+            const nameCellContent = document.createElement("div");
+            nameCellContent.className = "scripted-class-name-cell";
+            nameCellContent.appendChild(createScriptedClassSummary(definition, row.id));
+            nameCellContent.appendChild(editBtn);
+            summaryRow.appendChild(createScriptedClassCell("name", nameCellContent));
+            summaryRow.appendChild(createScriptedClassCell("global", definition.classGlobal || ""));
+            summaryRow.appendChild(createScriptedClassCell("path", formatPathSegments(definition.path)));
+            summaryRow.appendChild(createScriptedClassCell("source", createScriptedClassBadge(row.status)));
+
+            const actions = document.createElement("div");
+            actions.className = "mapping-table-actions";
+            const actionBtn = document.createElement("button");
+            actionBtn.type = "button";
+
+            if (row.status === "removed") {
+                actionBtn.className = "mapping-table-inline-btn";
+                actionBtn.textContent = "Use";
+                actionBtn.onclick = () => setDefinition(row.id, null);
+            } else if (row.defaultDefinition) {
+                actionBtn.className = "remove-btn";
+                actionBtn.textContent = "×";
+                actionBtn.setAttribute("aria-label", `Remove scripted class ${row.id}`);
+                actionBtn.onclick = () => setDefinition(row.id, { id: row.id, disabled: true });
+
+                if (row.status === "override") {
+                    const resetBtn = document.createElement("button");
+                    resetBtn.type = "button";
+                    resetBtn.className = "mapping-table-row-reset";
+                    resetBtn.textContent = "↺";
+                    resetBtn.title = "Reset to built-in definition";
+                    resetBtn.onclick = () => setDefinition(row.id, null);
+                    actions.appendChild(resetBtn);
+                }
+            } else {
+                actionBtn.className = "remove-btn";
+                actionBtn.textContent = "×";
+                actionBtn.setAttribute("aria-label", `Remove scripted class ${row.id}`);
+                actionBtn.onclick = () => setDefinition(row.id, null);
+            }
+
+            actions.appendChild(actionBtn);
+            summaryRow.appendChild(createScriptedClassCell("actions", actions));
+
+            if (expandedRows.has(row.id) && row.status !== "removed") {
+                const wrapper = document.createElement("div");
+                wrapper.className = "scripted-class-row-wrapper";
+                wrapper.appendChild(summaryRow);
+                wrapper.appendChild(renderDetailsPanel(row));
+                body.appendChild(wrapper);
+            } else {
+                body.appendChild(summaryRow);
+            }
+        });
+
+        renderLegacySection();
+    };
+
+    const addCustomDefinition = () => {
+        const id = addIdInput.value.trim();
+        if (!id || rawDefinitions.has(id) || defaults.some((entry) => entry.id === id)) {
+            return;
+        }
+
+        const label = addLabelInput.value.trim() || id;
+        const classGlobal = addGlobalInput.value.trim() || id.toUpperCase();
+        const pathSegments = normalizePathArray((addPathInput.value.trim() || id).split(/[\\/]+/));
+        const rootDir = inferScriptedClassRootDir(pathSegments);
+        rawDefinitions.set(id, {
+            id,
+            label,
+            classGlobal,
+            path: pathSegments,
+            include: inferScriptedClassInclude(pathSegments),
+            rootDir,
+        });
+        expandedRows.add(id);
+        addIdInput.value = "";
+        addLabelInput.value = "";
+        addGlobalInput.value = "";
+        addPathInput.value = "";
+        commit();
+        rerender({ keepBottomVisible: true, focusAddInput: true });
+    };
+
+    addBtn.onclick = addCustomDefinition;
+    [addIdInput, addLabelInput, addGlobalInput, addPathInput].forEach((input) => {
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                addCustomDefinition();
+            }
+        });
+    });
+
+    render();
+    return container;
+}
+
 export function renderObjectArrayEditor(field, value, onChange, options) {
     const { renderInput, getFieldDescription } = options;
     const itemProperties = Array.isArray(field.items?.properties)

@@ -1133,6 +1133,92 @@
                 width: 100%;
             }
 
+            .scripted-class-table-container {
+                gap: 16px;
+            }
+
+            .scripted-class-table-header,
+            .scripted-class-table-row,
+            .scripted-class-table-add-row {
+                grid-template-columns:
+                    minmax(220px, 1.4fr)
+                    minmax(96px, 0.7fr)
+                    minmax(160px, 1fr)
+                    var(--mapping-table-source-width)
+                    var(--mapping-table-actions-width);
+            }
+
+            .scripted-class-name-cell {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                min-width: 0;
+            }
+
+            .scripted-class-summary {
+                min-width: 0;
+            }
+
+            .scripted-class-summary strong {
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .scripted-class-summary-meta {
+                color: var(--vscode-descriptionForeground);
+                font-size: 12px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .scripted-class-expand-btn {
+                flex-shrink: 0;
+            }
+
+            .scripted-class-row-wrapper {
+                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+            }
+
+            .scripted-class-row-wrapper > .scripted-class-table-row {
+                border-bottom: none;
+            }
+
+            .scripted-class-details {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 12px 16px;
+                padding: 12px 16px 16px;
+                border-top: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+            }
+
+            .scripted-class-detail-field {
+                margin-bottom: 0;
+            }
+
+            .scripted-class-textarea {
+                min-height: 88px;
+                resize: vertical;
+            }
+
+            .scripted-class-legacy-section {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .scripted-class-legacy-header {
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: var(--vscode-descriptionForeground);
+            }
+
             @keyframes mapping-table-row-enter {
                 0% {
                     opacity: 0;

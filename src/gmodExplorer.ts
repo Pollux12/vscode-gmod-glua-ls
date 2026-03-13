@@ -2,7 +2,6 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { extensionContext } from './extension';
 
-export type ScriptedClassType = 'entities' | 'weapons' | 'effects' | 'stools' | 'plugins' | 'vgui';
 type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
 type GmodExplorerItemType =
     | 'category'
@@ -16,17 +15,15 @@ interface ItemData {
     type: GmodExplorerItemType;
     label: string;
     collapsible: vscode.TreeItemCollapsibleState;
-    // scriptedClassType
-    scType?: ScriptedClassType;
-    // scriptedClass
+    definitionId?: string;
+    classGlobal?: string;
     className?: string;
     startLine?: number;
     startCharacter?: number;
-    // resourceCategory
+    hasScaffold?: boolean;
+    icon?: string;
     rcType?: ResourceCategory;
-    // resourceGroup
     groupKey?: string;
-    // file and representative node URI
     uri?: vscode.Uri;
 }
 
@@ -40,12 +37,114 @@ interface LsRange {
     end: LsPosition;
 }
 
-interface LsScriptedClassEntry {
+export interface LsScriptedClassScaffoldFile {
+    path: string;
+    template: string;
+}
+
+export interface LsScriptedClassScaffold {
+    files: LsScriptedClassScaffoldFile[];
+}
+
+export interface LsScriptedClassDefinition {
+    id: string;
+    label: string;
+    path: string[];
+    include: string[];
+    exclude: string[];
+    classGlobal: string;
+    parentId?: string;
+    icon?: string;
+    rootDir: string;
+    scaffold?: LsScriptedClassScaffold;
+}
+
+export interface LsScriptedClassEntry {
     uri: string;
     classType: string;
     className: string;
+    definitionId?: string;
     range?: LsRange | null;
 }
+
+export interface LsScriptedClassesResult {
+    definitions: LsScriptedClassDefinition[];
+    entries: LsScriptedClassEntry[];
+}
+
+const LEGACY_SCRIPTED_CLASS_DEFINITIONS: LsScriptedClassDefinition[] = [
+    {
+        id: 'entities',
+        label: 'Entities',
+        path: ['entities'],
+        include: ['entities/**'],
+        exclude: [],
+        classGlobal: 'ENT',
+        icon: 'folder-library',
+        rootDir: 'lua/entities',
+        scaffold: {
+            files: [
+                { path: '{{name}}/shared.lua', template: 'ent_shared.lua' },
+                { path: '{{name}}/init.lua', template: 'ent_init.lua' },
+                { path: '{{name}}/cl_init.lua', template: 'ent_cl_init.lua' },
+            ],
+        },
+    },
+    {
+        id: 'weapons',
+        label: 'SWEPs',
+        path: ['weapons'],
+        include: ['weapons/**'],
+        exclude: ['weapons/gmod_tool/**'],
+        classGlobal: 'SWEP',
+        icon: 'folder-library',
+        rootDir: 'lua/weapons',
+        scaffold: {
+            files: [{ path: '{{name}}/shared.lua', template: 'swep_shared.lua' }],
+        },
+    },
+    {
+        id: 'effects',
+        label: 'Effects',
+        path: ['effects'],
+        include: ['effects/**'],
+        exclude: [],
+        classGlobal: 'EFFECT',
+        icon: 'folder-library',
+        rootDir: 'lua/effects',
+        scaffold: {
+            files: [{ path: '{{name}}.lua', template: 'effect.lua' }],
+        },
+    },
+    {
+        id: 'stools',
+        label: 'STools',
+        path: ['weapons', 'gmod_tool', 'stools'],
+        include: ['weapons/gmod_tool/stools/**'],
+        exclude: [],
+        classGlobal: 'TOOL',
+        parentId: 'weapons',
+        icon: 'tools',
+        rootDir: 'lua/weapons/gmod_tool/stools',
+        scaffold: {
+            files: [{ path: '{{name}}.lua', template: 'tool.lua' }],
+        },
+    },
+    {
+        id: 'plugins',
+        label: 'Plugins',
+        path: ['plugins'],
+        include: ['plugins/**'],
+        exclude: [],
+        classGlobal: 'PLUGIN',
+        icon: 'extensions',
+        rootDir: 'plugins',
+    },
+];
+
+const LEGACY_DEFINITION_ID_BY_CLASS_TYPE = new Map<string, string>(
+    LEGACY_SCRIPTED_CLASS_DEFINITIONS.map((definition) => [definition.classGlobal, definition.id]),
+);
 
 interface ScriptedClassFileEntry {
     uri: vscode.Uri;
@@ -53,23 +152,11 @@ interface ScriptedClassFileEntry {
     startCharacter?: number;
 }
 
-function mapLsClassTypeToScriptedClassType(classType: string): ScriptedClassType | undefined {
-    switch (classType) {
-        case 'ENT':
-            return 'entities';
-        case 'SWEP':
-            return 'weapons';
-        case 'EFFECT':
-            return 'effects';
-        case 'TOOL':
-            return 'stools';
-        case 'PLUGIN':
-            return 'plugins';
-        case 'VGUI':
-            return 'vgui';
-        default:
-            return undefined;
-    }
+interface ScriptedClassCache {
+    definitions: Map<string, LsScriptedClassDefinition>;
+    childDefinitions: Map<string | undefined, LsScriptedClassDefinition[]>;
+    classMaps: Map<string, Map<string, ScriptedClassFileEntry[]>>;
+    vguiClassMap: Map<string, ScriptedClassFileEntry[]>;
 }
 
 function parseLsUri(uri: string): vscode.Uri | undefined {
@@ -80,25 +167,211 @@ function parseLsUri(uri: string): vscode.Uri | undefined {
     }
 }
 
-async function fetchLsScriptedClasses(): Promise<LsScriptedClassEntry[]> {
+export async function fetchLsScriptedClassesResult(): Promise<LsScriptedClassesResult> {
     const client = extensionContext?.client;
     if (!client) {
-        return [];
+        return withWorkspaceFallback({ definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: [] });
     }
 
     try {
-        const result = await client.sendRequest<LsScriptedClassEntry[] | null>('gluals/gmodScriptedClasses', {});
-        return result ?? [];
-    } catch (error) {
-        console.warn('Failed to fetch scripted classes from language server:', error);
-        return [];
+        const result = await client.sendRequest<unknown>('gluals/gmodScriptedClassesV2', {});
+        return withWorkspaceFallback(normalizeLsScriptedClassesResult(result));
+    } catch (v2Error) {
+        try {
+            const legacyResult = await client.sendRequest<unknown>('gluals/gmodScriptedClasses', {});
+            return withWorkspaceFallback(normalizeLsScriptedClassesResult(legacyResult));
+        } catch (legacyError) {
+            console.warn('Failed to fetch scripted classes from language server:', v2Error, legacyError);
+            return withWorkspaceFallback({ definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: [] });
+        }
     }
+}
+
+export async function fetchLsScriptedClasses(): Promise<LsScriptedClassEntry[]> {
+    const result = await fetchLsScriptedClassesResult();
+    return result.entries;
+}
+
+export function hasScaffoldFiles(definition: LsScriptedClassDefinition): definition is LsScriptedClassDefinition & { scaffold: LsScriptedClassScaffold } {
+    const scaffoldFiles = definition.scaffold?.files;
+    return Array.isArray(scaffoldFiles) && scaffoldFiles.length > 0;
+}
+
+function normalizeLsScriptedClassesResult(result: unknown): LsScriptedClassesResult {
+    if (Array.isArray(result)) {
+        return createLegacyCompatibleResult(result);
+    }
+
+    if (!result || typeof result !== 'object') {
+        return { definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: [] };
+    }
+
+    const candidate = result as Partial<LsScriptedClassesResult>;
+    const entries = Array.isArray(candidate.entries) ? candidate.entries.map(normalizeLsScriptedClassEntry) : [];
+    let definitions = Array.isArray(candidate.definitions) ? candidate.definitions : [];
+    if (definitions.length === 0 && entries.some((entry) => !!entry.definitionId)) {
+        definitions = [...LEGACY_SCRIPTED_CLASS_DEFINITIONS];
+    }
+
+    return { definitions, entries };
+}
+
+function createLegacyCompatibleResult(entries: unknown[]): LsScriptedClassesResult {
+    const normalizedEntries = entries.map(normalizeLsScriptedClassEntry);
+    return { definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: normalizedEntries };
+}
+
+function normalizeLsScriptedClassEntry(entry: unknown): LsScriptedClassEntry {
+    if (!entry || typeof entry !== 'object') {
+        return { uri: '', classType: '', className: '' };
+    }
+
+    const typed = entry as Partial<LsScriptedClassEntry>;
+    const classType = typeof typed.classType === 'string' ? typed.classType : '';
+    const definitionId = typeof typed.definitionId === 'string'
+        ? typed.definitionId
+        : LEGACY_DEFINITION_ID_BY_CLASS_TYPE.get(classType);
+
+    return {
+        uri: typeof typed.uri === 'string' ? typed.uri : '',
+        classType,
+        className: typeof typed.className === 'string' ? typed.className : '',
+        definitionId,
+        range: typed.range ?? null,
+    };
+}
+
+async function withWorkspaceFallback(result: LsScriptedClassesResult): Promise<LsScriptedClassesResult> {
+    if (result.entries.length > 0 || result.definitions.length === 0) {
+        return result;
+    }
+
+    const entries = await discoverScriptedClassEntriesFromWorkspace(result.definitions);
+    return entries.length > 0 ? { definitions: result.definitions, entries } : result;
+}
+
+async function discoverScriptedClassEntriesFromWorkspace(
+    definitions: readonly LsScriptedClassDefinition[],
+): Promise<LsScriptedClassEntry[]> {
+    const candidateUris = new Map<string, vscode.Uri>();
+
+    for (const definition of definitions) {
+        const includeGlob = toWorkspaceGlob(definition.include);
+        if (!includeGlob) {
+            continue;
+        }
+
+        const excludeGlob = toWorkspaceGlob(definition.exclude);
+        const files = await vscode.workspace.findFiles(includeGlob, excludeGlob, 500);
+        for (const file of files) {
+            candidateUris.set(file.toString(), file);
+        }
+    }
+
+    const entries: LsScriptedClassEntry[] = [];
+    for (const uri of candidateUris.values()) {
+        const match = detectScriptedClassForPath(uri.fsPath, definitions);
+        if (!match) {
+            continue;
+        }
+
+        entries.push({
+            uri: uri.toString(),
+            classType: match.definition.classGlobal,
+            className: match.className,
+            definitionId: match.definition.id,
+            range: null,
+        });
+    }
+
+    return entries;
+}
+
+function toWorkspaceGlob(patterns: readonly string[]): string | undefined {
+    const normalized = patterns.filter((pattern) => typeof pattern === 'string' && pattern.trim().length > 0);
+    if (normalized.length === 0) {
+        return undefined;
+    }
+
+    return normalized.length === 1 ? normalized[0] : `{${normalized.join(',')}}`;
+}
+
+function detectScriptedClassForPath(
+    filePath: string,
+    definitions: readonly LsScriptedClassDefinition[],
+): { definition: LsScriptedClassDefinition; className: string } | undefined {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const originalSegments = normalizedPath.split('/').filter(Boolean);
+    const lowerSegments = originalSegments.map((segment) => segment.toLowerCase());
+    let bestMatch: { definition: LsScriptedClassDefinition; endIdx: number; ruleLen: number } | undefined;
+
+    for (const definition of definitions) {
+        const ruleLen = definition.path.length;
+        if (ruleLen === 0 || lowerSegments.length < ruleLen) {
+            continue;
+        }
+
+        for (let startIdx = lowerSegments.length - ruleLen; startIdx >= 0; startIdx--) {
+            let matched = true;
+            for (let offset = 0; offset < ruleLen; offset++) {
+                if (lowerSegments[startIdx + offset] !== definition.path[offset].toLowerCase()) {
+                    matched = false;
+                    break;
+                }
+            }
+
+            if (!matched) {
+                continue;
+            }
+
+            const endIdx = startIdx + ruleLen - 1;
+            if (!bestMatch || endIdx > bestMatch.endIdx || (endIdx === bestMatch.endIdx && ruleLen > bestMatch.ruleLen)) {
+                bestMatch = { definition, endIdx, ruleLen };
+            }
+            break;
+        }
+    }
+
+    if (!bestMatch) {
+        return undefined;
+    }
+
+    const classIdx = bestMatch.endIdx + 1;
+    if (classIdx >= originalSegments.length) {
+        return undefined;
+    }
+
+    const source = originalSegments[classIdx];
+    const className = classIdx === originalSegments.length - 1
+        ? source.replace(/\.lua$/i, '')
+        : source;
+    return className
+        ? { definition: bestMatch.definition, className }
+        : undefined;
+}
+
+function getScriptedClassTypeContextValue(item: ItemData): string {
+    return item.hasScaffold ? 'scriptedClassTypeScaffoldable' : 'scriptedClassType';
+}
+
+function getDefinitionIcon(item: ItemData, fallback: string): vscode.ThemeIcon {
+    if (item.icon) {
+        return new vscode.ThemeIcon(item.icon);
+    }
+
+    if (item.classGlobal === 'VGUI') {
+        return new vscode.ThemeIcon('window');
+    }
+
+    return new vscode.ThemeIcon(fallback);
 }
 
 export class GmodExplorerItem extends vscode.TreeItem {
     constructor(public readonly data: ItemData) {
         super(data.label, data.collapsible);
-        this.contextValue = data.type;
+        this.contextValue = data.type === 'scriptedClassType'
+            ? getScriptedClassTypeContextValue(data)
+            : data.type;
         this.configure();
     }
 
@@ -109,20 +382,12 @@ export class GmodExplorerItem extends vscode.TreeItem {
                 this.iconPath = new vscode.ThemeIcon('list-tree');
                 break;
             case 'scriptedClassType':
-                if (d.scType === 'vgui') {
-                    this.iconPath = new vscode.ThemeIcon('window');
-                } else {
-                    this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('folder-library');
-                }
+                this.iconPath = getDefinitionIcon(d, d.hasScaffold ? 'folder-library' : 'folder');
                 break;
             case 'scriptedClass':
-                if (d.scType === 'vgui') {
-                    this.iconPath = new vscode.ThemeIcon('window');
-                } else {
-                    this.iconPath = d.scType === 'plugins' ? new vscode.ThemeIcon('extensions') : new vscode.ThemeIcon('symbol-class');
-                }
+                this.iconPath = getDefinitionIcon(d, 'symbol-class');
                 if (
-                    d.scType === 'vgui'
+                    d.classGlobal === 'VGUI'
                     && d.uri
                     && typeof d.startLine === 'number'
                     && typeof d.startCharacter === 'number'
@@ -167,36 +432,6 @@ export class GmodExplorerItem extends vscode.TreeItem {
     }
 }
 
-// Extract class name for scripted class types.
-// Handles both multi-file folders and single-file classes by finding the
-// innermost matching type directory segment.
-function extractClassName(uri: vscode.Uri, scType: ScriptedClassType): string | undefined {
-    const parts = uri.fsPath.replace(/\\/g, '/').split('/');
-    const idx = parts.lastIndexOf(scType);
-    if (idx < 0 || idx + 1 >= parts.length) {
-        return undefined;
-    }
-
-    const next = parts[idx + 1];
-    if (!next) {
-        return undefined;
-    }
-
-    // Extra safety so an unexpected gmod_tool file never appears as a SWEP class.
-    if (scType === 'weapons' && next === 'gmod_tool') {
-        return undefined;
-    }
-
-    if (next.toLowerCase().endsWith('.lua')) {
-        const className = next.slice(0, -4);
-        return className.length > 0 ? className : undefined;
-    }
-
-    return next;
-}
-
-// Extract the first subdirectory relative to the resource category folder.
-// Returns '' for files residing directly in the category folder.
 function extractResourceGroup(uri: vscode.Uri, rcType: ResourceCategory): string {
     const folderName = rcType === 'sounds' ? 'sound' : rcType === 'other' ? 'resource' : rcType;
     const parts = uri.fsPath.replace(/\\/g, '/').split('/');
@@ -211,7 +446,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodExplorerItem | undefined | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
-    private scriptedClassCache?: Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>;
+    private scriptedClassCache?: ScriptedClassCache;
     private resourceCache?: Map<ResourceCategory, Map<string, vscode.Uri[]>>;
 
     refresh(): void {
@@ -236,7 +471,10 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                     type: 'scriptedClassType',
                     label: 'VGUI Panels',
                     collapsible: vscode.TreeItemCollapsibleState.Collapsed,
-                    scType: 'vgui',
+                    definitionId: '__vgui__',
+                    classGlobal: 'VGUI',
+                    hasScaffold: false,
+                    icon: 'window',
                 }),
                 new GmodExplorerItem({ type: 'category', label: 'Resources', collapsible: vscode.TreeItemCollapsibleState.Collapsed }),
             ];
@@ -247,12 +485,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         if (d.type === 'category') {
             switch (d.label) {
                 case 'Scripted Classes':
-                    return [
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'Entities', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'entities' }),
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'SWEPs', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'weapons' }),
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'Effects', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'effects' }),
-                        new GmodExplorerItem({ type: 'scriptedClassType', label: 'Plugins', collapsible: vscode.TreeItemCollapsibleState.Collapsed, scType: 'plugins' }),
-                    ];
+                    return this.getScriptedClassTypeItems(undefined);
                 case 'Resources':
                     return [
                         new GmodExplorerItem({ type: 'resourceCategory', label: 'Models', collapsible: vscode.TreeItemCollapsibleState.Collapsed, rcType: 'models' }),
@@ -263,49 +496,17 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             }
         }
 
-        if (d.type === 'scriptedClassType' && d.scType) {
-            const cache = await this.getScriptedClassCache();
-            const classMap = cache.get(d.scType) ?? new Map<string, ScriptedClassFileEntry[]>();
-            const classItems = [...classMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) =>
-                {
-                    const firstFile = files[0];
-                    const isVguiDefinition = d.scType === 'vgui'
-                        && files.length === 1
-                        && typeof firstFile?.startLine === 'number'
-                        && typeof firstFile?.startCharacter === 'number';
-
-                    return new GmodExplorerItem({
-                        type: 'scriptedClass',
-                        label: className,
-                        collapsible: isVguiDefinition
-                            ? vscode.TreeItemCollapsibleState.None
-                            : files.length > 0
-                                ? vscode.TreeItemCollapsibleState.Collapsed
-                                : vscode.TreeItemCollapsibleState.None,
-                        scType: d.scType,
-                        className,
-                        uri: firstFile?.uri,
-                        startLine: firstFile?.startLine,
-                        startCharacter: firstFile?.startCharacter,
-                    });
-                }
-            );
-
-            if (d.scType === 'weapons') {
-                classItems.push(new GmodExplorerItem({
-                    type: 'scriptedClassType',
-                    label: 'STools',
-                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
-                    scType: 'stools',
-                }));
+        if (d.type === 'scriptedClassType') {
+            if (d.classGlobal === 'VGUI') {
+                return this.getScriptedClassItemsForVgui();
             }
 
-            return classItems;
+            return this.getScriptedClassTypeChildren(d.definitionId);
         }
 
-        if (d.type === 'scriptedClass' && d.scType && d.className) {
+        if (d.type === 'scriptedClass' && d.definitionId && d.className) {
             const cache = await this.getScriptedClassCache();
-            const files = cache.get(d.scType)?.get(d.className) ?? [];
+            const files = cache.classMaps.get(d.definitionId)?.get(d.className) ?? [];
             return files.sort((a, b) => a.uri.fsPath.localeCompare(b.uri.fsPath)).map((file) =>
                 new GmodExplorerItem({ type: 'file', label: path.basename(file.uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri: file.uri })
             );
@@ -315,12 +516,10 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             const cache = await this.getResourceCache();
             const groupMap = cache.get(d.rcType) ?? new Map<string, vscode.Uri[]>();
             const items: GmodExplorerItem[] = [];
-            // Files directly in category root (groupKey = '') shown as direct file children
             const rootFiles = groupMap.get('') ?? [];
             for (const uri of rootFiles.sort((a, b) => a.fsPath.localeCompare(b.fsPath))) {
                 items.push(new GmodExplorerItem({ type: 'file', label: path.basename(uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri }));
             }
-            // Subdirectory groups
             for (const [groupKey, files] of [...groupMap.entries()].filter(([k]) => k !== '').sort((a, b) => a[0].localeCompare(b[0]))) {
                 items.push(new GmodExplorerItem({
                     type: 'resourceGroup',
@@ -367,24 +566,100 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         return vscode.Uri.file(path.dirname(uri.fsPath));
     }
 
-    private async resolveRepresentativeUri(data: ItemData): Promise<vscode.Uri | undefined> {
-        if (data.type === 'scriptedClass' && data.scType && data.className) {
-            const cache = await this.getScriptedClassCache();
-            return cache.get(data.scType)?.get(data.className)?.[0]?.uri;
+    private async getScriptedClassTypeItems(parentId: string | undefined): Promise<GmodExplorerItem[]> {
+        const cache = await this.getScriptedClassCache();
+        return (cache.childDefinitions.get(parentId) ?? []).map((definition) =>
+            new GmodExplorerItem({
+                type: 'scriptedClassType',
+                label: definition.label,
+                collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                definitionId: definition.id,
+                classGlobal: definition.classGlobal,
+                hasScaffold: hasScaffoldFiles(definition),
+                icon: definition.icon,
+            })
+        );
+    }
+
+    private async getScriptedClassTypeChildren(definitionId: string | undefined): Promise<GmodExplorerItem[]> {
+        if (!definitionId) {
+            return [];
         }
 
-        if (data.type === 'scriptedClassType' && data.scType) {
+        const cache = await this.getScriptedClassCache();
+        const definition = cache.definitions.get(definitionId);
+        if (!definition) {
+            return [];
+        }
+
+        const classMap = cache.classMaps.get(definitionId) ?? new Map<string, ScriptedClassFileEntry[]>();
+        const classItems = [...classMap.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([className, files]) => {
+                const firstFile = files[0];
+                return new GmodExplorerItem({
+                    type: 'scriptedClass',
+                    label: className,
+                    collapsible: files.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+                    definitionId,
+                    classGlobal: definition.classGlobal,
+                    className,
+                    icon: definition.icon,
+                    uri: firstFile?.uri,
+                    startLine: firstFile?.startLine,
+                    startCharacter: firstFile?.startCharacter,
+                });
+            });
+
+        const childTypes = await this.getScriptedClassTypeItems(definitionId);
+        return [...classItems, ...childTypes];
+    }
+
+    private async getScriptedClassItemsForVgui(): Promise<GmodExplorerItem[]> {
+        const cache = await this.getScriptedClassCache();
+        return [...cache.vguiClassMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) => {
+            const firstFile = files[0];
+            const isVguiDefinition = files.length === 1
+                && typeof firstFile?.startLine === 'number'
+                && typeof firstFile?.startCharacter === 'number';
+
+            return new GmodExplorerItem({
+                type: 'scriptedClass',
+                label: className,
+                collapsible: isVguiDefinition
+                    ? vscode.TreeItemCollapsibleState.None
+                    : files.length > 0
+                        ? vscode.TreeItemCollapsibleState.Collapsed
+                        : vscode.TreeItemCollapsibleState.None,
+                definitionId: '__vgui__',
+                classGlobal: 'VGUI',
+                className,
+                icon: 'window',
+                uri: firstFile?.uri,
+                startLine: firstFile?.startLine,
+                startCharacter: firstFile?.startCharacter,
+            });
+        });
+    }
+
+    private async resolveRepresentativeUri(data: ItemData): Promise<vscode.Uri | undefined> {
+        if (data.type === 'scriptedClass' && data.definitionId && data.className) {
             const cache = await this.getScriptedClassCache();
-            const classMap = cache.get(data.scType);
-            if (!classMap) {
+            return cache.classMaps.get(data.definitionId)?.get(data.className)?.[0]?.uri;
+        }
+
+        if (data.type === 'scriptedClassType') {
+            const cache = await this.getScriptedClassCache();
+            if (data.classGlobal === 'VGUI') {
+                for (const files of cache.vguiClassMap.values()) {
+                    if (files.length > 0) {
+                        return files[0].uri;
+                    }
+                }
                 return undefined;
             }
-            for (const files of classMap.values()) {
-                if (files.length > 0) {
-                    return files[0].uri;
-                }
-            }
-            return undefined;
+
+            return this.findRepresentativeUriForDefinition(cache, data.definitionId);
         }
 
         if (data.type === 'resourceGroup' && data.rcType && data.groupKey !== undefined) {
@@ -408,83 +683,110 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         return undefined;
     }
 
-    private async getScriptedClassCache(): Promise<Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>> {
+    private findRepresentativeUriForDefinition(cache: ScriptedClassCache, definitionId: string | undefined): vscode.Uri | undefined {
+        if (!definitionId) {
+            return undefined;
+        }
+
+        const classMap = cache.classMaps.get(definitionId);
+        if (classMap) {
+            for (const files of classMap.values()) {
+                if (files.length > 0) {
+                    return files[0].uri;
+                }
+            }
+        }
+
+        for (const childDefinition of cache.childDefinitions.get(definitionId) ?? []) {
+            const childUri = this.findRepresentativeUriForDefinition(cache, childDefinition.id);
+            if (childUri) {
+                return childUri;
+            }
+        }
+
+        return undefined;
+    }
+
+    private async getScriptedClassCache(): Promise<ScriptedClassCache> {
         if (this.scriptedClassCache) {
             return this.scriptedClassCache;
         }
 
-        const cache = new Map<ScriptedClassType, Map<string, ScriptedClassFileEntry[]>>();
-        const LIMIT = 500;
+        const result = await fetchLsScriptedClassesResult();
+        const definitions = new Map<string, LsScriptedClassDefinition>();
+        const childDefinitions = new Map<string | undefined, LsScriptedClassDefinition[]>();
+        const classMaps = new Map<string, Map<string, ScriptedClassFileEntry[]>>();
+        const vguiClassMap = new Map<string, ScriptedClassFileEntry[]>();
 
-        const scanType = async (scType: ScriptedClassType, pattern: string, exclude?: string) => {
-            const files = await vscode.workspace.findFiles(pattern, exclude ?? '**/node_modules/**', LIMIT);
-            const classMap = new Map<string, ScriptedClassFileEntry[]>();
-            for (const uri of files) {
-                const className = extractClassName(uri, scType);
-                if (className) {
-                    const existing = classMap.get(className) ?? [];
-                    existing.push({ uri });
-                    classMap.set(className, existing);
-                }
-            }
-            cache.set(scType, classMap);
-        };
-
-        await Promise.all([
-            scanType('entities', '{**/entities/*/*.lua,**/entities/*.lua}', '{**/node_modules/**,**/effects/**,**/weapons/**}'),
-            scanType('weapons', '{**/weapons/*/*.lua,**/weapons/*.lua}', '{**/node_modules/**,**/gmod_tool/**}'),
-            scanType('effects', '{**/effects/*/*.lua,**/effects/*.lua}', '**/node_modules/**'),
-            scanType('stools', '{**/stools/*/*.lua,**/stools/*.lua}', '**/node_modules/**'),
-            scanType('plugins', '{**/plugins/*/*.lua,**/plugins/*.lua}', '**/node_modules/**'),
-        ]);
-
-        // VGUI panel classes are discovered from LS metadata, not folder patterns.
-        cache.set('vgui', cache.get('vgui') ?? new Map<string, ScriptedClassFileEntry[]>());
-
-        // Glob scan remains authoritative; LS entries only fill in classes missed by globs.
-        const lsEntries = await fetchLsScriptedClasses();
-        for (const lsEntry of lsEntries) {
-            const scriptedClassType = mapLsClassTypeToScriptedClassType(lsEntry.classType);
-            if (!scriptedClassType || !lsEntry.className) {
-                continue;
-            }
-
-            const classMap = cache.get(scriptedClassType) ?? new Map<string, ScriptedClassFileEntry[]>();
-            if (scriptedClassType !== 'vgui' && classMap.has(lsEntry.className)) {
-                continue;
-            }
-
-            const uri = parseLsUri(lsEntry.uri);
-            const files = classMap.get(lsEntry.className) ?? [];
-            if (uri) {
-                const existingIndex = files.findIndex((existingFile) => existingFile.uri.toString() === uri.toString());
-                const startLine = lsEntry.range?.start?.line;
-                const startCharacter = lsEntry.range?.start?.character;
-                const hasStart = typeof startLine === 'number' && typeof startCharacter === 'number';
-
-                if (existingIndex >= 0) {
-                    if (hasStart) {
-                        files[existingIndex] = {
-                            ...files[existingIndex],
-                            startLine,
-                            startCharacter,
-                        };
-                    }
-                } else {
-                    files.push({
-                        uri,
-                        startLine: hasStart ? startLine : undefined,
-                        startCharacter: hasStart ? startCharacter : undefined,
-                    });
-                }
-            }
-
-            classMap.set(lsEntry.className, files);
-            cache.set(scriptedClassType, classMap);
+        for (const definition of result.definitions) {
+            definitions.set(definition.id, definition);
+            classMaps.set(definition.id, new Map<string, ScriptedClassFileEntry[]>());
         }
 
-        this.scriptedClassCache = cache;
-        return cache;
+        for (const definition of result.definitions) {
+            const parentId = definition.parentId && definitions.has(definition.parentId)
+                ? definition.parentId
+                : undefined;
+            const siblings = childDefinitions.get(parentId) ?? [];
+            siblings.push(definition);
+            childDefinitions.set(parentId, siblings);
+        }
+
+        for (const entry of result.entries) {
+            const uri = parseLsUri(entry.uri);
+            if (!uri || !entry.className) {
+                continue;
+            }
+
+            const startLine = entry.range?.start?.line;
+            const startCharacter = entry.range?.start?.character;
+            const fileEntry: ScriptedClassFileEntry = {
+                uri,
+                startLine: typeof startLine === 'number' ? startLine : undefined,
+                startCharacter: typeof startCharacter === 'number' ? startCharacter : undefined,
+            };
+
+            if (entry.classType === 'VGUI' || entry.definitionId === undefined) {
+                const files = vguiClassMap.get(entry.className) ?? [];
+                files.push(fileEntry);
+                vguiClassMap.set(entry.className, files);
+                continue;
+            }
+
+            const classMap = classMaps.get(entry.definitionId);
+            if (!classMap) {
+                continue;
+            }
+
+            const files = classMap.get(entry.className) ?? [];
+            files.push(fileEntry);
+            classMap.set(entry.className, files);
+        }
+
+        for (const entries of classMaps.values()) {
+            for (const [className, files] of entries) {
+                files.sort((a, b) => a.uri.fsPath.localeCompare(b.uri.fsPath));
+                entries.set(className, files);
+            }
+        }
+
+        for (const [className, files] of vguiClassMap) {
+            files.sort((a, b) => a.uri.fsPath.localeCompare(b.uri.fsPath));
+            vguiClassMap.set(className, files);
+        }
+
+        for (const [parentId, children] of childDefinitions) {
+            children.sort((a, b) => a.label.localeCompare(b.label));
+            childDefinitions.set(parentId, children);
+        }
+
+        this.scriptedClassCache = {
+            definitions,
+            childDefinitions,
+            classMaps,
+            vguiClassMap,
+        };
+        return this.scriptedClassCache;
     }
 
     private async getResourceCache(): Promise<Map<ResourceCategory, Map<string, vscode.Uri[]>>> {

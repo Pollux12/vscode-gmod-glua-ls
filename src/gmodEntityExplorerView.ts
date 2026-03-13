@@ -11,6 +11,7 @@ import {
     Vec3,
 } from './debugger/gmod_debugger/lrdb/Client';
 import { extensionContext } from './extension';
+import { fetchLsScriptedClasses } from './gmodExplorer';
 
 const ENTITY_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -26,12 +27,6 @@ interface EntityClassGroup {
     className: string;
     groupKind: EntityClassGroupKind;
     entities: EntitySummary[];
-}
-
-interface LsScriptedClassEntry {
-    uri: string;
-    classType: string;
-    className: string;
 }
 
 type EntityTreeItemData =
@@ -1314,16 +1309,15 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return this.luaDefinedClassNames;
         }
 
-        const client = extensionContext?.client;
-        if (!client) {
+        if (!extensionContext?.client) {
             this.luaDefinedClassNames = new Set<string>();
             return this.luaDefinedClassNames;
         }
 
         try {
-            const entries = await client.sendRequest<LsScriptedClassEntry[] | null>('gluals/gmodScriptedClasses', {});
+            const entries = await fetchLsScriptedClasses();
             this.luaDefinedClassNames = new Set(
-                (entries ?? [])
+                entries
                     .map((entry) => entry.className?.trim().toLowerCase())
                     .filter((className): className is string => typeof className === 'string' && className.length > 0)
             );
