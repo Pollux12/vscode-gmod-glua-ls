@@ -820,7 +820,14 @@ export class GmodMcpHost implements vscode.Disposable {
             return {};
         }
 
-        const raw = Buffer.concat(chunks).toString('utf8');
+        // Manual concat avoids TS 5.x ArrayBuffer variance issue with Buffer.concat
+        const combined = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+        }
+        const raw = Buffer.from(combined).toString('utf8');
         try {
             const parsed = JSON.parse(raw) as unknown;
             if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -881,7 +888,10 @@ export class GmodMcpHost implements vscode.Disposable {
         }
         const expected = Buffer.from(this.authToken, 'utf8');
         const actual = Buffer.from(incomingToken, 'utf8');
-        return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+        // Cast needed: Buffer extends Uint8Array but TS 5.x ArrayBuffer variance
+        // rejects Buffer where Uint8Array is expected by timingSafeEqual.
+        return expected.length === actual.length
+            && crypto.timingSafeEqual(expected as Uint8Array, actual as Uint8Array);
     }
 
     private respondWithSuccess(res: http.ServerResponse, requestId: string, data: unknown, tool?: GmodMcpToolName): void {
