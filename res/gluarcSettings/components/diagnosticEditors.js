@@ -5,6 +5,7 @@ import {
     DIAGNOSTIC_SEVERITY_VALUES,
     DIAGNOSTIC_STATE_CODES,
 } from "../data.js";
+import { showConfirmDialog } from "./dialog.js";
 
 function getDiagnosticDefaultEnable(code) {
     return DIAGNOSTIC_DEFAULT_ENABLE[code] !== false;
@@ -284,11 +285,18 @@ export function renderDiagnosticsStateTable(field, context) {
         };
 
         resetBtn.onclick = () => {
-            delete stateMap[code];
-            select.value = defaultValue;
-            updateRowState();
-            updateOverridesCount();
-            commitStateToConfig();
+            showConfirmDialog({
+                title: "Reset Diagnostics State",
+                message: `Are you sure you want to reset the override for diagnostic code "${code}"?`,
+                confirmLabel: "Reset",
+                onConfirm: () => {
+                    delete stateMap[code];
+                    select.value = defaultValue;
+                    updateRowState();
+                    updateOverridesCount();
+                    commitStateToConfig();
+                }
+            });
         };
 
         overrideCell.appendChild(select);
@@ -393,11 +401,18 @@ export function renderSeverityTable(field, severityConfig, context) {
         };
 
         resetBtn.onclick = () => {
-            delete localOverrides[code];
-            select.value = defaultSeverity;
-            updateRowState();
-            updateOverridesCount();
-            context.commitLocalChange([...field.path, code], null);
+            showConfirmDialog({
+                title: "Reset Severity Override",
+                message: `Are you sure you want to reset the severity override for "${code}"?`,
+                confirmLabel: "Reset",
+                onConfirm: () => {
+                    delete localOverrides[code];
+                    select.value = defaultSeverity;
+                    updateRowState();
+                    updateOverridesCount();
+                    context.commitLocalChange([...field.path, code], null);
+                }
+            });
         };
 
         selectCell.appendChild(select);

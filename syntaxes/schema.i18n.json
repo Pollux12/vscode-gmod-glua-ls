@@ -309,6 +309,9 @@
         "en": "Symbol that's used to trigger postfix autocompletion.",
         "zh-CN": "后缀补全触发关键词。"
     },
+    "EmmyrcCompletion.stagedCallSnippets": {
+        "en": "Whether to stage known API call snippets so autocomplete can guide\nthe user through the next relevant argument."
+    },
     "EmmyrcDiagnostic": {
         "en": "Represents the diagnostic configuration for Emmyrc.",
         "zh-CN": "Emmyrc 诊断配置。"
@@ -607,6 +610,9 @@
     "EmmyrcGmod.autoLoadAnnotations": {
         "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
     },
+    "EmmyrcGmod.fileParamDefaults": {
+        "en": "Parameter-name to type-name fallbacks for otherwise unresolved params."
+    },
     "EmmyrcGmod.templatePath": {
         "en": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root."
     },
@@ -756,6 +762,9 @@
     "EmmyrcStrict.docBaseConstMatchBaseType": {
         "en": "Base constant types defined in doc can match base types, allowing int to match `---@alias id 1|2|3`, same for string.",
         "zh-CN": "doc定义的基础常量类型可以匹配基础类型，使 int 可以匹配 `---@alias id 1|2|3`，string 同理。"
+    },
+    "EmmyrcStrict.inferredTypeMismatch": {
+        "en": "Keep inferred types lenient in mismatch diagnostics."
     },
     "EmmyrcStrict.metaOverrideFileDefine": {
         "en": "meta define overrides file define",

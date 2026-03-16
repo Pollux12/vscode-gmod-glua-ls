@@ -1,4 +1,5 @@
 import { PATH_FIELD_KEYWORDS } from "../data.js";
+import { showConfirmDialog } from "./dialog.js";
 
 function getFieldTokens(field) {
     const values = [];
@@ -267,7 +268,14 @@ function createCollectionRow(columns, onRemove, removeLabel) {
     removeBtn.type = "button";
     removeBtn.textContent = "×";
     removeBtn.setAttribute("aria-label", removeLabel);
-    removeBtn.onclick = onRemove;
+    removeBtn.onclick = () => {
+        showConfirmDialog({
+            title: "Remove Item",
+            message: `Are you sure you want to remove this item?`,
+            confirmLabel: "Remove",
+            onConfirm: onRemove
+        });
+    };
     row.appendChild(removeBtn);
 
     return row;
@@ -340,7 +348,7 @@ export function renderScalarListEditor(field, value, onChange) {
 
     const inputElement = createScalarInput(
         items,
-        pathLike ? "Enter path..." : "Add item...",
+        items.placeholder || (pathLike ? "Enter path..." : "Add item..."),
     );
     addRow.appendChild(inputElement);
 
@@ -407,6 +415,9 @@ export function renderScalarListEditor(field, value, onChange) {
 
 export function renderMapEditor(field, value, onChange) {
     const descriptor = field.additionalProperties ?? { type: "string" };
+    const editorDesc = field.editor ?? {};
+    const keyLabel = editorDesc.keyLabel || "Key";
+    const valueLabel = editorDesc.valueLabel || "Value";
 
     const container = document.createElement("div");
     container.className = "path-list-container";
@@ -423,10 +434,13 @@ export function renderMapEditor(field, value, onChange) {
 
     const keyInput = document.createElement("input");
     keyInput.type = "text";
-    keyInput.placeholder = "Key...";
+    keyInput.placeholder = editorDesc.keyPlaceholder || `${keyLabel}...`;
     inputsRow.appendChild(keyInput);
 
     const valueInput = createMapValueInput(descriptor);
+    if (valueInput.tagName === "INPUT") {
+        valueInput.placeholder = editorDesc.valuePlaceholder || `${valueLabel}...`;
+    }
     inputsRow.appendChild(valueInput);
 
     addRow.appendChild(inputsRow);
@@ -472,9 +486,16 @@ export function renderMapEditor(field, value, onChange) {
             removeBtn.textContent = "×";
             removeBtn.setAttribute("aria-label", `Remove item ${key}`);
             removeBtn.onclick = () => {
-                delete currentObj[key];
-                save();
-                renderRows();
+                showConfirmDialog({
+                    title: "Remove Item",
+                    message: `Are you sure you want to remove the mapped item "${key}"?`,
+                    confirmLabel: "Remove",
+                    onConfirm: () => {
+                        delete currentObj[key];
+                        save();
+                        renderRows();
+                    }
+                });
             };
             row.appendChild(removeBtn);
 
@@ -786,38 +807,45 @@ export function renderMappingTableEditor(field, value, onChange) {
                 actionBtn.textContent = "×";
                 actionBtn.setAttribute("aria-label", `Remove ${keyLabel.toLowerCase()} ${key}`);
                 actionBtn.onclick = () => {
-                    const nextEntries = { ...rawEntries };
-                    if (hasDefault) {
-                        nextEntries[key] = "";
-                    } else {
-                        delete nextEntries[key];
-                    }
+                    showConfirmDialog({
+                        title: "Remove Entry",
+                        message: `Are you sure you want to remove this entry for "${key}"?`,
+                        confirmLabel: "Remove",
+                        onConfirm: () => {
+                            const nextEntries = { ...rawEntries };
+                            if (hasDefault) {
+                                nextEntries[key] = "";
+                            } else {
+                                delete nextEntries[key];
+                            }
 
-                    if (!hasDefault) {
-                        if (row.classList.contains("is-removing")) {
-                            return;
-                        }
+                            if (!hasDefault) {
+                                if (row.classList.contains("is-removing")) {
+                                    return;
+                                }
 
-                        row.classList.add("is-removing");
-                        row.querySelectorAll("input, select, button").forEach((element) => {
-                            element.disabled = true;
-                        });
+                                row.classList.add("is-removing");
+                                row.querySelectorAll("input, select, button").forEach((element) => {
+                                    element.disabled = true;
+                                });
 
-                        window.setTimeout(() => {
+                                window.setTimeout(() => {
+                                    const viewState = captureMappingTableViewState(shell);
+                                    const shouldRenderLocally = commitEntries(nextEntries, viewState);
+                                    if (shouldRenderLocally) {
+                                        renderRows({ viewState });
+                                    }
+                                }, MAPPING_TABLE_REMOVE_ANIMATION_MS);
+                                return;
+                            }
+
                             const viewState = captureMappingTableViewState(shell);
                             const shouldRenderLocally = commitEntries(nextEntries, viewState);
                             if (shouldRenderLocally) {
                                 renderRows({ viewState });
                             }
-                        }, MAPPING_TABLE_REMOVE_ANIMATION_MS);
-                        return;
-                    }
-
-                    const viewState = captureMappingTableViewState(shell);
-                    const shouldRenderLocally = commitEntries(nextEntries, viewState);
-                    if (shouldRenderLocally) {
-                        renderRows({ viewState });
-                    }
+                        }
+                    });
                 };
             } else {
                 actionBtn.className = "mapping-table-inline-btn";
@@ -1205,17 +1233,6 @@ function createScriptedClassPayload(defaults, rawDefinitions, legacyGlobs) {
     return entries;
 }
 
-function parseLineList(text) {
-    return text
-        .split(/\r?\n/)
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
-}
-
-function formatLineList(values) {
-    return Array.isArray(values) ? values.join("\n") : "";
-}
-
 function formatPathSegments(values) {
     return Array.isArray(values) ? values.join("/") : "";
 }
@@ -1254,14 +1271,6 @@ function createScriptedClassTextInput(value, placeholder = "") {
     input.value = value ?? "";
     input.placeholder = placeholder;
     return input;
-}
-
-function createScriptedClassTextArea(value, placeholder = "") {
-    const textarea = document.createElement("textarea");
-    textarea.className = "json-input scripted-class-textarea";
-    textarea.value = value ?? "";
-    textarea.placeholder = placeholder;
-    return textarea;
 }
 
 function createScriptedClassSummary(definition, id) {
@@ -1400,13 +1409,30 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
         const panel = document.createElement("div");
         panel.className = "scripted-class-details";
 
-        const createField = (labelText, input) => {
-            const fieldWrapper = document.createElement("label");
+        const createField = (labelText, input, isFullWidth = false, helpText = null) => {
+            const fieldWrapper = document.createElement("div");
             fieldWrapper.className = "object-list-field scripted-class-detail-field";
+            if (isFullWidth) {
+                fieldWrapper.classList.add("is-full-width");
+            }
+
+            const labelWrapper = document.createElement("div");
+            labelWrapper.className = "setting-label-row";
+
             const label = document.createElement("div");
             label.className = "setting-label";
             label.textContent = labelText;
-            fieldWrapper.appendChild(label);
+            labelWrapper.appendChild(label);
+
+            if (helpText) {
+                const helpIcon = document.createElement("span");
+                helpIcon.className = "help-icon";
+                helpIcon.title = helpText;
+                helpIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM6.98 5.48c0-.58.46-1.02 1.05-1.02.58 0 1.05.44 1.05 1.02 0 .57-.47 1.02-1.05 1.02-.59 0-1.05-.45-1.05-1.02zm.45 6.51v-4.5h1.16v4.5H7.43z"/></svg>`;
+                labelWrapper.appendChild(helpIcon);
+            }
+
+            fieldWrapper.appendChild(labelWrapper);
             fieldWrapper.appendChild(input);
             panel.appendChild(fieldWrapper);
             return input;
@@ -1483,55 +1509,63 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
             });
         });
 
-        const includeInput = createField("Include Globs", createScriptedClassTextArea(formatLineList(definition.include), "folder/**"));
-        includeInput.addEventListener("change", () => {
-            updateEffectiveDefinition(row, (nextDefinition) => {
-                nextDefinition.include = parseLineList(includeInput.value);
-            });
-        });
+        const includeContainer = renderScalarListEditor(
+            { items: { type: "string", placeholder: "folder/**" }, path: ["include"] },
+            definition.include || [],
+            (nextValue) => {
+                updateEffectiveDefinition(row, (nextDefinition) => {
+                    nextDefinition.include = nextValue;
+                });
+            }
+        );
+        createField("Include Globs", includeContainer, true);
 
-        const excludeInput = createField("Exclude Globs", createScriptedClassTextArea(formatLineList(definition.exclude), "folder/excluded/**"));
-        excludeInput.addEventListener("change", () => {
-            updateEffectiveDefinition(row, (nextDefinition) => {
-                const nextExclude = parseLineList(excludeInput.value);
-                if (nextExclude.length > 0) {
-                    nextDefinition.exclude = nextExclude;
-                } else {
-                    nextDefinition.exclude = [];
-                }
-            });
-        });
+        const excludeContainer = renderScalarListEditor(
+            { items: { type: "string", placeholder: "folder/excluded/**" }, path: ["exclude"] },
+            definition.exclude || [],
+            (nextValue) => {
+                updateEffectiveDefinition(row, (nextDefinition) => {
+                    if (nextValue.length > 0) {
+                        nextDefinition.exclude = nextValue;
+                    } else {
+                        nextDefinition.exclude = [];
+                    }
+                });
+            }
+        );
+        createField("Exclude Globs", excludeContainer, true);
 
         const scaffoldFiles = Array.isArray(definition.scaffold?.files) ? definition.scaffold.files : [];
-        const scaffoldInput = createField(
-            "Scaffold Files",
-            createScriptedClassTextArea(
-                scaffoldFiles.map((entry) => `${entry.path} => ${entry.template}`).join("\n"),
-                "{{name}}/shared.lua => ent_shared.lua",
-            ),
-        );
-        scaffoldInput.addEventListener("change", () => {
-            updateEffectiveDefinition(row, (nextDefinition) => {
-                const nextFiles = scaffoldInput.value
-                    .split(/\r?\n/)
-                    .map((entry) => entry.trim())
-                    .filter((entry) => entry.length > 0)
-                    .map((entry) => {
-                        const [filePath, template] = entry.split(/\s*=>\s*/, 2);
-                        return {
-                            path: filePath?.trim() || "",
-                            template: template?.trim() || "",
-                        };
-                    })
-                    .filter((entry) => entry.path && entry.template);
-
-                if (nextFiles.length > 0) {
-                    nextDefinition.scaffold = { files: nextFiles };
-                } else {
-                    nextDefinition.scaffold = { files: [] };
-                }
-            });
+        const initialScaffoldMap = {};
+        scaffoldFiles.forEach((file) => {
+            if (file.path && file.template) {
+                initialScaffoldMap[file.path] = file.template;
+            }
         });
+
+        const scaffoldContainer = renderMapEditor(
+            {
+                additionalProperties: { type: "string" },
+                editor: {
+                    keyLabel: "File path",
+                    valueLabel: "Template name",
+                    keyPlaceholder: "{{name}}/shared.lua",
+                    valuePlaceholder: "ent_shared.lua"
+                }
+            },
+            initialScaffoldMap,
+            (nextMap) => {
+                updateEffectiveDefinition(row, (nextDefinition) => {
+                    const nextFiles = Object.entries(nextMap).map(([path, template]) => ({ path, template }));
+                    if (nextFiles.length > 0) {
+                        nextDefinition.scaffold = { files: nextFiles };
+                    } else {
+                        nextDefinition.scaffold = { files: [] };
+                    }
+                });
+            }
+        );
+        createField("Scaffold Files", scaffoldContainer, true, "Use {{name}} in the path to automatically replace it with the file or class name.");
 
         return panel;
     };
@@ -1654,7 +1688,14 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
                 actionBtn.className = "remove-btn";
                 actionBtn.textContent = "×";
                 actionBtn.setAttribute("aria-label", `Remove scripted class ${row.id}`);
-                actionBtn.onclick = () => setDefinition(row.id, { id: row.id, disabled: true });
+                actionBtn.onclick = () => {
+                    showConfirmDialog({
+                        title: "Disable Scripted Class",
+                        message: `Are you sure you want to disable the default scripted class definition for "${row.id}"?`,
+                        confirmLabel: "Disable",
+                        onConfirm: () => setDefinition(row.id, { id: row.id, disabled: true })
+                    });
+                };
 
                 if (row.status === "override") {
                     const resetBtn = document.createElement("button");
@@ -1662,14 +1703,28 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
                     resetBtn.className = "mapping-table-row-reset";
                     resetBtn.textContent = "↺";
                     resetBtn.title = "Reset to built-in definition";
-                    resetBtn.onclick = () => setDefinition(row.id, null);
+                    resetBtn.onclick = () => {
+                        showConfirmDialog({
+                            title: "Reset Scripted Class",
+                            message: `Are you sure you want to reset the scripted class "${row.id}" to its built-in definition?`,
+                            confirmLabel: "Reset",
+                            onConfirm: () => setDefinition(row.id, null)
+                        });
+                    };
                     actions.appendChild(resetBtn);
                 }
             } else {
                 actionBtn.className = "remove-btn";
                 actionBtn.textContent = "×";
                 actionBtn.setAttribute("aria-label", `Remove scripted class ${row.id}`);
-                actionBtn.onclick = () => setDefinition(row.id, null);
+                actionBtn.onclick = () => {
+                    showConfirmDialog({
+                        title: "Remove Scripted Class",
+                        message: `Are you sure you want to remove the custom scripted class definition for "${row.id}"?`,
+                        confirmLabel: "Remove",
+                        onConfirm: () => setDefinition(row.id, null)
+                    });
+                };
             }
 
             actions.appendChild(actionBtn);
@@ -1841,9 +1896,16 @@ export function renderObjectArrayEditor(field, value, onChange, options) {
             removeBtn.textContent = "×";
             removeBtn.setAttribute("aria-label", `Remove item ${index + 1}`);
             removeBtn.onclick = () => {
-                currentArr.splice(index, 1);
-                onChange([...currentArr]);
-                renderList();
+                showConfirmDialog({
+                    title: "Remove Item",
+                    message: `Are you sure you want to remove item ${index + 1}?`,
+                    confirmLabel: "Remove",
+                    onConfirm: () => {
+                        currentArr.splice(index, 1);
+                        onChange([...currentArr]);
+                        renderList();
+                    }
+                });
             };
             row.appendChild(removeBtn);
 

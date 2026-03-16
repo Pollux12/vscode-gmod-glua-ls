@@ -1,3 +1,5 @@
+import { showConfirmDialog } from "./dialog.js";
+
 /**
  * Creates a standardized setting row element used across all settings sections.
  *
@@ -60,7 +62,14 @@ export function createSettingRow(options) {
         resetBtn.title = "Reset to default";
         resetBtn.setAttribute("aria-label", `Reset ${label} to default`);
         resetBtn.textContent = "↺";
-        resetBtn.onclick = onReset;
+        resetBtn.onclick = () => {
+            showConfirmDialog({
+                title: "Reset Setting",
+                message: `Are you sure you want to reset "${label}" to its default value?`,
+                confirmLabel: "Reset",
+                onConfirm: onReset
+            });
+        };
         labelRow.appendChild(resetBtn);
     }
 

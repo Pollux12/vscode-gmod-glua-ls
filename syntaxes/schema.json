@@ -321,6 +321,7 @@
         "allowNullableAsNonNullable": true,
         "arrayIndex": false,
         "docBaseConstMatchBaseType": true,
+        "inferredTypeMismatch": false,
         "metaOverrideFileDefine": true,
         "requireExportGlobal": false,
         "requirePath": false
@@ -2735,6 +2736,11 @@
           "description": "Base constant types defined in doc can match base types, allowing int to match `---@alias id 1|2|3`, same for string.",
           "type": "boolean",
           "default": true
+        },
+        "inferredTypeMismatch": {
+          "description": "Keep inferred types lenient in mismatch diagnostics.",
+          "type": "boolean",
+          "default": false
         },
         "metaOverrideFileDefine": {
           "description": "meta define overrides file define",

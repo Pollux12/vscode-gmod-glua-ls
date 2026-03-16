@@ -27,6 +27,7 @@ import {
 } from "./components/diagnosticEditors.js";
 import { renderFormatterSectionContent } from "./components/formatterSection.js";
 import { createSettingRow } from "./components/settingRow.js";
+import { showConfirmDialog } from "./components/dialog.js";
 
 const vscode = acquireVsCodeApi();
 
@@ -317,7 +318,14 @@ function reloadServer() {
 }
 
 function resetAllSettings() {
-    vscode.postMessage({ type: "resetAll" });
+    showConfirmDialog({
+        title: "Reset All Settings",
+        message: "Are you sure you want to reset all settings to their default values?\nThis will clear all customizations and cannot be undone.",
+        confirmLabel: "Reset All",
+        onConfirm: () => {
+            vscode.postMessage({ type: "resetAll" });
+        }
+    });
 }
 
 function getFieldPathKey(field) {
@@ -590,11 +598,14 @@ function renderObjectGroup(field, value, onChange) {
         const child = createFieldWidget(subField, {
             value: currentObjectValue[subField.key],
             onChange: (newValue) => {
-                currentObjectValue = {
-                    ...currentObjectValue,
-                    [subField.key]: newValue,
-                };
-                onChange({ ...currentObjectValue });
+                const nextObj = { ...currentObjectValue };
+                if (newValue === null || newValue === undefined) {
+                    delete nextObj[subField.key];
+                } else {
+                    nextObj[subField.key] = newValue;
+                }
+                currentObjectValue = nextObj;
+                onChange(Object.keys(currentObjectValue).length > 0 ? currentObjectValue : null);
             },
         });
 

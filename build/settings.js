@@ -228,8 +228,8 @@ function dumpPackageJson(rendered) {
         const title = canonicalizeTitle(configuration[i].title);
         const existing = configuration[i].properties;
 
-        // Ensure Misc, Language Server and Colors stay at the end of config.
-        if (["Misc", "Language Server", "Colors"].includes(title)) {
+        // Ensure Misc, Language Server and Decorations stay at the end of config.
+        if (["Misc", "Language Server", "Decorations"].includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...existing,
@@ -245,8 +245,8 @@ function dumpPackageJson(rendered) {
     for (const [rawTitle, items] of Object.entries(rendered)) {
         const title = canonicalizeTitle(rawTitle);
 
-        // Ensure Misc, Language Server and Colors stay at the end of config.
-        if (["Misc", "Language Server", "Colors"].includes(title)) {
+        // Ensure Misc, Language Server and Decorations stay at the end of config.
+        if (["Misc", "Language Server", "Decorations"].includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...items,

@@ -453,6 +453,40 @@
                 "configuration": "./language-configuration.json"
             }
         ],
+        "grammars": [
+            {
+                "scopeName": "gluals.lua.injection",
+                "injectTo": [
+                    "source.lua"
+                ],
+                "path": "./syntaxes/glua.tmLanguage.json"
+            }
+        ],
+        "semanticTokenTypes": [
+            {
+                "id": "field",
+                "superType": "property",
+                "description": "Lua table or object field"
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "global",
+                "description": "Lua global symbol"
+            },
+            {
+                "id": "local",
+                "description": "Lua local symbol"
+            },
+            {
+                "id": "callable",
+                "description": "Lua value that can be invoked"
+            },
+            {
+                "id": "object",
+                "description": "Lua value that refers to an object-like instance"
+            }
+        ],
         "keybindings": [
             {
                 "command": "gluals.language.smartEnter",
@@ -1600,8 +1634,37 @@
                 }
             },
             {
-                "title": "GMod",
+                "title": "Strict",
                 "order": 11,
+                "properties": {
+                    "gluals.strict.inferredTypeMismatch": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.gluals.strict.inferredTypeMismatch.description%"
+                    }
+                }
+            },
+            {
+                "title": "GMod",
+                "order": 12,
                 "properties": {
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
@@ -1680,37 +1743,33 @@
                 }
             },
             {
-                "title": "Colors",
+                "title": "Decorations",
                 "order": 12,
                 "properties": {
-                    "gluals.colors.parameter": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.parameter.description%"
-                    },
-                    "gluals.colors.global": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.global.description%"
-                    },
-                    "gluals.colors.local": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "%config.emmylua.colors.local.description%"
-                    },
-                    "gluals.colors.mutable_underline": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ],
-                        "default": null,
-                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%",
-                        "markdownDeprecationMessage": "Use `gluals.colors.mutableUnderline` instead"
-                    },
-                    "gluals.colors.mutableUnderline": {
+                    "gluals.decorations.globalUnderline": {
                         "type": "boolean",
-                        "default": true,
-                        "markdownDescription": "%config.emmylua.colors.mutableUnderline.description%"
+                        "default": false,
+                        "markdownDescription": "%config.gluals.decorations.globalUnderline.description%"
+                    },
+                    "gluals.decorations.readonlyLocalUnderline": {
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%config.gluals.decorations.readonlyLocalUnderline.description%"
+                    },
+                    "gluals.decorations.mutableLocalUnderline": {
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%config.gluals.decorations.mutableLocalUnderline.description%"
+                    },
+                    "gluals.decorations.readonlyParameterUnderline": {
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%config.gluals.decorations.readonlyParameterUnderline.description%"
+                    },
+                    "gluals.decorations.mutableParameterUnderline": {
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%config.gluals.decorations.mutableParameterUnderline.description%"
                     }
                 }
             },
@@ -1797,118 +1856,316 @@
                 "language": "lua",
                 "scopes": {
                     "class": [
+                        "entity.name.type.class",
                         "support.class.lua"
                     ],
                     "class.declaration": [
+                        "entity.name.type.class",
                         "support.class.lua"
                     ],
                     "comment.documentation": [
-                        "storage.type.annotation.lua"
+                        "comment.block.documentation",
+                        "comment.line.documentation"
                     ],
-                    "event.static": [
-                        "support.class.lua"
+                    "event": [
+                        "variable.other.event",
+                        "support.function"
                     ],
                     "function": [
-                        "support.function.any-method.lua"
+                        "entity.name.function",
+                        "entity.name.function.lua"
                     ],
                     "function.declaration": [
+                        "entity.name.function",
+                        "entity.name.function.lua"
+                    ],
+                    "function.callable": [
+                        "entity.name.function",
                         "entity.name.function.lua"
                     ],
                     "function.defaultLibrary": [
+                        "support.function",
+                        "entity.name.function",
+                        "entity.name.function.lua",
                         "support.function.lua"
                     ],
-                    "function.static": [
-                        "entity.name.function.lua"
+                    "field": [
+                        "variable.other.property",
+                        "entity.other.attribute.lua"
                     ],
-                    "keyword": [
-                        "keyword.control.lua"
+                    "field.global": [
+                        "variable.other.global",
+                        "variable.other.property",
+                        "entity.other.attribute.lua",
+                        "support.variable.lua"
                     ],
+                    "field.callable": [
+                        "variable.other.property",
+                        "entity.name.function.member",
+                        "entity.other.attribute.lua"
+                    ],
+                    "field.global.callable": [
+                        "variable.other.global",
+                        "variable.other.property",
+                        "entity.name.function.member",
+                        "entity.other.attribute.lua"
+                    ],
+                    "field.declaration": [
+                        "variable.other.property",
+                        "entity.other.property.lua"
+                    ],
+                    "field.modification": [
+                        "variable.other.property",
+                        "entity.other.attribute.lua"
+                    ],
+
                     "keyword.async": [
-                        "entity.name.tag.lua"
+                        "keyword",
+                        "storage.modifier"
                     ],
                     "keyword.declaration": [
-                        "keyword.local.lua"
+                        "keyword"
                     ],
                     "keyword.documentation": [
-                        "storage.type.annotation.lua"
+                        "storage.type.annotation"
                     ],
                     "keyword.readonly": [
-                        "constant.language.lua"
+                        "constant.language"
                     ],
                     "macro": [
-                        "variable.lua"
+                        "entity.name.function.preprocessor"
                     ],
                     "method": [
+                        "entity.name.function.member",
                         "entity.name.function.lua"
                     ],
                     "method.declaration": [
+                        "entity.name.function.member",
                         "entity.name.function.lua"
                     ],
-                    "number": [
-                        "constant.numeric.float.lua"
+                    "method.callable": [
+                        "entity.name.function.member",
+                        "entity.name.function.lua"
                     ],
-                    "number.static": [
-                        "constant.numeric.integer.lua"
+                    "namespace": [
+                        "entity.name.namespace",
+                        "entity.name.type.module",
+                        "support.variable.lua"
+                    ],
+                    "namespace.defaultLibrary": [
+                        "entity.name.type.module",
+                        "entity.name.namespace",
+                        "support.function",
+                        "support.function.library",
+                        "support.function.library.lua"
+                    ],
+                    "number": [
+                        "constant.numeric"
                     ],
                     "operator": [
-                        "keyword.operator.lua"
+                        "keyword.operator"
+                    ],
+                    "parameter": [
+                        "variable.parameter",
+                        "variable.parameter.lua"
+                    ],
+                    "parameter.callable": [
+                        "variable.parameter",
+                        "entity.name.function",
+                        "variable.parameter.lua"
                     ],
                     "parameter.declaration": [
+                        "variable.parameter",
+                        "variable.parameter.lua"
+                    ],
+                    "parameter.declaration.callable": [
+                        "variable.parameter",
+                        "entity.name.function",
+                        "variable.parameter.lua"
+                    ],
+                    "parameter.modification": [
+                        "variable.parameter",
                         "variable.parameter.lua"
                     ],
                     "property": [
+                        "variable.other.property",
                         "entity.other.attribute.lua"
                     ],
                     "property.declaration": [
+                        "variable.other.property",
                         "entity.other.property.lua"
                     ],
+                    "property.modification": [
+                        "variable.other.property",
+                        "entity.other.attribute.lua"
+                    ],
                     "string": [
-                        "string.lua"
+                        "string"
                     ],
                     "string.deprecated": [
-                        "invalid.illegal.character.escape.lua"
+                        "invalid.deprecated"
                     ],
                     "string.modification": [
-                        "constant.character.escape.lua"
+                        "constant.character.escape"
                     ],
                     "struct": [
+                        "storage.type.struct",
                         "string.tag.lua"
                     ],
                     "struct.declaration": [
+                        "storage.type.struct",
                         "string.tag.lua"
                     ],
                     "type": [
+                        "entity.name.type",
                         "support.type.lua"
                     ],
                     "type.modification": [
-                        "storage.type.generic.lua"
+                        "entity.name.type",
+                        "support.type.lua"
                     ],
                     "type.readonly": [
-                        "storage.type.self.lua"
+                        "entity.name.type",
+                        "support.type.lua"
                     ],
                     "typeParameter": [
+                        "entity.name.type.parameter",
                         "string.tag.lua"
                     ],
                     "variable": [
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
                         "variable.other.lua"
                     ],
                     "variable.abstract": [
                         "variable.other.constant.lua"
                     ],
                     "variable.declaration": [
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
                         "variable.other.lua"
                     ],
-                    "variable.defaultLibrary": [
-                        "support.constant.lua"
+                    "variable.modification": [
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua"
                     ],
-                    "variable.definition": [
-                        "variable.language.self.lua"
+                    "variable.local": [
+                        "variable.other.local",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua"
+                    ],
+                    "variable.local.declaration": [
+                        "variable.other.local",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua"
+                    ],
+                    "variable.local.modification": [
+                        "variable.other.local",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua"
+                    ],
+                    "variable.object": [
+                        "variable.other.constant.object",
+                        "variable.other.object",
+                        "variable.other.readwrite",
+                        "entity.name.variable"
+                    ],
+                    "variable.local.object": [
+                        "variable.other.local",
+                        "variable.other.constant.object",
+                        "variable.other.object",
+                        "variable.other.readwrite",
+                        "entity.name.variable"
+                    ],
+                    "variable.local.declaration.object": [
+                        "variable.other.local",
+                        "variable.other.constant.object",
+                        "variable.other.object",
+                        "variable.other.readwrite",
+                        "entity.name.variable"
+                    ],
+                    "variable.local.modification.object": [
+                        "variable.other.local",
+                        "variable.other.constant.object",
+                        "variable.other.object",
+                        "variable.other.readwrite",
+                        "entity.name.variable"
                     ],
                     "variable.global": [
+                        "variable.other.global",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua",
+                        "support.variable.lua",
                         "variable.global.lua"
                     ],
+                    "variable.global.modification": [
+                        "variable.other.global",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "variable.other.readwrite.lua",
+                        "variable.other.lua",
+                        "support.variable.lua",
+                        "variable.global.lua"
+                    ],
+                    "variable.global.object": [
+                        "variable.other.global",
+                        "variable.other.constant.object",
+                        "variable.other.object",
+                        "variable.other.readwrite",
+                        "entity.name.variable"
+                    ],
+                    "variable.callable": [
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "entity.name.function",
+                        "variable.other.readwrite.lua"
+                    ],
+                    "variable.local.callable": [
+                        "variable.other.local",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "entity.name.function",
+                        "variable.other.readwrite.lua"
+                    ],
+                    "variable.global.callable": [
+                        "variable.other.global",
+                        "variable.other.readwrite",
+                        "entity.name.variable",
+                        "entity.name.function",
+                        "support.variable.lua"
+                    ],
+                    "variable.defaultLibrary": [
+                        "support.constant"
+                    ],
+                    "variable.definition": [
+                        "variable.language",
+                        "variable.language.self.lua"
+                    ],
                     "variable.readonly": [
+                        "variable.other.constant",
                         "variable.other.constant.lua"
+                    ],
+                    "parameter.object": [
+                        "variable.other.constant.object",
+                        "variable.parameter",
+                        "variable.parameter.lua"
+                    ],
+                    "parameter.declaration.object": [
+                        "variable.other.constant.object",
+                        "variable.parameter",
+                        "variable.parameter.lua"
                     ]
                 }
             }
@@ -1971,6 +2228,7 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
+        "test:grammar": "node ./build/grammar-test.cjs",
         "test:parity": "npm run compile && node ./build/gmod-debug-parity-test.js",
         "test": "npm run compile && node ./node_modules/vscode/bin/test",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",
@@ -1994,7 +2252,9 @@
         "eslint": "^9",
         "filecopy": "^4.0.2",
         "globals": "^16",
-        "typescript": "^4.0.2"
+        "typescript": "^4.0.2",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.2.0"
     },
     "dependencies": {
         "@vscode/debugadapter": "^1.61.0",

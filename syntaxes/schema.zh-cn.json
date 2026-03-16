@@ -1,2844 +1,2850 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Emmyrc",
-  "type": "object",
-  "properties": {
-    "$schema": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "codeAction": {
-      "$ref": "#/$defs/EmmyrcCodeAction",
-      "default": {
-        "insertSpace": false
-      }
-    },
-    "codeLens": {
-      "$ref": "#/$defs/EmmyrcCodeLens",
-      "default": {
-        "enable": true
-      }
-    },
-    "completion": {
-      "$ref": "#/$defs/EmmyrcCompletion",
-      "default": {
-        "autoRequire": true,
-        "autoRequireFunction": "require",
-        "autoRequireNamingConvention": "keep",
-        "autoRequireSeparator": ".",
-        "baseFunctionIncludesName": true,
-        "callSnippet": true,
-        "enable": true,
-        "postfix": "@",
-        "stagedCallSnippets": true
-      }
-    },
-    "diagnostics": {
-      "$ref": "#/$defs/EmmyrcDiagnostic",
-      "default": {
-        "diagnosticInterval": 500,
-        "disable": [],
-        "enable": true,
-        "enables": [],
-        "globals": [],
-        "globalsRegex": [],
-        "severity": {}
-      }
-    },
-    "doc": {
-      "$ref": "#/$defs/EmmyrcDoc",
-      "default": {
-        "knownTags": [],
-        "privateName": [],
-        "syntax": "md"
-      }
-    },
-    "documentColor": {
-      "$ref": "#/$defs/EmmyrcDocumentColor",
-      "default": {
-        "enable": true
-      }
-    },
-    "format": {
-      "$ref": "#/$defs/EmmyrcReformat",
-      "default": {
-        "configPrecedence": "preferEditorconfig",
-        "externalTool": null,
-        "externalToolRangeFormat": null,
-        "preset": "default",
-        "useDiff": false
-      }
-    },
-    "gmod": {
-      "$ref": "#/$defs/EmmyrcGmod",
-      "default": {
-        "autoLoadAnnotations": null,
-        "defaultRealm": "shared",
-        "dynamicFieldsGlobal": true,
-        "enabled": true,
-        "fileParamDefaults": {
-          "ang": "Angle",
-          "angle": "Angle",
-          "attacker": "Entity",
-          "cmd": "CUserCmd",
-          "col": "Color",
-          "color": "Color",
-          "dmginfo": "CTakeDamageInfo",
-          "ent": "Entity",
-          "entity": "Entity",
-          "inflictor": "Entity",
-          "mat": "IMaterial",
-          "npc": "NPC",
-          "panel": "Panel",
-          "phys": "PhysObj",
-          "player": "Player",
-          "ply": "Player",
-          "pnl": "Panel",
-          "pos": "Vector",
-          "tr": "TraceResult",
-          "trace": "TraceResult",
-          "vec": "Vector",
-          "veh": "Entity",
-          "vehicle": "Entity",
-          "victim": "Entity",
-          "weapon": "Weapon",
-          "wep": "Weapon"
-        },
-        "hookMappings": {
-          "emitterToHook": {},
-          "methodPrefixes": [],
-          "methodToHook": {}
-        },
-        "inferDynamicFields": true,
-        "network": {
-          "completion": {
-            "mismatchHints": true,
-            "smartReadSuggestions": true
-          },
-          "diagnostics": {
-            "missingCounterpart": true,
-            "orderMismatch": true,
-            "typeMismatch": true
-          },
-          "enabled": true
-        },
-        "outline": {
-          "verbosity": "normal"
-        },
-        "scriptedClassScopes": {
-          "include": [
-            {
-              "classGlobal": "ENT",
-              "icon": "folder-library",
-              "id": "entities",
-              "include": [
-                "entities/**"
-              ],
-              "label": "Entities",
-              "path": [
-                "entities"
-              ],
-              "rootDir": "lua/entities",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}/shared.lua",
-                    "template": "ent_shared.lua"
-                  },
-                  {
-                    "path": "{{name}}/init.lua",
-                    "template": "ent_init.lua"
-                  },
-                  {
-                    "path": "{{name}}/cl_init.lua",
-                    "template": "ent_cl_init.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "SWEP",
-              "exclude": [
-                "weapons/gmod_tool/**"
-              ],
-              "icon": "folder-library",
-              "id": "weapons",
-              "include": [
-                "weapons/**"
-              ],
-              "label": "SWEPs",
-              "path": [
-                "weapons"
-              ],
-              "rootDir": "lua/weapons",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}/shared.lua",
-                    "template": "swep_shared.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "EFFECT",
-              "icon": "folder-library",
-              "id": "effects",
-              "include": [
-                "effects/**"
-              ],
-              "label": "Effects",
-              "path": [
-                "effects"
-              ],
-              "rootDir": "lua/effects",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}.lua",
-                    "template": "effect.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "TOOL",
-              "icon": "tools",
-              "id": "stools",
-              "include": [
-                "weapons/gmod_tool/stools/**"
-              ],
-              "label": "STools",
-              "parentId": "weapons",
-              "path": [
-                "weapons",
-                "gmod_tool",
-                "stools"
-              ],
-              "rootDir": "lua/weapons/gmod_tool/stools",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}.lua",
-                    "template": "tool.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "PLUGIN",
-              "icon": "extensions",
-              "id": "plugins",
-              "include": [
-                "plugins/**"
-              ],
-              "label": "Plugins",
-              "path": [
-                "plugins"
-              ],
-              "rootDir": "plugins"
-            }
-          ]
-        },
-        "vgui": {
-          "codeLensEnabled": true,
-          "inlayHintEnabled": false
-        }
-      }
-    },
-    "hint": {
-      "$ref": "#/$defs/EmmyrcInlayHint",
-      "default": {
-        "closingEndHint": true,
-        "closingEndHintControlFlow": false,
-        "closingEndHintMinLines": 15,
-        "enumParamHint": false,
-        "indexHint": true,
-        "localHint": true,
-        "metaCallHint": true,
-        "overrideHint": true,
-        "paramHint": true
-      }
-    },
-    "hover": {
-      "$ref": "#/$defs/EmmyrcHover",
-      "default": {
-        "customDetail": null,
-        "enable": true
-      }
-    },
-    "inlineValues": {
-      "$ref": "#/$defs/EmmyrcInlineValues",
-      "default": {
-        "enable": true
-      }
-    },
-    "references": {
-      "$ref": "#/$defs/EmmyrcReference",
-      "default": {
-        "enable": true,
-        "fuzzySearch": true,
-        "shortStringSearch": false
-      }
-    },
-    "resource": {
-      "$ref": "#/$defs/EmmyrcResource",
-      "default": {
-        "paths": []
-      }
-    },
-    "runtime": {
-      "$ref": "#/$defs/EmmyrcRuntime",
-      "default": {
-        "extensions": [],
-        "nonstandardSymbol": [
-          "//",
-          "/**/",
-          "continue",
-          "!=",
-          "||",
-          "&&",
-          "!"
-        ],
-        "requireLikeFunction": [],
-        "requirePattern": [],
-        "special": {},
-        "version": "LuaJIT"
-      }
-    },
-    "semanticTokens": {
-      "$ref": "#/$defs/EmmyrcSemanticToken",
-      "default": {
-        "enable": true,
-        "renderDocumentationMarkup": true
-      }
-    },
-    "strict": {
-      "$ref": "#/$defs/EmmyrcStrict",
-      "default": {
-        "allowNullableAsNonNullable": true,
-        "arrayIndex": false,
-        "docBaseConstMatchBaseType": true,
-        "metaOverrideFileDefine": true,
-        "requireExportGlobal": false,
-        "requirePath": false
-      }
-    },
-    "workspace": {
-      "$ref": "#/$defs/EmmyrcWorkspace",
-      "default": {
-        "enableReindex": false,
-        "encoding": "utf-8",
-        "ignoreDir": [],
-        "ignoreGlobs": [],
-        "library": [],
-        "moduleMap": [],
-        "packageDirs": [],
-        "reindexDuration": 5000,
-        "workspaceRoots": []
-      }
-    }
-  },
-  "$defs": {
-    "DiagnosticCode": {
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "none"
-          ]
-        },
-        {
-          "description": "Syntax error",
-          "type": "string",
-          "const": "syntax-error"
-        },
-        {
-          "description": "Doc syntax error",
-          "type": "string",
-          "const": "doc-syntax-error"
-        },
-        {
-          "description": "Type not found",
-          "type": "string",
-          "const": "type-not-found"
-        },
-        {
-          "description": "Missing return statement",
-          "type": "string",
-          "const": "missing-return"
-        },
-        {
-          "description": "Param Type not match",
-          "type": "string",
-          "const": "param-type-mismatch"
-        },
-        {
-          "description": "Missing parameter",
-          "type": "string",
-          "const": "missing-parameter"
-        },
-        {
-          "description": "Redundant parameter",
-          "type": "string",
-          "const": "redundant-parameter"
-        },
-        {
-          "description": "Unreachable code",
-          "type": "string",
-          "const": "unreachable-code"
-        },
-        {
-          "description": "Unused",
-          "type": "string",
-          "const": "unused"
-        },
-        {
-          "description": "Unused implicit self parameter",
-          "type": "string",
-          "const": "unused-self"
-        },
-        {
-          "description": "Undefined global",
-          "type": "string",
-          "const": "undefined-global"
-        },
-        {
-          "description": "Deprecated",
-          "type": "string",
-          "const": "deprecated"
-        },
-        {
-          "description": "Access invisible",
-          "type": "string",
-          "const": "access-invisible"
-        },
-        {
-          "description": "Discard return value",
-          "type": "string",
-          "const": "discard-returns"
-        },
-        {
-          "description": "Undefined field",
-          "type": "string",
-          "const": "undefined-field"
-        },
-        {
-          "description": "Local const reassign",
-          "type": "string",
-          "const": "local-const-reassign"
-        },
-        {
-          "description": "Iter variable reassign",
-          "type": "string",
-          "const": "iter-variable-reassign"
-        },
-        {
-          "description": "Duplicate type",
-          "type": "string",
-          "const": "duplicate-type"
-        },
-        {
-          "description": "Redefined local",
-          "type": "string",
-          "const": "redefined-local"
-        },
-        {
-          "description": "Redefined label",
-          "type": "string",
-          "const": "redefined-label"
-        },
-        {
-          "description": "Code style check",
-          "type": "string",
-          "const": "code-style-check"
-        },
-        {
-          "description": "Need check nil",
-          "type": "string",
-          "const": "need-check-nil"
-        },
-        {
-          "description": "Await in sync",
-          "type": "string",
-          "const": "await-in-sync"
-        },
-        {
-          "description": "Doc tag usage error",
-          "type": "string",
-          "const": "annotation-usage-error"
-        },
-        {
-          "description": "Return type mismatch",
-          "type": "string",
-          "const": "return-type-mismatch"
-        },
-        {
-          "description": "Missing return value",
-          "type": "string",
-          "const": "missing-return-value"
-        },
-        {
-          "description": "Redundant return value",
-          "type": "string",
-          "const": "redundant-return-value"
-        },
-        {
-          "description": "Undefined Doc Param",
-          "type": "string",
-          "const": "undefined-doc-param"
-        },
-        {
-          "description": "Duplicate doc field",
-          "type": "string",
-          "const": "duplicate-doc-field"
-        },
-        {
-          "description": "Unknown doc annotation",
-          "type": "string",
-          "const": "unknown-doc-tag"
-        },
-        {
-          "description": "Missing fields",
-          "type": "string",
-          "const": "missing-fields"
-        },
-        {
-          "description": "Inject Field",
-          "type": "string",
-          "const": "inject-field"
-        },
-        {
-          "description": "Circle Doc Class",
-          "type": "string",
-          "const": "circle-doc-class"
-        },
-        {
-          "description": "Incomplete signature doc",
-          "type": "string",
-          "const": "incomplete-signature-doc"
-        },
-        {
-          "description": "Missing global doc",
-          "type": "string",
-          "const": "missing-global-doc"
-        },
-        {
-          "description": "Assign type mismatch",
-          "type": "string",
-          "const": "assign-type-mismatch"
-        },
-        {
-          "description": "Duplicate require",
-          "type": "string",
-          "const": "duplicate-require"
-        },
-        {
-          "description": "non-literal-expressions-in-assert",
-          "type": "string",
-          "const": "non-literal-expressions-in-assert"
-        },
-        {
-          "description": "Unbalanced assignments",
-          "type": "string",
-          "const": "unbalanced-assignments"
-        },
-        {
-          "description": "unnecessary-assert",
-          "type": "string",
-          "const": "unnecessary-assert"
-        },
-        {
-          "description": "unnecessary-if",
-          "type": "string",
-          "const": "unnecessary-if"
-        },
-        {
-          "description": "duplicate-set-field",
-          "type": "string",
-          "const": "duplicate-set-field"
-        },
-        {
-          "description": "duplicate-index",
-          "type": "string",
-          "const": "duplicate-index"
-        },
-        {
-          "description": "generic-constraint-mismatch",
-          "type": "string",
-          "const": "generic-constraint-mismatch"
-        },
-        {
-          "description": "cast-type-mismatch",
-          "type": "string",
-          "const": "cast-type-mismatch"
-        },
-        {
-          "description": "require-module-not-visible",
-          "type": "string",
-          "const": "require-module-not-visible"
-        },
-        {
-          "description": "enum-value-mismatch",
-          "type": "string",
-          "const": "enum-value-mismatch"
-        },
-        {
-          "description": "preferred-local-alias",
-          "type": "string",
-          "const": "preferred-local-alias"
-        },
-        {
-          "description": "readonly",
-          "type": "string",
-          "const": "read-only"
-        },
-        {
-          "description": "Global variable defined in non-module scope",
-          "type": "string",
-          "const": "global-in-non-module"
-        },
-        {
-          "description": "attribute-param-type-mismatch",
-          "type": "string",
-          "const": "attribute-param-type-mismatch"
-        },
-        {
-          "description": "attribute-missing-parameter",
-          "type": "string",
-          "const": "attribute-missing-parameter"
-        },
-        {
-          "description": "attribute-redundant-parameter",
-          "type": "string",
-          "const": "attribute-redundant-parameter"
-        },
-        {
-          "description": "invert-if",
-          "type": "string",
-          "const": "invert-if"
-        },
-        {
-          "description": "Call to a non-callable value",
-          "type": "string",
-          "const": "call-non-callable"
-        },
-        {
-          "description": "gmod-invalid-hook-name",
-          "type": "string",
-          "const": "gmod-invalid-hook-name"
-        },
-        {
-          "description": "gmod-realm-mismatch (strict realm mismatch)",
-          "type": "string",
-          "const": "gmod-realm-mismatch"
-        },
-        {
-          "description": "gmod-realm-mismatch-heuristic (heuristic realm mismatch)",
-          "type": "string",
-          "const": "gmod-realm-mismatch-heuristic"
-        },
-        {
-          "description": "gmod-unknown-realm (realm could not be resolved)",
-          "type": "string",
-          "const": "gmod-unknown-realm"
-        },
-        {
-          "description": "gmod-unknown-net-message",
-          "type": "string",
-          "const": "gmod-unknown-net-message"
-        },
-        {
-          "description": "gmod-net-read-write-type-mismatch",
-          "type": "string",
-          "const": "gmod-net-read-write-type-mismatch"
-        },
-        {
-          "description": "gmod-net-read-write-order-mismatch",
-          "type": "string",
-          "const": "gmod-net-read-write-order-mismatch"
-        },
-        {
-          "description": "gmod-net-missing-network-counterpart",
-          "type": "string",
-          "const": "gmod-net-missing-network-counterpart"
-        },
-        {
-          "description": "gmod-duplicate-system-registration",
-          "type": "string",
-          "const": "gmod-duplicate-system-registration"
-        }
-      ]
-    },
-    "DiagnosticSeveritySetting": {
-      "oneOf": [
-        {
-          "description": "Represents an error diagnostic severity.",
-          "type": "string",
-          "const": "error"
-        },
-        {
-          "description": "Represents a warning diagnostic severity.",
-          "type": "string",
-          "const": "warning"
-        },
-        {
-          "description": "Represents an information diagnostic severity.",
-          "type": "string",
-          "const": "information"
-        },
-        {
-          "description": "Represents a hint diagnostic severity.",
-          "type": "string",
-          "const": "hint"
-        }
-      ]
-    },
-    "DocSyntax": {
-      "type": "string",
-      "enum": [
-        "none",
-        "md",
-        "myst",
-        "rst"
-      ]
-    },
-    "EmmyLibraryConfig": {
-      "type": "object",
-      "properties": {
-        "ignoreDir": {
-          "description": "Ignore directories within this library",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "ignoreGlobs": {
-          "description": "Ignore globs within this library. eg: [\"**/*.lua\"]",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "path": {
-          "description": "Library path",
-          "type": "string"
-        }
-      },
-      "required": [
-        "path"
-      ]
-    },
-    "EmmyLibraryItem": {
-      "anyOf": [
-        {
-          "description": "Simple library path string",
-          "type": "string"
-        },
-        {
-          "description": "Library configuration with path and ignore rules",
-          "$ref": "#/$defs/EmmyLibraryConfig"
-        }
-      ]
-    },
-    "EmmyrcCodeAction": {
-      "type": "object",
-      "properties": {
-        "insertSpace": {
-          "description": "Add space after `---` comments when inserting `@diagnostic disable-next-line`.",
-          "type": "boolean",
-          "default": false,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcCodeLens": {
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enable code lens.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcCompletion": {
-      "description": "Configuration for EmmyLua code completion.",
-      "type": "object",
-      "properties": {
-        "autoRequire": {
-          "description": "Automatically insert call to `require` when autocompletion\ninserts objects from other modules.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "autoRequireFunction": {
-          "description": "The function used for auto-requiring modules.",
-          "type": "string",
-          "default": "require"
-        },
-        "autoRequireNamingConvention": {
-          "description": "The naming convention for auto-required filenames.",
-          "$ref": "#/$defs/EmmyrcFilenameConvention",
-          "default": "keep"
-        },
-        "autoRequireSeparator": {
-          "description": "A separator used in auto-require paths.",
-          "type": "string",
-          "default": "."
-        },
-        "baseFunctionIncludesName": {
-          "description": "Whether to include the name in the base function completion. Effect: `function () end` -> `function name() end`.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "callSnippet": {
-          "description": "Whether to use call snippets in completions.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "enable": {
-          "description": "Enable autocompletion.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "postfix": {
-          "description": "Symbol that's used to trigger postfix autocompletion.",
-          "type": "string",
-          "default": "@",
-          "x-vscode-setting": {
-            "default": null,
-            "enum": [
-              null,
-              "@",
-              ".",
-              ":"
-            ],
-            "enumItemLabels": [
-              "Default"
-            ],
-            "markdownEnumDescriptions": [
-              "%config.common.enum.default.description%"
-            ],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Emmyrc",
+    "type": "object",
+    "properties": {
+        "$schema": {
             "type": [
-              "string",
-              "null"
+                "string",
+                "null"
             ]
-          }
         },
-        "stagedCallSnippets": {
-          "description": "Whether to stage known API call snippets so autocomplete can guide\nthe user through the next relevant argument.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcDiagnostic": {
-      "description": "Represents the diagnostic configuration for Emmyrc.",
-      "type": "object",
-      "properties": {
-        "diagnosticInterval": {
-          "description": "Delay between opening/changing a file and scanning it for errors, in milliseconds.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0,
-          "x-vscode-setting": true
-        },
-        "disable": {
-          "description": "A list of diagnostic codes that are disabled.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/DiagnosticCode"
-          }
-        },
-        "enable": {
-          "description": "A flag indicating whether diagnostics are enabled.",
-          "type": "boolean",
-          "default": true
-        },
-        "enables": {
-          "description": "A list of diagnostic codes that are enabled.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/DiagnosticCode"
-          }
-        },
-        "globals": {
-          "description": "A list of global variables.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "globalsRegex": {
-          "description": "A list of regular expressions for global variables.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "severity": {
-          "description": "A map of diagnostic codes to their severity settings.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/DiagnosticSeveritySetting"
-          },
-          "default": {}
-        }
-      }
-    },
-    "EmmyrcDoc": {
-      "type": "object",
-      "properties": {
-        "knownTags": {
-          "description": "List of known documentation tags.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "privateName": {
-          "description": "Treat specific field names as private, e.g. `m_*` means `XXX.m_id` and `XXX.m_type` are private, witch can only be accessed in the class where the definition is located.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "rstDefaultRole": {
-          "description": "When `syntax` is `Myst` or `Rst`, specifies default role used\nwith RST processor.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rstPrimaryDomain": {
-          "description": "When `syntax` is `Myst` or `Rst`, specifies primary domain used\nwith RST processor.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "syntax": {
-          "description": "Syntax for highlighting documentation.",
-          "$ref": "#/$defs/DocSyntax",
-          "default": "md"
-        }
-      }
-    },
-    "EmmyrcDocumentColor": {
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enable parsing strings for color tags and showing a color picker next to them.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcExternalTool": {
-      "type": "object",
-      "properties": {
-        "args": {
-          "description": "The arguments to pass to the external tool.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "program": {
-          "description": "The command to run the external tool.",
-          "type": "string",
-          "default": ""
-        },
-        "timeout": {
-          "description": "The timeout for the external tool in milliseconds.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 5000,
-          "minimum": 0
-        }
-      }
-    },
-    "EmmyrcFilenameConvention": {
-      "oneOf": [
-        {
-          "description": "Keep the original filename.",
-          "type": "string",
-          "const": "keep"
-        },
-        {
-          "description": "Convert the filename to snake_case.",
-          "type": "string",
-          "const": "snake-case"
-        },
-        {
-          "description": "Convert the filename to PascalCase.",
-          "type": "string",
-          "const": "pascal-case"
-        },
-        {
-          "description": "Convert the filename to camelCase.",
-          "type": "string",
-          "const": "camel-case"
-        },
-        {
-          "description": "When returning class definition, use class name, otherwise keep original name.",
-          "type": "string",
-          "const": "keep-class"
-        }
-      ]
-    },
-    "EmmyrcFormatAlignArrayTable": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatAlignArrayTableMode"
-        }
-      ]
-    },
-    "EmmyrcFormatAlignArrayTableMode": {
-      "type": "string",
-      "enum": [
-        "none",
-        "always",
-        "contain_curly"
-      ]
-    },
-    "EmmyrcFormatAlignChainExpr": {
-      "type": "string",
-      "enum": [
-        "none",
-        "always",
-        "only_call_stmt"
-      ]
-    },
-    "EmmyrcFormatAlignContinuousAssignStatement": {
-      "type": "string",
-      "enum": [
-        "true",
-        "false",
-        "always"
-      ]
-    },
-    "EmmyrcFormatAsymmetricOperatorSpacing": {
-      "type": "string",
-      "enum": [
-        "none",
-        "always",
-        "no_space_asym"
-      ]
-    },
-    "EmmyrcFormatBoolKeyword": {
-      "type": "string",
-      "enum": [
-        "true",
-        "false"
-      ]
-    },
-    "EmmyrcFormatCallArgParentheses": {
-      "type": "string",
-      "enum": [
-        "keep",
-        "remove",
-        "remove_table_only",
-        "remove_string_only",
-        "always"
-      ]
-    },
-    "EmmyrcFormatConfigPrecedence": {
-      "oneOf": [
-        {
-          "description": "Prefer discovered .editorconfig files over .gluarc formatter overrides.",
-          "type": "string",
-          "const": "preferEditorconfig"
-        },
-        {
-          "description": "Prefer .gluarc formatter overrides over discovered .editorconfig files.",
-          "type": "string",
-          "const": "preferGluarc"
-        }
-      ]
-    },
-    "EmmyrcFormatEndOfLine": {
-      "type": "string",
-      "enum": [
-        "crlf",
-        "lf",
-        "cr",
-        "auto",
-        "unset"
-      ]
-    },
-    "EmmyrcFormatEndStatementWithSemicolon": {
-      "type": "string",
-      "enum": [
-        "keep",
-        "always",
-        "same_line",
-        "replace_with_newline",
-        "never"
-      ]
-    },
-    "EmmyrcFormatIndentStyle": {
-      "type": "string",
-      "enum": [
-        "tab",
-        "space"
-      ]
-    },
-    "EmmyrcFormatKeepKeyword": {
-      "type": "string",
-      "enum": [
-        "keep"
-      ]
-    },
-    "EmmyrcFormatMaxLineLength": {
-      "anyOf": [
-        {
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatUnsetKeyword"
-        }
-      ]
-    },
-    "EmmyrcFormatPreset": {
-      "oneOf": [
-        {
-          "description": "Use EmmyLuaCodeStyle built-in defaults. No style overrides are applied.",
-          "type": "string",
-          "const": "default"
-        },
-        {
-          "description": "Apply the built-in CFC (Clockwork Fighters Community) style preset: 4-space indentation, spaces inside parentheses, semicolons replaced with newlines.",
-          "type": "string",
-          "const": "cfc"
-        },
-        {
-          "description": "Apply no preset. Only the `styleOverrides` you configure explicitly take effect; everything else uses the formatter's compiled-in default.",
-          "type": "string",
-          "const": "custom"
-        }
-      ]
-    },
-    "EmmyrcFormatQuoteStyle": {
-      "type": "string",
-      "enum": [
-        "none",
-        "single",
-        "double"
-      ]
-    },
-    "EmmyrcFormatSpaceAroundAssignOperator": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
-        }
-      ]
-    },
-    "EmmyrcFormatSpaceAroundConcatOperator": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
-        }
-      ]
-    },
-    "EmmyrcFormatSpaceBeforeFunctionCallSingleArg": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatSpaceBeforeFunctionCallSingleArgMode"
-        }
-      ]
-    },
-    "EmmyrcFormatSpaceBeforeFunctionCallSingleArgMode": {
-      "type": "string",
-      "enum": [
-        "always",
-        "only_string",
-        "only_table",
-        "none"
-      ]
-    },
-    "EmmyrcFormatSpaceBeforeInlineComment": {
-      "anyOf": [
-        {
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0
-        },
-        {
-          "$ref": "#/$defs/EmmyrcFormatKeepKeyword"
-        }
-      ]
-    },
-    "EmmyrcFormatStyleOverrides": {
-      "description": "Typed EmmyLuaCodeStyle overrides for built-in formatting.",
-      "type": "object",
-      "properties": {
-        "align_array_table": {
-          "description": "Array table layout: `none` keeps items inline, `always` puts each item on its own line, `contain_curly` uses multiline only when a nested table is present.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatAlignArrayTable"
-            },
-            {
-              "type": "null"
+        "codeAction": {
+            "$ref": "#/$defs/EmmyrcCodeAction",
+            "default": {
+                "insertSpace": false
             }
-          ]
         },
-        "align_call_args": {
-          "description": "Vertically align arguments of multi-line function calls to the opening parenthesis.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "align_chain_expr": {
-          "description": "Align chained method / field expressions: `none` disables, `always` aligns all chains, `only_call_stmt` aligns only call statement chains.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatAlignChainExpr"
-            },
-            {
-              "type": "null"
+        "codeLens": {
+            "$ref": "#/$defs/EmmyrcCodeLens",
+            "default": {
+                "enable": true
             }
-          ]
         },
-        "align_continuous_assign_statement": {
-          "description": "Align consecutive assignment statements on their `=` sign (`true` aligns within a block, `always` aligns across blank lines, `false` disables).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatAlignContinuousAssignStatement"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "align_continuous_inline_comment": {
-          "description": "Align the `--` of inline comments across consecutive lines so they form a vertical column.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "align_continuous_line_space": {
-          "description": "Maximum number of blank lines between consecutive statements before they are no longer considered part of the same aligned block.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0
-        },
-        "align_continuous_rect_table_field": {
-          "description": "Align key-value fields in rectangular table literals so that `=` signs line up vertically (`true`, `false`, `always`).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatAlignContinuousAssignStatement"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "align_continuous_similar_call_args": {
-          "description": "Align arguments across similar consecutive function calls so that matching argument positions line up vertically.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "align_function_params": {
-          "description": "Vertically align parameters in multi-line function declarations to the opening parenthesis.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "align_if_branch": {
-          "description": "Vertically align `if` / `elseif` / `else` condition keywords.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "allow_non_indented_comments": {
-          "description": "Allow comments that start at column 0 to remain un-indented even when inside an indented block.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "auto_collapse_lines": {
-          "description": "Collapse short multi-statement blocks into a single line when they fit within `max_line_length`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "break_all_list_when_line_exceed": {
-          "description": "When a line exceeds `max_line_length`, break every item in the containing list onto its own line rather than only the overflowing item.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "break_before_braces": {
-          "description": "Place the opening `{` of a table constructor on a new line instead of at the end of the preceding line.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "break_multiline_call_expression_list": {
-          "description": "When a function call already spans multiple lines, put each argument and the closing `)` on their own lines.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "call_arg_parentheses": {
-          "description": "How to handle parentheses around single-argument function calls with a string or table literal (`keep`, `remove`, `remove_table_only`, `remove_string_only`, `always`).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatCallArgParentheses"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "continuation_indent": {
-          "description": "Number of extra spaces used for indenting continuation lines when a line is wrapped.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0
-        },
-        "detect_end_of_line": {
-          "description": "Detect line endings from file content.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "end_of_line": {
-          "description": "Line ending preference.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatEndOfLine"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "end_statement_with_semicolon": {
-          "description": "Semicolon handling: `keep` preserves existing, `always` adds to all statements, `same_line` adds between same-line statements, `replace_with_newline` replaces semicolons with newlines, `never` removes all.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatEndStatementWithSemicolon"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "ignore_space_after_colon": {
-          "description": "Do not normalize spacing after `:` in method call and definition syntax.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "ignore_spaces_inside_function_call": {
-          "description": "When `true`, preserve existing spacing inside function call arguments instead of normalizing it.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "indent_size": {
-          "description": "Number of spaces used for one indentation level.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0
-        },
-        "indent_style": {
-          "description": "`tab` or `space` indentation mode.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatIndentStyle"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "insert_final_newline": {
-          "description": "Ensure file ends with a newline.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "keep_indents_on_empty_lines": {
-          "description": "Keep indentation whitespace on otherwise blank lines instead of stripping it.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "line_space_after_comment": {
-          "description": "Line spacing after comments (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_do_statement": {
-          "description": "Line spacing after `do` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_expression_statement": {
-          "description": "Line spacing after expression statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_for_statement": {
-          "description": "Line spacing after `for` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_function_statement": {
-          "description": "Line spacing after function statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_if_statement": {
-          "description": "Line spacing after `if` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_local_or_assign_statement": {
-          "description": "Line spacing after local/assignment statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_repeat_statement": {
-          "description": "Line spacing after `repeat` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_after_while_statement": {
-          "description": "Line spacing after `while` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "line_space_around_block": {
-          "description": "Line spacing around blocks (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "max_line_length": {
-          "description": "Column limit before the formatter wraps items onto new lines. Set to `\"unset\"` to disable line length enforcement.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatMaxLineLength"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "never_indent_before_if_condition": {
-          "description": "Do not add extra indentation to wrapped `if`/`elseif` condition expressions.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "never_indent_comment_on_if_branch": {
-          "description": "Do not indent a lone comment that appears inside an `if` branch body.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "quote_style": {
-          "description": "Preferred quote style for string literals. `none` preserves the original style.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatQuoteStyle"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "remove_call_expression_list_finish_comma": {
-          "description": "Remove trailing commas that appear at the end of function call argument lists.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "remove_redundant_condition_parentheses": {
-          "description": "Remove redundant parentheses around single-line condition expressions such as `if (x) then`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_after_comma": {
-          "description": "Add a space after commas in expressions and argument lists.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_after_comma_in_for_statement": {
-          "description": "Add a space after commas in `for` loop range expressions.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_after_comment_dash": {
-          "description": "Ensure a single space exists after the comment dash prefix (`--`).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_around_assign_operator": {
-          "description": "Spaces around assignment operators (`=`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (asymmetric spacing).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatSpaceAroundAssignOperator"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "space_around_concat_operator": {
-          "description": "Spaces around the concatenation operator (`..`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (space on left side only).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatSpaceAroundConcatOperator"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "space_around_logical_operator": {
-          "description": "Add spaces around logical operators (`and`, `or`, `not`).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_around_math_operator": {
-          "description": "Add spaces around math operators (`+`, `-`, `*`, `/`, `%`, `^`).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_around_table_append_operator": {
-          "description": "Add spaces around the table append operator (`#t + 1` style appends).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_around_table_field_list": {
-          "description": "Add spaces inside table braces, e.g. `{ a = 1 }` vs `{a = 1}`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_before_attribute": {
-          "description": "Add a space before Lua attribute annotations, e.g. `local x <const>`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_before_closure_open_parenthesis": {
-          "description": "Add a space before `(` in anonymous function expressions, e.g. `function ()`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_before_function_call_open_parenthesis": {
-          "description": "Add a space before `(` in function calls, e.g. `print ('hello')`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_before_function_call_single_arg": {
-          "description": "Space handling before a single string or table literal argument: `always`, `only_string`, `only_table`, or `none`.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatSpaceBeforeFunctionCallSingleArg"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "space_before_function_open_parenthesis": {
-          "description": "Add a space before `(` in function declarations, e.g. `function foo ()`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_before_inline_comment": {
-          "description": "Number of spaces to enforce before inline comments (`--`), or `\"keep\"` to preserve existing spacing.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatSpaceBeforeInlineComment"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "space_before_open_square_bracket": {
-          "description": "Add a space before `[` in table index expressions, e.g. `t [key]`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_inside_function_call_parentheses": {
-          "description": "Add spaces inside function call parentheses, e.g. `print( 'hello' )`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_inside_function_param_list_parentheses": {
-          "description": "Add spaces inside function parameter list parentheses, e.g. `function foo( a, b )`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "space_inside_square_brackets": {
-          "description": "Add spaces inside square bracket index expressions, e.g. `t[ 1 ]`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "tab_width": {
-          "description": "Display width of a tab character in spaces, used for visual alignment calculations.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint32",
-          "minimum": 0
-        },
-        "table_separator_style": {
-          "description": "Separator character used between table fields (`none`, `comma`, `semicolon`, `only_kv_colon`).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatTableSeparatorStyle"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "trailing_table_separator": {
-          "description": "Whether to add or remove a trailing separator after the last field in a table (`keep`, `never`, `always`, `smart`).",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatTrailingTableSeparator"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "EmmyrcFormatTableSeparatorStyle": {
-      "type": "string",
-      "enum": [
-        "none",
-        "comma",
-        "semicolon",
-        "only_kv_colon"
-      ]
-    },
-    "EmmyrcFormatTrailingTableSeparator": {
-      "type": "string",
-      "enum": [
-        "keep",
-        "never",
-        "always",
-        "smart"
-      ]
-    },
-    "EmmyrcFormatUnsetKeyword": {
-      "type": "string",
-      "enum": [
-        "unset"
-      ]
-    },
-    "EmmyrcGmod": {
-      "type": "object",
-      "properties": {
-        "annotationsPath": {
-          "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "autoLoadAnnotations": {
-          "description": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings.",
-          "type": [
-            "boolean",
-            "null"
-          ],
-          "default": null
-        },
-        "defaultRealm": {
-          "$ref": "#/$defs/EmmyrcGmodRealm",
-          "default": "shared"
-        },
-        "detectRealmFromCalls": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "detectRealmFromFilename": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "dynamicFieldsGlobal": {
-          "type": "boolean",
-          "default": true
-        },
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "fileParamDefaults": {
-          "description": "Parameter-name to type-name fallbacks for otherwise unresolved params.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {
-            "ang": "Angle",
-            "angle": "Angle",
-            "attacker": "Entity",
-            "cmd": "CUserCmd",
-            "col": "Color",
-            "color": "Color",
-            "dmginfo": "CTakeDamageInfo",
-            "ent": "Entity",
-            "entity": "Entity",
-            "inflictor": "Entity",
-            "mat": "IMaterial",
-            "npc": "NPC",
-            "panel": "Panel",
-            "phys": "PhysObj",
-            "player": "Player",
-            "ply": "Player",
-            "pnl": "Panel",
-            "pos": "Vector",
-            "tr": "TraceResult",
-            "trace": "TraceResult",
-            "vec": "Vector",
-            "veh": "Entity",
-            "vehicle": "Entity",
-            "victim": "Entity",
-            "weapon": "Weapon",
-            "wep": "Weapon"
-          },
-          "x-gluals-editor": "mappingTable",
-          "x-gluals-key-label": "Parameter",
-          "x-gluals-value-label": "Type"
-        },
-        "hookMappings": {
-          "$ref": "#/$defs/EmmyrcGmodHookMappings",
-          "default": {
-            "emitterToHook": {},
-            "methodPrefixes": [],
-            "methodToHook": {}
-          }
-        },
-        "inferDynamicFields": {
-          "type": "boolean",
-          "default": true
-        },
-        "network": {
-          "$ref": "#/$defs/EmmyrcGmodNetwork",
-          "default": {
-            "completion": {
-              "mismatchHints": true,
-              "smartReadSuggestions": true
-            },
-            "diagnostics": {
-              "missingCounterpart": true,
-              "orderMismatch": true,
-              "typeMismatch": true
-            },
-            "enabled": true
-          }
-        },
-        "outline": {
-          "$ref": "#/$defs/EmmyrcGmodOutline",
-          "default": {
-            "verbosity": "normal"
-          }
-        },
-        "scriptedClassScopes": {
-          "$ref": "#/$defs/EmmyrcGmodScriptedClassScopes",
-          "default": {
-            "include": [
-              {
-                "classGlobal": "ENT",
-                "icon": "folder-library",
-                "id": "entities",
-                "include": [
-                  "entities/**"
-                ],
-                "label": "Entities",
-                "path": [
-                  "entities"
-                ],
-                "rootDir": "lua/entities",
-                "scaffold": {
-                  "files": [
-                    {
-                      "path": "{{name}}/shared.lua",
-                      "template": "ent_shared.lua"
-                    },
-                    {
-                      "path": "{{name}}/init.lua",
-                      "template": "ent_init.lua"
-                    },
-                    {
-                      "path": "{{name}}/cl_init.lua",
-                      "template": "ent_cl_init.lua"
-                    }
-                  ]
-                }
-              },
-              {
-                "classGlobal": "SWEP",
-                "exclude": [
-                  "weapons/gmod_tool/**"
-                ],
-                "icon": "folder-library",
-                "id": "weapons",
-                "include": [
-                  "weapons/**"
-                ],
-                "label": "SWEPs",
-                "path": [
-                  "weapons"
-                ],
-                "rootDir": "lua/weapons",
-                "scaffold": {
-                  "files": [
-                    {
-                      "path": "{{name}}/shared.lua",
-                      "template": "swep_shared.lua"
-                    }
-                  ]
-                }
-              },
-              {
-                "classGlobal": "EFFECT",
-                "icon": "folder-library",
-                "id": "effects",
-                "include": [
-                  "effects/**"
-                ],
-                "label": "Effects",
-                "path": [
-                  "effects"
-                ],
-                "rootDir": "lua/effects",
-                "scaffold": {
-                  "files": [
-                    {
-                      "path": "{{name}}.lua",
-                      "template": "effect.lua"
-                    }
-                  ]
-                }
-              },
-              {
-                "classGlobal": "TOOL",
-                "icon": "tools",
-                "id": "stools",
-                "include": [
-                  "weapons/gmod_tool/stools/**"
-                ],
-                "label": "STools",
-                "parentId": "weapons",
-                "path": [
-                  "weapons",
-                  "gmod_tool",
-                  "stools"
-                ],
-                "rootDir": "lua/weapons/gmod_tool/stools",
-                "scaffold": {
-                  "files": [
-                    {
-                      "path": "{{name}}.lua",
-                      "template": "tool.lua"
-                    }
-                  ]
-                }
-              },
-              {
-                "classGlobal": "PLUGIN",
-                "icon": "extensions",
-                "id": "plugins",
-                "include": [
-                  "plugins/**"
-                ],
-                "label": "Plugins",
-                "path": [
-                  "plugins"
-                ],
-                "rootDir": "plugins"
-              }
-            ]
-          }
-        },
-        "templatePath": {
-          "description": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "vgui": {
-          "$ref": "#/$defs/EmmyrcGmodVgui",
-          "default": {
-            "codeLensEnabled": true,
-            "inlayHintEnabled": false
-          }
-        }
-      }
-    },
-    "EmmyrcGmodHookMappings": {
-      "type": "object",
-      "properties": {
-        "emitterToHook": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        },
-        "methodPrefixes": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "methodToHook": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
-        }
-      }
-    },
-    "EmmyrcGmodNetwork": {
-      "type": "object",
-      "properties": {
         "completion": {
-          "$ref": "#/$defs/EmmyrcGmodNetworkCompletion",
-          "default": {
-            "mismatchHints": true,
-            "smartReadSuggestions": true
-          }
+            "$ref": "#/$defs/EmmyrcCompletion",
+            "default": {
+                "autoRequire": true,
+                "autoRequireFunction": "require",
+                "autoRequireNamingConvention": "keep",
+                "autoRequireSeparator": ".",
+                "baseFunctionIncludesName": true,
+                "callSnippet": true,
+                "enable": true,
+                "postfix": "@",
+                "stagedCallSnippets": true
+            }
         },
         "diagnostics": {
-          "$ref": "#/$defs/EmmyrcGmodNetworkDiagnostics",
-          "default": {
-            "missingCounterpart": true,
-            "orderMismatch": true,
-            "typeMismatch": true
-          }
-        },
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        }
-      }
-    },
-    "EmmyrcGmodNetworkCompletion": {
-      "type": "object",
-      "properties": {
-        "mismatchHints": {
-          "type": "boolean",
-          "default": true
-        },
-        "smartReadSuggestions": {
-          "type": "boolean",
-          "default": true
-        }
-      }
-    },
-    "EmmyrcGmodNetworkDiagnostics": {
-      "type": "object",
-      "properties": {
-        "missingCounterpart": {
-          "type": "boolean",
-          "default": true
-        },
-        "orderMismatch": {
-          "type": "boolean",
-          "default": true
-        },
-        "typeMismatch": {
-          "type": "boolean",
-          "default": true
-        }
-      }
-    },
-    "EmmyrcGmodOutline": {
-      "type": "object",
-      "properties": {
-        "verbosity": {
-          "description": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals.",
-          "$ref": "#/$defs/EmmyrcGmodOutlineVerbosity",
-          "default": "normal"
-        }
-      }
-    },
-    "EmmyrcGmodOutlineVerbosity": {
-      "oneOf": [
-        {
-          "description": "Show only functions, classes, VGUI panels, hooks, net receivers, timers, concommands.",
-          "type": "string",
-          "const": "minimal"
-        },
-        {
-          "description": "Show functions, classes, important tables, hooks, net receivers, timers, concommands, and\nnon-primitive variables. Hides `if`/`for`/`do` blocks.",
-          "type": "string",
-          "const": "normal"
-        },
-        {
-          "description": "Show everything (legacy behavior, includes control-flow blocks and all locals).",
-          "type": "string",
-          "const": "verbose"
-        }
-      ]
-    },
-    "EmmyrcGmodRealm": {
-      "type": "string",
-      "enum": [
-        "client",
-        "server",
-        "shared",
-        "menu"
-      ]
-    },
-    "EmmyrcGmodScriptedClassDefinition": {
-      "type": "object",
-      "properties": {
-        "classGlobal": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "disabled": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "exclude": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "icon": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "include": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "label": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "parentId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "path": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "rootDir": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "scaffold": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcGmodScriptedClassScaffold"
-            },
-            {
-              "type": "null"
+            "$ref": "#/$defs/EmmyrcDiagnostic",
+            "default": {
+                "diagnosticInterval": 500,
+                "disable": [],
+                "enable": true,
+                "enables": [],
+                "globals": [],
+                "globalsRegex": [],
+                "severity": {}
             }
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "EmmyrcGmodScriptedClassScaffold": {
-      "type": "object",
-      "properties": {
-        "files": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/EmmyrcGmodScriptedClassScaffoldFile"
-          }
-        }
-      }
-    },
-    "EmmyrcGmodScriptedClassScaffoldFile": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "type": "string"
         },
-        "template": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "template"
-      ]
-    },
-    "EmmyrcGmodScriptedClassScopeEntry": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "$ref": "#/$defs/EmmyrcGmodScriptedClassDefinition"
-        }
-      ]
-    },
-    "EmmyrcGmodScriptedClassScopes": {
-      "type": "object",
-      "properties": {
-        "include": {
-          "type": "array",
-          "default": [
-            {
-              "classGlobal": "ENT",
-              "icon": "folder-library",
-              "id": "entities",
-              "include": [
-                "entities/**"
-              ],
-              "label": "Entities",
-              "path": [
-                "entities"
-              ],
-              "rootDir": "lua/entities",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}/shared.lua",
-                    "template": "ent_shared.lua"
-                  },
-                  {
-                    "path": "{{name}}/init.lua",
-                    "template": "ent_init.lua"
-                  },
-                  {
-                    "path": "{{name}}/cl_init.lua",
-                    "template": "ent_cl_init.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "SWEP",
-              "exclude": [
-                "weapons/gmod_tool/**"
-              ],
-              "icon": "folder-library",
-              "id": "weapons",
-              "include": [
-                "weapons/**"
-              ],
-              "label": "SWEPs",
-              "path": [
-                "weapons"
-              ],
-              "rootDir": "lua/weapons",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}/shared.lua",
-                    "template": "swep_shared.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "EFFECT",
-              "icon": "folder-library",
-              "id": "effects",
-              "include": [
-                "effects/**"
-              ],
-              "label": "Effects",
-              "path": [
-                "effects"
-              ],
-              "rootDir": "lua/effects",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}.lua",
-                    "template": "effect.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "TOOL",
-              "icon": "tools",
-              "id": "stools",
-              "include": [
-                "weapons/gmod_tool/stools/**"
-              ],
-              "label": "STools",
-              "parentId": "weapons",
-              "path": [
-                "weapons",
-                "gmod_tool",
-                "stools"
-              ],
-              "rootDir": "lua/weapons/gmod_tool/stools",
-              "scaffold": {
-                "files": [
-                  {
-                    "path": "{{name}}.lua",
-                    "template": "tool.lua"
-                  }
-                ]
-              }
-            },
-            {
-              "classGlobal": "PLUGIN",
-              "icon": "extensions",
-              "id": "plugins",
-              "include": [
-                "plugins/**"
-              ],
-              "label": "Plugins",
-              "path": [
-                "plugins"
-              ],
-              "rootDir": "plugins"
+        "doc": {
+            "$ref": "#/$defs/EmmyrcDoc",
+            "default": {
+                "knownTags": [],
+                "privateName": [],
+                "syntax": "md"
             }
-          ],
-          "items": {
-            "$ref": "#/$defs/EmmyrcGmodScriptedClassScopeEntry"
-          },
-          "x-gluals-editor": "scriptedClassTable"
-        }
-      }
-    },
-    "EmmyrcGmodVgui": {
-      "type": "object",
-      "properties": {
-        "codeLensEnabled": {
-          "type": "boolean",
-          "default": true
         },
-        "inlayHintEnabled": {
-          "type": "boolean",
-          "default": false
-        }
-      }
-    },
-    "EmmyrcHover": {
-      "type": "object",
-      "properties": {
-        "customDetail": {
-          "description": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint8",
-          "default": null,
-          "maximum": 255,
-          "minimum": 0
-        },
-        "enable": {
-          "description": "Enable showing documentation on hover.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcInlayHint": {
-      "type": "object",
-      "properties": {
-        "closingEndHint": {
-          "description": "Show an inlay hint after closing `end` keywords indicating what block\nthey belong to (e.g. function name). Only shown when the block spans\nat least `closingEndHintMinLines` lines.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "closingEndHintControlFlow": {
-          "description": "Also show closing `end` hints for control flow blocks (if, while, do,\nfor). Only effective when `closingEndHint` is enabled.",
-          "type": "boolean",
-          "default": false,
-          "x-vscode-setting": true
-        },
-        "closingEndHintMinLines": {
-          "description": "Minimum number of lines a block must span before a closing `end` hint\nis shown.",
-          "type": "integer",
-          "format": "uint32",
-          "default": 15,
-          "minimum": 0,
-          "x-vscode-setting": true
-        },
-        "enumParamHint": {
-          "description": "Show name of enumerator when passing a literal value to a function\nthat expects an enum.\n\nExample:\n\n```lua\n--- @enum Level\nlocal Foo = {\n   Info = 1,\n   Error = 2,\n}\n\n--- @param l Level\nfunction print_level(l) end\n\nprint_level(1 --[[ Hint: Level.Info ]])\n```",
-          "type": "boolean",
-          "default": false,
-          "x-vscode-setting": true
-        },
-        "indexHint": {
-          "description": "Show named array indexes.\n\nExample:\n\n```lua\nlocal array = {\n   [1] = 1, -- [name]\n}\n\nprint(array[1] --[[ Hint: name ]])\n```",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "localHint": {
-          "description": "Show types of local variables.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "metaCallHint": {
-          "description": "Show hint when calling an object results in a call to\nits meta table's `__call` function.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "overrideHint": {
-          "description": "Show methods that override functions from base class.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "paramHint": {
-          "description": "Show parameter names in function calls and parameter types in function definitions.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcInlineValues": {
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Show inline values during debug.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcLuaVersion": {
-      "oneOf": [
-        {
-          "description": "Lua 5.1",
-          "type": "string",
-          "const": "Lua5.1"
-        },
-        {
-          "description": "LuaJIT",
-          "type": "string",
-          "const": "LuaJIT"
-        },
-        {
-          "description": "Lua 5.2",
-          "type": "string",
-          "const": "Lua5.2"
-        },
-        {
-          "description": "Lua 5.3",
-          "type": "string",
-          "const": "Lua5.3"
-        },
-        {
-          "description": "Lua 5.4",
-          "type": "string",
-          "const": "Lua5.4"
-        },
-        {
-          "description": "Lua 5.5",
-          "type": "string",
-          "const": "Lua5.5"
-        },
-        {
-          "description": "Lua Latest",
-          "type": "string",
-          "const": "LuaLatest"
-        }
-      ]
-    },
-    "EmmyrcNonStdSymbol": {
-      "type": "string",
-      "enum": [
-        "//",
-        "/**/",
-        "`",
-        "+=",
-        "-=",
-        "*=",
-        "/=",
-        "%=",
-        "^=",
-        "//=",
-        "|=",
-        "&=",
-        "<<=",
-        ">>=",
-        "||",
-        "&&",
-        "!",
-        "!=",
-        "continue"
-      ]
-    },
-    "EmmyrcReference": {
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enable searching for symbol usages.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "fuzzySearch": {
-          "description": "Use fuzzy search when searching for symbol usages\nand normal search didn't find anything.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "shortStringSearch": {
-          "description": "Also search for usages in strings.",
-          "type": "boolean",
-          "default": false,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcReformat": {
-      "type": "object",
-      "properties": {
-        "configPrecedence": {
-          "description": "Controls which takes precedence when both `.editorconfig` and `.gluarc.json` formatter settings apply to the same option: `preferEditorconfig` (default) or `preferGluarc`.",
-          "$ref": "#/$defs/EmmyrcFormatConfigPrecedence",
-          "default": "preferEditorconfig",
-          "x-vscode-setting": true
-        },
-        "externalTool": {
-          "description": "External formatter tool configuration. When set, the specified program is used for formatting instead of the built-in formatter.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcExternalTool"
-            },
-            {
-              "type": "null"
+        "documentColor": {
+            "$ref": "#/$defs/EmmyrcDocumentColor",
+            "default": {
+                "enable": true
             }
-          ],
-          "default": null
         },
-        "externalToolRangeFormat": {
-          "description": "External formatter for range formatting. When set, range format requests use this tool instead of the built-in formatter.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcExternalTool"
-            },
-            {
-              "type": "null"
+        "format": {
+            "$ref": "#/$defs/EmmyrcReformat",
+            "default": {
+                "configPrecedence": "preferEditorconfig",
+                "externalTool": null,
+                "externalToolRangeFormat": null,
+                "preset": "default",
+                "useDiff": false
             }
-          ],
-          "default": null
         },
-        "preset": {
-          "description": "Built-in formatter preset. `default` uses EmmyLuaCodeStyle defaults. `cfc` applies the CFC style preset. `custom` applies no preset — only the `styleOverrides` you configure below take effect.",
-          "$ref": "#/$defs/EmmyrcFormatPreset",
-          "default": "default",
-          "x-vscode-setting": true
-        },
-        "styleOverrides": {
-          "description": "Per-key EmmyLuaCodeStyle style overrides applied on top of the selected preset. Keys not configured here inherit their value from the active preset.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/EmmyrcFormatStyleOverrides"
-            },
-            {
-              "type": "null"
+        "gmod": {
+            "$ref": "#/$defs/EmmyrcGmod",
+            "default": {
+                "autoLoadAnnotations": null,
+                "defaultRealm": "shared",
+                "dynamicFieldsGlobal": true,
+                "enabled": true,
+                "fileParamDefaults": {
+                    "ang": "Angle",
+                    "angle": "Angle",
+                    "attacker": "Entity",
+                    "cmd": "CUserCmd",
+                    "col": "Color",
+                    "color": "Color",
+                    "dmginfo": "CTakeDamageInfo",
+                    "ent": "Entity",
+                    "entity": "Entity",
+                    "inflictor": "Entity",
+                    "mat": "IMaterial",
+                    "npc": "NPC",
+                    "panel": "Panel",
+                    "phys": "PhysObj",
+                    "player": "Player",
+                    "ply": "Player",
+                    "pnl": "Panel",
+                    "pos": "Vector",
+                    "tr": "TraceResult",
+                    "trace": "TraceResult",
+                    "vec": "Vector",
+                    "veh": "Entity",
+                    "vehicle": "Entity",
+                    "victim": "Entity",
+                    "weapon": "Weapon",
+                    "wep": "Weapon"
+                },
+                "hookMappings": {
+                    "emitterToHook": {},
+                    "methodPrefixes": [],
+                    "methodToHook": {}
+                },
+                "inferDynamicFields": true,
+                "network": {
+                    "completion": {
+                        "mismatchHints": true,
+                        "smartReadSuggestions": true
+                    },
+                    "diagnostics": {
+                        "missingCounterpart": true,
+                        "orderMismatch": true,
+                        "typeMismatch": true
+                    },
+                    "enabled": true
+                },
+                "outline": {
+                    "verbosity": "normal"
+                },
+                "scriptedClassScopes": {
+                    "include": [
+                        {
+                            "classGlobal": "ENT",
+                            "icon": "folder-library",
+                            "id": "entities",
+                            "include": [
+                                "entities/**"
+                            ],
+                            "label": "Entities",
+                            "path": [
+                                "entities"
+                            ],
+                            "rootDir": "lua/entities",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}/shared.lua",
+                                        "template": "ent_shared.lua"
+                                    },
+                                    {
+                                        "path": "{{name}}/init.lua",
+                                        "template": "ent_init.lua"
+                                    },
+                                    {
+                                        "path": "{{name}}/cl_init.lua",
+                                        "template": "ent_cl_init.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "SWEP",
+                            "exclude": [
+                                "weapons/gmod_tool/**"
+                            ],
+                            "icon": "folder-library",
+                            "id": "weapons",
+                            "include": [
+                                "weapons/**"
+                            ],
+                            "label": "SWEPs",
+                            "path": [
+                                "weapons"
+                            ],
+                            "rootDir": "lua/weapons",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}/shared.lua",
+                                        "template": "swep_shared.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "EFFECT",
+                            "icon": "folder-library",
+                            "id": "effects",
+                            "include": [
+                                "effects/**"
+                            ],
+                            "label": "Effects",
+                            "path": [
+                                "effects"
+                            ],
+                            "rootDir": "lua/effects",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}.lua",
+                                        "template": "effect.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "TOOL",
+                            "icon": "tools",
+                            "id": "stools",
+                            "include": [
+                                "weapons/gmod_tool/stools/**"
+                            ],
+                            "label": "STools",
+                            "parentId": "weapons",
+                            "path": [
+                                "weapons",
+                                "gmod_tool",
+                                "stools"
+                            ],
+                            "rootDir": "lua/weapons/gmod_tool/stools",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}.lua",
+                                        "template": "tool.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "PLUGIN",
+                            "icon": "extensions",
+                            "id": "plugins",
+                            "include": [
+                                "plugins/**"
+                            ],
+                            "label": "Plugins",
+                            "path": [
+                                "plugins"
+                            ],
+                            "rootDir": "plugins"
+                        }
+                    ]
+                },
+                "vgui": {
+                    "codeLensEnabled": true,
+                    "inlayHintEnabled": false
+                }
             }
-          ],
-          "x-vscode-setting": true
         },
-        "useDiff": {
-          "description": "Whether to use the diff algorithm for formatting.",
-          "type": "boolean",
-          "default": false
+        "hint": {
+            "$ref": "#/$defs/EmmyrcInlayHint",
+            "default": {
+                "closingEndHint": true,
+                "closingEndHintControlFlow": false,
+                "closingEndHintMinLines": 15,
+                "enumParamHint": false,
+                "indexHint": true,
+                "localHint": true,
+                "metaCallHint": true,
+                "overrideHint": true,
+                "paramHint": true
+            }
+        },
+        "hover": {
+            "$ref": "#/$defs/EmmyrcHover",
+            "default": {
+                "customDetail": null,
+                "enable": true
+            }
+        },
+        "inlineValues": {
+            "$ref": "#/$defs/EmmyrcInlineValues",
+            "default": {
+                "enable": true
+            }
+        },
+        "references": {
+            "$ref": "#/$defs/EmmyrcReference",
+            "default": {
+                "enable": true,
+                "fuzzySearch": true,
+                "shortStringSearch": false
+            }
+        },
+        "resource": {
+            "$ref": "#/$defs/EmmyrcResource",
+            "default": {
+                "paths": []
+            }
+        },
+        "runtime": {
+            "$ref": "#/$defs/EmmyrcRuntime",
+            "default": {
+                "extensions": [],
+                "nonstandardSymbol": [
+                    "//",
+                    "/**/",
+                    "continue",
+                    "!=",
+                    "||",
+                    "&&",
+                    "!"
+                ],
+                "requireLikeFunction": [],
+                "requirePattern": [],
+                "special": {},
+                "version": "LuaJIT"
+            }
+        },
+        "semanticTokens": {
+            "$ref": "#/$defs/EmmyrcSemanticToken",
+            "default": {
+                "enable": true,
+                "renderDocumentationMarkup": true
+            }
+        },
+        "strict": {
+            "$ref": "#/$defs/EmmyrcStrict",
+            "default": {
+                "allowNullableAsNonNullable": true,
+                "arrayIndex": false,
+                "docBaseConstMatchBaseType": true,
+                "inferredTypeMismatch": false,
+                "metaOverrideFileDefine": true,
+                "requireExportGlobal": false,
+                "requirePath": false
+            }
+        },
+        "workspace": {
+            "$ref": "#/$defs/EmmyrcWorkspace",
+            "default": {
+                "enableReindex": false,
+                "encoding": "utf-8",
+                "ignoreDir": [],
+                "ignoreGlobs": [],
+                "library": [],
+                "moduleMap": [],
+                "packageDirs": [],
+                "reindexDuration": 5000,
+                "workspaceRoots": []
+            }
         }
-      }
     },
-    "EmmyrcResource": {
-      "type": "object",
-      "properties": {
-        "paths": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
+    "$defs": {
+        "DiagnosticCode": {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "enum": [
+                        "none"
+                    ]
+                },
+                {
+                    "description": "语法错误。",
+                    "type": "string",
+                    "const": "syntax-error"
+                },
+                {
+                    "description": "注解语法错误。",
+                    "type": "string",
+                    "const": "doc-syntax-error"
+                },
+                {
+                    "description": "类型未找到。",
+                    "type": "string",
+                    "const": "type-not-found"
+                },
+                {
+                    "description": "缺少返回语句。",
+                    "type": "string",
+                    "const": "missing-return"
+                },
+                {
+                    "description": "Param Type not match",
+                    "type": "string",
+                    "const": "param-type-mismatch"
+                },
+                {
+                    "description": "缺少参数。",
+                    "type": "string",
+                    "const": "missing-parameter"
+                },
+                {
+                    "description": "冗余参数。",
+                    "type": "string",
+                    "const": "redundant-parameter"
+                },
+                {
+                    "description": "不可达的代码。",
+                    "type": "string",
+                    "const": "unreachable-code"
+                },
+                {
+                    "description": "未使用的变量。",
+                    "type": "string",
+                    "const": "unused"
+                },
+                {
+                    "description": "Unused implicit self parameter",
+                    "type": "string",
+                    "const": "unused-self"
+                },
+                {
+                    "description": "未定义的全局变量。",
+                    "type": "string",
+                    "const": "undefined-global"
+                },
+                {
+                    "description": "已弃用。",
+                    "type": "string",
+                    "const": "deprecated"
+                },
+                {
+                    "description": "成员可见性检查。",
+                    "type": "string",
+                    "const": "access-invisible"
+                },
+                {
+                    "description": "不可丢弃返回值。",
+                    "type": "string",
+                    "const": "discard-returns"
+                },
+                {
+                    "description": "未定义的字段。",
+                    "type": "string",
+                    "const": "undefined-field"
+                },
+                {
+                    "description": "局部常量重新赋值。",
+                    "type": "string",
+                    "const": "local-const-reassign"
+                },
+                {
+                    "description": "迭代变量重新赋值。",
+                    "type": "string",
+                    "const": "iter-variable-reassign"
+                },
+                {
+                    "description": "重复定义的类型。",
+                    "type": "string",
+                    "const": "duplicate-type"
+                },
+                {
+                    "description": "重复定义的局部变量。",
+                    "type": "string",
+                    "const": "redefined-local"
+                },
+                {
+                    "description": "重复定义的标签。",
+                    "type": "string",
+                    "const": "redefined-label"
+                },
+                {
+                    "description": "代码风格检查。",
+                    "type": "string",
+                    "const": "code-style-check"
+                },
+                {
+                    "description": "需要检查 nil。",
+                    "type": "string",
+                    "const": "need-check-nil"
+                },
+                {
+                    "description": "在同步上下文中使用 await。",
+                    "type": "string",
+                    "const": "await-in-sync"
+                },
+                {
+                    "description": "注解使用错误。",
+                    "type": "string",
+                    "const": "annotation-usage-error"
+                },
+                {
+                    "description": "返回类型不匹配。",
+                    "type": "string",
+                    "const": "return-type-mismatch"
+                },
+                {
+                    "description": "缺少返回值。",
+                    "type": "string",
+                    "const": "missing-return-value"
+                },
+                {
+                    "description": "冗余的返回值。",
+                    "type": "string",
+                    "const": "redundant-return-value"
+                },
+                {
+                    "description": "未使用注解定义的参数。",
+                    "type": "string",
+                    "const": "undefined-doc-param"
+                },
+                {
+                    "description": "重复定义的字段(注解)。",
+                    "type": "string",
+                    "const": "duplicate-doc-field"
+                },
+                {
+                    "description": "未知文档注解。",
+                    "type": "string",
+                    "const": "unknown-doc-tag"
+                },
+                {
+                    "description": "缺少字段。",
+                    "type": "string",
+                    "const": "missing-fields"
+                },
+                {
+                    "description": "注入字段。",
+                    "type": "string",
+                    "const": "inject-field"
+                },
+                {
+                    "description": "类型循环依赖。",
+                    "type": "string",
+                    "const": "circle-doc-class"
+                },
+                {
+                    "description": "不完整的签名文档。",
+                    "type": "string",
+                    "const": "incomplete-signature-doc"
+                },
+                {
+                    "description": "全局变量缺少文档。",
+                    "type": "string",
+                    "const": "missing-global-doc"
+                },
+                {
+                    "description": "赋值类型不匹配。",
+                    "type": "string",
+                    "const": "assign-type-mismatch"
+                },
+                {
+                    "description": "重复的 require 导入。",
+                    "type": "string",
+                    "const": "duplicate-require"
+                },
+                {
+                    "description": "在 assert 中使用了非字面量表达式。",
+                    "type": "string",
+                    "const": "non-literal-expressions-in-assert"
+                },
+                {
+                    "description": "不平衡的赋值。",
+                    "type": "string",
+                    "const": "unbalanced-assignments"
+                },
+                {
+                    "description": "不必要的 assert。",
+                    "type": "string",
+                    "const": "unnecessary-assert"
+                },
+                {
+                    "description": "不必要的 if。",
+                    "type": "string",
+                    "const": "unnecessary-if"
+                },
+                {
+                    "description": "重复定义的字段(实际代码)。",
+                    "type": "string",
+                    "const": "duplicate-set-field"
+                },
+                {
+                    "description": "重复的索引。",
+                    "type": "string",
+                    "const": "duplicate-index"
+                },
+                {
+                    "description": "泛型约束不匹配。",
+                    "type": "string",
+                    "const": "generic-constraint-mismatch"
+                },
+                {
+                    "description": "cast-type-mismatch",
+                    "type": "string",
+                    "const": "cast-type-mismatch"
+                },
+                {
+                    "description": "require 模块不可见。",
+                    "type": "string",
+                    "const": "require-module-not-visible"
+                },
+                {
+                    "description": "枚举值不匹配。",
+                    "type": "string",
+                    "const": "enum-value-mismatch"
+                },
+                {
+                    "description": "preferred-local-alias",
+                    "type": "string",
+                    "const": "preferred-local-alias"
+                },
+                {
+                    "description": "readonly",
+                    "type": "string",
+                    "const": "read-only"
+                },
+                {
+                    "description": "Global variable defined in non-module scope",
+                    "type": "string",
+                    "const": "global-in-non-module"
+                },
+                {
+                    "description": "attribute-param-type-mismatch",
+                    "type": "string",
+                    "const": "attribute-param-type-mismatch"
+                },
+                {
+                    "description": "attribute-missing-parameter",
+                    "type": "string",
+                    "const": "attribute-missing-parameter"
+                },
+                {
+                    "description": "attribute-redundant-parameter",
+                    "type": "string",
+                    "const": "attribute-redundant-parameter"
+                },
+                {
+                    "description": "invert-if",
+                    "type": "string",
+                    "const": "invert-if"
+                },
+                {
+                    "description": "Call to a non-callable value",
+                    "type": "string",
+                    "const": "call-non-callable"
+                },
+                {
+                    "description": "gmod-invalid-hook-name",
+                    "type": "string",
+                    "const": "gmod-invalid-hook-name"
+                },
+                {
+                    "description": "gmod-realm-mismatch (strict realm mismatch)",
+                    "type": "string",
+                    "const": "gmod-realm-mismatch"
+                },
+                {
+                    "description": "gmod-realm-mismatch-heuristic (heuristic realm mismatch)",
+                    "type": "string",
+                    "const": "gmod-realm-mismatch-heuristic"
+                },
+                {
+                    "description": "gmod-unknown-realm (realm could not be resolved)",
+                    "type": "string",
+                    "const": "gmod-unknown-realm"
+                },
+                {
+                    "description": "gmod-unknown-net-message",
+                    "type": "string",
+                    "const": "gmod-unknown-net-message"
+                },
+                {
+                    "description": "gmod-net-read-write-type-mismatch",
+                    "type": "string",
+                    "const": "gmod-net-read-write-type-mismatch"
+                },
+                {
+                    "description": "gmod-net-read-write-order-mismatch",
+                    "type": "string",
+                    "const": "gmod-net-read-write-order-mismatch"
+                },
+                {
+                    "description": "gmod-net-missing-network-counterpart",
+                    "type": "string",
+                    "const": "gmod-net-missing-network-counterpart"
+                },
+                {
+                    "description": "gmod-duplicate-system-registration",
+                    "type": "string",
+                    "const": "gmod-duplicate-system-registration"
+                }
+            ]
+        },
+        "DiagnosticSeveritySetting": {
+            "oneOf": [
+                {
+                    "description": "诊断严重性: 错误。",
+                    "type": "string",
+                    "const": "error"
+                },
+                {
+                    "description": "诊断严重性: 警告。",
+                    "type": "string",
+                    "const": "warning"
+                },
+                {
+                    "description": "诊断严重性: 信息。",
+                    "type": "string",
+                    "const": "information"
+                },
+                {
+                    "description": "诊断严重性: 提示。",
+                    "type": "string",
+                    "const": "hint"
+                }
+            ]
+        },
+        "DocSyntax": {
+            "type": "string",
+            "enum": [
+                "none",
+                "md",
+                "myst",
+                "rst"
+            ]
+        },
+        "EmmyLibraryConfig": {
+            "type": "object",
+            "properties": {
+                "ignoreDir": {
+                    "description": "Ignore directories within this library",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ignoreGlobs": {
+                    "description": "Ignore globs within this library. eg: [\"**/*.lua\"]",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "path": {
+                    "description": "Library path",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path"
+            ]
+        },
+        "EmmyLibraryItem": {
+            "anyOf": [
+                {
+                    "description": "Simple library path string",
+                    "type": "string"
+                },
+                {
+                    "description": "Library configuration with path and ignore rules",
+                    "$ref": "#/$defs/EmmyLibraryConfig"
+                }
+            ]
+        },
+        "EmmyrcCodeAction": {
+            "type": "object",
+            "properties": {
+                "insertSpace": {
+                    "description": "是否在 '---' 后插入空格。",
+                    "type": "boolean",
+                    "default": false,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcCodeLens": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "Enable code lens.",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcCompletion": {
+            "description": "EmmyLua 代码补全配置。",
+            "type": "object",
+            "properties": {
+                "autoRequire": {
+                    "description": "自动补全 require 语句。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "autoRequireFunction": {
+                    "description": "自动补全 require 语句时使用的函数名。",
+                    "type": "string",
+                    "default": "require"
+                },
+                "autoRequireNamingConvention": {
+                    "description": "自动补全 require 语句时使用的命名规范。",
+                    "$ref": "#/$defs/EmmyrcFilenameConvention",
+                    "default": "keep"
+                },
+                "autoRequireSeparator": {
+                    "description": "自动补全 require 语句时使用的分隔符。",
+                    "type": "string",
+                    "default": "."
+                },
+                "baseFunctionIncludesName": {
+                    "description": "是否在基本函数补全中包含函数名。效果: `function () end` -> `function name() end`。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "callSnippet": {
+                    "description": "是否使用代码片段补全函数调用。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "enable": {
+                    "description": "是否启用代码补全。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "postfix": {
+                    "description": "后缀补全触发关键词。",
+                    "type": "string",
+                    "default": "@",
+                    "x-vscode-setting": {
+                        "default": null,
+                        "enum": [
+                            null,
+                            "@",
+                            ".",
+                            ":"
+                        ],
+                        "enumItemLabels": [
+                            "Default"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%"
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "stagedCallSnippets": {
+                    "description": "Whether to stage known API call snippets so autocomplete can guide\nthe user through the next relevant argument.",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcDiagnostic": {
+            "description": "Emmyrc 诊断配置。",
+            "type": "object",
+            "properties": {
+                "diagnosticInterval": {
+                    "description": "诊断间隔时间(毫秒)。",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0,
+                    "x-vscode-setting": true
+                },
+                "disable": {
+                    "description": "禁用的诊断代码列表。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/DiagnosticCode"
+                    }
+                },
+                "enable": {
+                    "description": "是否启用诊断。",
+                    "type": "boolean",
+                    "default": true
+                },
+                "enables": {
+                    "description": "启用的诊断代码列表。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/DiagnosticCode"
+                    }
+                },
+                "globals": {
+                    "description": "全局变量列表，在该列表中的全局变量不会被诊断为未定义。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "globalsRegex": {
+                    "description": "全局变量正则表达式列表，符合正则表达式的全局变量不会被诊断为未定义。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "severity": {
+                    "description": "诊断代码与严重性设置的映射。",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/DiagnosticSeveritySetting"
+                    },
+                    "default": {}
+                }
+            }
+        },
+        "EmmyrcDoc": {
+            "type": "object",
+            "properties": {
+                "knownTags": {
+                    "description": "已知文档标签列表。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "privateName": {
+                    "description": "将特定字段名视为私有，例如 `m_*` 表示 `XXX.m_id` 和 `XXX.m_type` 是私有字段，只能在定义所在的类中访问。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rstDefaultRole": {
+                    "description": "When `syntax` is `Myst` or `Rst`, specifies default role used\nwith RST processor.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "rstPrimaryDomain": {
+                    "description": "When `syntax` is `Myst` or `Rst`, specifies primary domain used\nwith RST processor.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "syntax": {
+                    "description": "Syntax for highlighting documentation.",
+                    "$ref": "#/$defs/DocSyntax",
+                    "default": "md"
+                }
+            }
+        },
+        "EmmyrcDocumentColor": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "是否启用文档颜色。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcExternalTool": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "description": "The arguments to pass to the external tool.",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "program": {
+                    "description": "The command to run the external tool.",
+                    "type": "string",
+                    "default": ""
+                },
+                "timeout": {
+                    "description": "The timeout for the external tool in milliseconds.",
+                    "type": "integer",
+                    "format": "uint64",
+                    "default": 5000,
+                    "minimum": 0
+                }
+            }
+        },
+        "EmmyrcFilenameConvention": {
+            "oneOf": [
+                {
+                    "description": "保持原始文件名。",
+                    "type": "string",
+                    "const": "keep"
+                },
+                {
+                    "description": "将文件名转换为蛇形(snake_case)命名。",
+                    "type": "string",
+                    "const": "snake-case"
+                },
+                {
+                    "description": "将文件名转换为帕斯卡(PascalCase)命名。",
+                    "type": "string",
+                    "const": "pascal-case"
+                },
+                {
+                    "description": "将文件名转换为驼峰(camelCase)命名。",
+                    "type": "string",
+                    "const": "camel-case"
+                },
+                {
+                    "description": "返回类定义时，使用类名，否则保持原始名称。",
+                    "type": "string",
+                    "const": "keep-class"
+                }
+            ]
+        },
+        "EmmyrcFormatAlignArrayTable": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatAlignArrayTableMode"
+                }
+            ]
+        },
+        "EmmyrcFormatAlignArrayTableMode": {
+            "type": "string",
+            "enum": [
+                "none",
+                "always",
+                "contain_curly"
+            ]
+        },
+        "EmmyrcFormatAlignChainExpr": {
+            "type": "string",
+            "enum": [
+                "none",
+                "always",
+                "only_call_stmt"
+            ]
+        },
+        "EmmyrcFormatAlignContinuousAssignStatement": {
+            "type": "string",
+            "enum": [
+                "true",
+                "false",
+                "always"
+            ]
+        },
+        "EmmyrcFormatAsymmetricOperatorSpacing": {
+            "type": "string",
+            "enum": [
+                "none",
+                "always",
+                "no_space_asym"
+            ]
+        },
+        "EmmyrcFormatBoolKeyword": {
+            "type": "string",
+            "enum": [
+                "true",
+                "false"
+            ]
+        },
+        "EmmyrcFormatCallArgParentheses": {
+            "type": "string",
+            "enum": [
+                "keep",
+                "remove",
+                "remove_table_only",
+                "remove_string_only",
+                "always"
+            ]
+        },
+        "EmmyrcFormatConfigPrecedence": {
+            "oneOf": [
+                {
+                    "description": "Prefer discovered .editorconfig files over .gluarc formatter overrides.",
+                    "type": "string",
+                    "const": "preferEditorconfig"
+                },
+                {
+                    "description": "Prefer .gluarc formatter overrides over discovered .editorconfig files.",
+                    "type": "string",
+                    "const": "preferGluarc"
+                }
+            ]
+        },
+        "EmmyrcFormatEndOfLine": {
+            "type": "string",
+            "enum": [
+                "crlf",
+                "lf",
+                "cr",
+                "auto",
+                "unset"
+            ]
+        },
+        "EmmyrcFormatEndStatementWithSemicolon": {
+            "type": "string",
+            "enum": [
+                "keep",
+                "always",
+                "same_line",
+                "replace_with_newline",
+                "never"
+            ]
+        },
+        "EmmyrcFormatIndentStyle": {
+            "type": "string",
+            "enum": [
+                "tab",
+                "space"
+            ]
+        },
+        "EmmyrcFormatKeepKeyword": {
+            "type": "string",
+            "enum": [
+                "keep"
+            ]
+        },
+        "EmmyrcFormatMaxLineLength": {
+            "anyOf": [
+                {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatUnsetKeyword"
+                }
+            ]
+        },
+        "EmmyrcFormatPreset": {
+            "oneOf": [
+                {
+                    "description": "Use EmmyLuaCodeStyle built-in defaults. No style overrides are applied.",
+                    "type": "string",
+                    "const": "default"
+                },
+                {
+                    "description": "Apply the built-in CFC (Clockwork Fighters Community) style preset: 4-space indentation, spaces inside parentheses, semicolons replaced with newlines.",
+                    "type": "string",
+                    "const": "cfc"
+                },
+                {
+                    "description": "Apply no preset. Only the `styleOverrides` you configure explicitly take effect; everything else uses the formatter's compiled-in default.",
+                    "type": "string",
+                    "const": "custom"
+                }
+            ]
+        },
+        "EmmyrcFormatQuoteStyle": {
+            "type": "string",
+            "enum": [
+                "none",
+                "single",
+                "double"
+            ]
+        },
+        "EmmyrcFormatSpaceAroundAssignOperator": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+                }
+            ]
+        },
+        "EmmyrcFormatSpaceAroundConcatOperator": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatAsymmetricOperatorSpacing"
+                }
+            ]
+        },
+        "EmmyrcFormatSpaceBeforeFunctionCallSingleArg": {
+            "anyOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatBoolKeyword"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatSpaceBeforeFunctionCallSingleArgMode"
+                }
+            ]
+        },
+        "EmmyrcFormatSpaceBeforeFunctionCallSingleArgMode": {
+            "type": "string",
+            "enum": [
+                "always",
+                "only_string",
+                "only_table",
+                "none"
+            ]
+        },
+        "EmmyrcFormatSpaceBeforeInlineComment": {
+            "anyOf": [
+                {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcFormatKeepKeyword"
+                }
+            ]
+        },
+        "EmmyrcFormatStyleOverrides": {
+            "description": "Typed EmmyLuaCodeStyle overrides for built-in formatting.",
+            "type": "object",
+            "properties": {
+                "align_array_table": {
+                    "description": "Array table layout: `none` keeps items inline, `always` puts each item on its own line, `contain_curly` uses multiline only when a nested table is present.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatAlignArrayTable"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "align_call_args": {
+                    "description": "Vertically align arguments of multi-line function calls to the opening parenthesis.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "align_chain_expr": {
+                    "description": "Align chained method / field expressions: `none` disables, `always` aligns all chains, `only_call_stmt` aligns only call statement chains.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatAlignChainExpr"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "align_continuous_assign_statement": {
+                    "description": "Align consecutive assignment statements on their `=` sign (`true` aligns within a block, `always` aligns across blank lines, `false` disables).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatAlignContinuousAssignStatement"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "align_continuous_inline_comment": {
+                    "description": "Align the `--` of inline comments across consecutive lines so they form a vertical column.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "align_continuous_line_space": {
+                    "description": "Maximum number of blank lines between consecutive statements before they are no longer considered part of the same aligned block.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                "align_continuous_rect_table_field": {
+                    "description": "Align key-value fields in rectangular table literals so that `=` signs line up vertically (`true`, `false`, `always`).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatAlignContinuousAssignStatement"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "align_continuous_similar_call_args": {
+                    "description": "Align arguments across similar consecutive function calls so that matching argument positions line up vertically.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "align_function_params": {
+                    "description": "Vertically align parameters in multi-line function declarations to the opening parenthesis.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "align_if_branch": {
+                    "description": "Vertically align `if` / `elseif` / `else` condition keywords.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "allow_non_indented_comments": {
+                    "description": "Allow comments that start at column 0 to remain un-indented even when inside an indented block.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "auto_collapse_lines": {
+                    "description": "Collapse short multi-statement blocks into a single line when they fit within `max_line_length`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "break_all_list_when_line_exceed": {
+                    "description": "When a line exceeds `max_line_length`, break every item in the containing list onto its own line rather than only the overflowing item.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "break_before_braces": {
+                    "description": "Place the opening `{` of a table constructor on a new line instead of at the end of the preceding line.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "break_multiline_call_expression_list": {
+                    "description": "When a function call already spans multiple lines, put each argument and the closing `)` on their own lines.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "call_arg_parentheses": {
+                    "description": "How to handle parentheses around single-argument function calls with a string or table literal (`keep`, `remove`, `remove_table_only`, `remove_string_only`, `always`).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatCallArgParentheses"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "continuation_indent": {
+                    "description": "Number of extra spaces used for indenting continuation lines when a line is wrapped.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                "detect_end_of_line": {
+                    "description": "Detect line endings from file content.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "end_of_line": {
+                    "description": "Line ending preference.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatEndOfLine"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "end_statement_with_semicolon": {
+                    "description": "Semicolon handling: `keep` preserves existing, `always` adds to all statements, `same_line` adds between same-line statements, `replace_with_newline` replaces semicolons with newlines, `never` removes all.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatEndStatementWithSemicolon"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ignore_space_after_colon": {
+                    "description": "Do not normalize spacing after `:` in method call and definition syntax.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "ignore_spaces_inside_function_call": {
+                    "description": "When `true`, preserve existing spacing inside function call arguments instead of normalizing it.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "indent_size": {
+                    "description": "Number of spaces used for one indentation level.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                "indent_style": {
+                    "description": "`tab` or `space` indentation mode.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatIndentStyle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "insert_final_newline": {
+                    "description": "Ensure file ends with a newline.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "keep_indents_on_empty_lines": {
+                    "description": "Keep indentation whitespace on otherwise blank lines instead of stripping it.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "line_space_after_comment": {
+                    "description": "Line spacing after comments (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_do_statement": {
+                    "description": "Line spacing after `do` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_expression_statement": {
+                    "description": "Line spacing after expression statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_for_statement": {
+                    "description": "Line spacing after `for` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_function_statement": {
+                    "description": "Line spacing after function statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_if_statement": {
+                    "description": "Line spacing after `if` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_local_or_assign_statement": {
+                    "description": "Line spacing after local/assignment statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_repeat_statement": {
+                    "description": "Line spacing after `repeat` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_after_while_statement": {
+                    "description": "Line spacing after `while` statements (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "line_space_around_block": {
+                    "description": "Line spacing around blocks (`keep`, `fixed(n)`, `min(n)`, `max(n)`).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "max_line_length": {
+                    "description": "Column limit before the formatter wraps items onto new lines. Set to `\"unset\"` to disable line length enforcement.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatMaxLineLength"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "never_indent_before_if_condition": {
+                    "description": "Do not add extra indentation to wrapped `if`/`elseif` condition expressions.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "never_indent_comment_on_if_branch": {
+                    "description": "Do not indent a lone comment that appears inside an `if` branch body.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "quote_style": {
+                    "description": "Preferred quote style for string literals. `none` preserves the original style.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatQuoteStyle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "remove_call_expression_list_finish_comma": {
+                    "description": "Remove trailing commas that appear at the end of function call argument lists.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "remove_redundant_condition_parentheses": {
+                    "description": "Remove redundant parentheses around single-line condition expressions such as `if (x) then`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_after_comma": {
+                    "description": "Add a space after commas in expressions and argument lists.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_after_comma_in_for_statement": {
+                    "description": "Add a space after commas in `for` loop range expressions.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_after_comment_dash": {
+                    "description": "Ensure a single space exists after the comment dash prefix (`--`).",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_around_assign_operator": {
+                    "description": "Spaces around assignment operators (`=`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (asymmetric spacing).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatSpaceAroundAssignOperator"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "space_around_concat_operator": {
+                    "description": "Spaces around the concatenation operator (`..`). Accepts `true`/`false`, or `\"none\"` (no spaces), `\"always\"` (spaces on both sides), `\"no_space_asym\"` (space on left side only).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatSpaceAroundConcatOperator"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "space_around_logical_operator": {
+                    "description": "Add spaces around logical operators (`and`, `or`, `not`).",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_around_math_operator": {
+                    "description": "Add spaces around math operators (`+`, `-`, `*`, `/`, `%`, `^`).",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_around_table_append_operator": {
+                    "description": "Add spaces around the table append operator (`#t + 1` style appends).",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_around_table_field_list": {
+                    "description": "Add spaces inside table braces, e.g. `{ a = 1 }` vs `{a = 1}`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_before_attribute": {
+                    "description": "Add a space before Lua attribute annotations, e.g. `local x <const>`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_before_closure_open_parenthesis": {
+                    "description": "Add a space before `(` in anonymous function expressions, e.g. `function ()`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_before_function_call_open_parenthesis": {
+                    "description": "Add a space before `(` in function calls, e.g. `print ('hello')`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_before_function_call_single_arg": {
+                    "description": "Space handling before a single string or table literal argument: `always`, `only_string`, `only_table`, or `none`.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatSpaceBeforeFunctionCallSingleArg"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "space_before_function_open_parenthesis": {
+                    "description": "Add a space before `(` in function declarations, e.g. `function foo ()`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_before_inline_comment": {
+                    "description": "Number of spaces to enforce before inline comments (`--`), or `\"keep\"` to preserve existing spacing.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatSpaceBeforeInlineComment"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "space_before_open_square_bracket": {
+                    "description": "Add a space before `[` in table index expressions, e.g. `t [key]`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_inside_function_call_parentheses": {
+                    "description": "Add spaces inside function call parentheses, e.g. `print( 'hello' )`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_inside_function_param_list_parentheses": {
+                    "description": "Add spaces inside function parameter list parentheses, e.g. `function foo( a, b )`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "space_inside_square_brackets": {
+                    "description": "Add spaces inside square bracket index expressions, e.g. `t[ 1 ]`.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "tab_width": {
+                    "description": "Display width of a tab character in spaces, used for visual alignment calculations.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint32",
+                    "minimum": 0
+                },
+                "table_separator_style": {
+                    "description": "Separator character used between table fields (`none`, `comma`, `semicolon`, `only_kv_colon`).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatTableSeparatorStyle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "trailing_table_separator": {
+                    "description": "Whether to add or remove a trailing separator after the last field in a table (`keep`, `never`, `always`, `smart`).",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatTrailingTableSeparator"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            }
+        },
+        "EmmyrcFormatTableSeparatorStyle": {
+            "type": "string",
+            "enum": [
+                "none",
+                "comma",
+                "semicolon",
+                "only_kv_colon"
+            ]
+        },
+        "EmmyrcFormatTrailingTableSeparator": {
+            "type": "string",
+            "enum": [
+                "keep",
+                "never",
+                "always",
+                "smart"
+            ]
+        },
+        "EmmyrcFormatUnsetKeyword": {
+            "type": "string",
+            "enum": [
+                "unset"
+            ]
+        },
+        "EmmyrcGmod": {
+            "type": "object",
+            "properties": {
+                "annotationsPath": {
+                    "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "autoLoadAnnotations": {
+                    "description": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "defaultRealm": {
+                    "$ref": "#/$defs/EmmyrcGmodRealm",
+                    "default": "shared"
+                },
+                "detectRealmFromCalls": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "detectRealmFromFilename": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "dynamicFieldsGlobal": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "fileParamDefaults": {
+                    "description": "Parameter-name to type-name fallbacks for otherwise unresolved params.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "default": {
+                        "ang": "Angle",
+                        "angle": "Angle",
+                        "attacker": "Entity",
+                        "cmd": "CUserCmd",
+                        "col": "Color",
+                        "color": "Color",
+                        "dmginfo": "CTakeDamageInfo",
+                        "ent": "Entity",
+                        "entity": "Entity",
+                        "inflictor": "Entity",
+                        "mat": "IMaterial",
+                        "npc": "NPC",
+                        "panel": "Panel",
+                        "phys": "PhysObj",
+                        "player": "Player",
+                        "ply": "Player",
+                        "pnl": "Panel",
+                        "pos": "Vector",
+                        "tr": "TraceResult",
+                        "trace": "TraceResult",
+                        "vec": "Vector",
+                        "veh": "Entity",
+                        "vehicle": "Entity",
+                        "victim": "Entity",
+                        "weapon": "Weapon",
+                        "wep": "Weapon"
+                    },
+                    "x-gluals-editor": "mappingTable",
+                    "x-gluals-key-label": "Parameter",
+                    "x-gluals-value-label": "Type"
+                },
+                "hookMappings": {
+                    "$ref": "#/$defs/EmmyrcGmodHookMappings",
+                    "default": {
+                        "emitterToHook": {},
+                        "methodPrefixes": [],
+                        "methodToHook": {}
+                    }
+                },
+                "inferDynamicFields": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "network": {
+                    "$ref": "#/$defs/EmmyrcGmodNetwork",
+                    "default": {
+                        "completion": {
+                            "mismatchHints": true,
+                            "smartReadSuggestions": true
+                        },
+                        "diagnostics": {
+                            "missingCounterpart": true,
+                            "orderMismatch": true,
+                            "typeMismatch": true
+                        },
+                        "enabled": true
+                    }
+                },
+                "outline": {
+                    "$ref": "#/$defs/EmmyrcGmodOutline",
+                    "default": {
+                        "verbosity": "normal"
+                    }
+                },
+                "scriptedClassScopes": {
+                    "$ref": "#/$defs/EmmyrcGmodScriptedClassScopes",
+                    "default": {
+                        "include": [
+                            {
+                                "classGlobal": "ENT",
+                                "icon": "folder-library",
+                                "id": "entities",
+                                "include": [
+                                    "entities/**"
+                                ],
+                                "label": "Entities",
+                                "path": [
+                                    "entities"
+                                ],
+                                "rootDir": "lua/entities",
+                                "scaffold": {
+                                    "files": [
+                                        {
+                                            "path": "{{name}}/shared.lua",
+                                            "template": "ent_shared.lua"
+                                        },
+                                        {
+                                            "path": "{{name}}/init.lua",
+                                            "template": "ent_init.lua"
+                                        },
+                                        {
+                                            "path": "{{name}}/cl_init.lua",
+                                            "template": "ent_cl_init.lua"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "classGlobal": "SWEP",
+                                "exclude": [
+                                    "weapons/gmod_tool/**"
+                                ],
+                                "icon": "folder-library",
+                                "id": "weapons",
+                                "include": [
+                                    "weapons/**"
+                                ],
+                                "label": "SWEPs",
+                                "path": [
+                                    "weapons"
+                                ],
+                                "rootDir": "lua/weapons",
+                                "scaffold": {
+                                    "files": [
+                                        {
+                                            "path": "{{name}}/shared.lua",
+                                            "template": "swep_shared.lua"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "classGlobal": "EFFECT",
+                                "icon": "folder-library",
+                                "id": "effects",
+                                "include": [
+                                    "effects/**"
+                                ],
+                                "label": "Effects",
+                                "path": [
+                                    "effects"
+                                ],
+                                "rootDir": "lua/effects",
+                                "scaffold": {
+                                    "files": [
+                                        {
+                                            "path": "{{name}}.lua",
+                                            "template": "effect.lua"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "classGlobal": "TOOL",
+                                "icon": "tools",
+                                "id": "stools",
+                                "include": [
+                                    "weapons/gmod_tool/stools/**"
+                                ],
+                                "label": "STools",
+                                "parentId": "weapons",
+                                "path": [
+                                    "weapons",
+                                    "gmod_tool",
+                                    "stools"
+                                ],
+                                "rootDir": "lua/weapons/gmod_tool/stools",
+                                "scaffold": {
+                                    "files": [
+                                        {
+                                            "path": "{{name}}.lua",
+                                            "template": "tool.lua"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "classGlobal": "PLUGIN",
+                                "icon": "extensions",
+                                "id": "plugins",
+                                "include": [
+                                    "plugins/**"
+                                ],
+                                "label": "Plugins",
+                                "path": [
+                                    "plugins"
+                                ],
+                                "rootDir": "plugins"
+                            }
+                        ]
+                    }
+                },
+                "templatePath": {
+                    "description": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "vgui": {
+                    "$ref": "#/$defs/EmmyrcGmodVgui",
+                    "default": {
+                        "codeLensEnabled": true,
+                        "inlayHintEnabled": false
+                    }
+                }
+            }
+        },
+        "EmmyrcGmodHookMappings": {
+            "type": "object",
+            "properties": {
+                "emitterToHook": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "default": {}
+                },
+                "methodPrefixes": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "methodToHook": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "default": {}
+                }
+            }
+        },
+        "EmmyrcGmodNetwork": {
+            "type": "object",
+            "properties": {
+                "completion": {
+                    "$ref": "#/$defs/EmmyrcGmodNetworkCompletion",
+                    "default": {
+                        "mismatchHints": true,
+                        "smartReadSuggestions": true
+                    }
+                },
+                "diagnostics": {
+                    "$ref": "#/$defs/EmmyrcGmodNetworkDiagnostics",
+                    "default": {
+                        "missingCounterpart": true,
+                        "orderMismatch": true,
+                        "typeMismatch": true
+                    }
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
+        "EmmyrcGmodNetworkCompletion": {
+            "type": "object",
+            "properties": {
+                "mismatchHints": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "smartReadSuggestions": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
+        "EmmyrcGmodNetworkDiagnostics": {
+            "type": "object",
+            "properties": {
+                "missingCounterpart": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "orderMismatch": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "typeMismatch": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
+        "EmmyrcGmodOutline": {
+            "type": "object",
+            "properties": {
+                "verbosity": {
+                    "description": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals.",
+                    "$ref": "#/$defs/EmmyrcGmodOutlineVerbosity",
+                    "default": "normal"
+                }
+            }
+        },
+        "EmmyrcGmodOutlineVerbosity": {
+            "oneOf": [
+                {
+                    "description": "Show only functions, classes, VGUI panels, hooks, net receivers, timers, concommands.",
+                    "type": "string",
+                    "const": "minimal"
+                },
+                {
+                    "description": "Show functions, classes, important tables, hooks, net receivers, timers, concommands, and\nnon-primitive variables. Hides `if`/`for`/`do` blocks.",
+                    "type": "string",
+                    "const": "normal"
+                },
+                {
+                    "description": "Show everything (legacy behavior, includes control-flow blocks and all locals).",
+                    "type": "string",
+                    "const": "verbose"
+                }
+            ]
+        },
+        "EmmyrcGmodRealm": {
+            "type": "string",
+            "enum": [
+                "client",
+                "server",
+                "shared",
+                "menu"
+            ]
+        },
+        "EmmyrcGmodScriptedClassDefinition": {
+            "type": "object",
+            "properties": {
+                "classGlobal": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "disabled": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "exclude": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "icon": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "id": {
+                    "type": "string"
+                },
+                "include": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "label": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "parentId": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "path": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rootDir": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "scaffold": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcGmodScriptedClassScaffold"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "id"
+            ]
+        },
+        "EmmyrcGmodScriptedClassScaffold": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/EmmyrcGmodScriptedClassScaffoldFile"
+                    }
+                }
+            }
+        },
+        "EmmyrcGmodScriptedClassScaffoldFile": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path",
+                "template"
+            ]
+        },
+        "EmmyrcGmodScriptedClassScopeEntry": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "$ref": "#/$defs/EmmyrcGmodScriptedClassDefinition"
+                }
+            ]
+        },
+        "EmmyrcGmodScriptedClassScopes": {
+            "type": "object",
+            "properties": {
+                "include": {
+                    "type": "array",
+                    "default": [
+                        {
+                            "classGlobal": "ENT",
+                            "icon": "folder-library",
+                            "id": "entities",
+                            "include": [
+                                "entities/**"
+                            ],
+                            "label": "Entities",
+                            "path": [
+                                "entities"
+                            ],
+                            "rootDir": "lua/entities",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}/shared.lua",
+                                        "template": "ent_shared.lua"
+                                    },
+                                    {
+                                        "path": "{{name}}/init.lua",
+                                        "template": "ent_init.lua"
+                                    },
+                                    {
+                                        "path": "{{name}}/cl_init.lua",
+                                        "template": "ent_cl_init.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "SWEP",
+                            "exclude": [
+                                "weapons/gmod_tool/**"
+                            ],
+                            "icon": "folder-library",
+                            "id": "weapons",
+                            "include": [
+                                "weapons/**"
+                            ],
+                            "label": "SWEPs",
+                            "path": [
+                                "weapons"
+                            ],
+                            "rootDir": "lua/weapons",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}/shared.lua",
+                                        "template": "swep_shared.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "EFFECT",
+                            "icon": "folder-library",
+                            "id": "effects",
+                            "include": [
+                                "effects/**"
+                            ],
+                            "label": "Effects",
+                            "path": [
+                                "effects"
+                            ],
+                            "rootDir": "lua/effects",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}.lua",
+                                        "template": "effect.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "TOOL",
+                            "icon": "tools",
+                            "id": "stools",
+                            "include": [
+                                "weapons/gmod_tool/stools/**"
+                            ],
+                            "label": "STools",
+                            "parentId": "weapons",
+                            "path": [
+                                "weapons",
+                                "gmod_tool",
+                                "stools"
+                            ],
+                            "rootDir": "lua/weapons/gmod_tool/stools",
+                            "scaffold": {
+                                "files": [
+                                    {
+                                        "path": "{{name}}.lua",
+                                        "template": "tool.lua"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "classGlobal": "PLUGIN",
+                            "icon": "extensions",
+                            "id": "plugins",
+                            "include": [
+                                "plugins/**"
+                            ],
+                            "label": "Plugins",
+                            "path": [
+                                "plugins"
+                            ],
+                            "rootDir": "plugins"
+                        }
+                    ],
+                    "items": {
+                        "$ref": "#/$defs/EmmyrcGmodScriptedClassScopeEntry"
+                    },
+                    "x-gluals-editor": "scriptedClassTable"
+                }
+            }
+        },
+        "EmmyrcGmodVgui": {
+            "type": "object",
+            "properties": {
+                "codeLensEnabled": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "inlayHintEnabled": {
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "EmmyrcHover": {
+            "type": "object",
+            "properties": {
+                "customDetail": {
+                    "description": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint8",
+                    "default": null,
+                    "maximum": 255,
+                    "minimum": 0
+                },
+                "enable": {
+                    "description": "是否启用悬浮提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcInlayHint": {
+            "type": "object",
+            "properties": {
+                "closingEndHint": {
+                    "description": "Show an inlay hint after closing `end` keywords indicating what block\nthey belong to (e.g. function name). Only shown when the block spans\nat least `closingEndHintMinLines` lines.",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "closingEndHintControlFlow": {
+                    "description": "Also show closing `end` hints for control flow blocks (if, while, do,\nfor). Only effective when `closingEndHint` is enabled.",
+                    "type": "boolean",
+                    "default": false,
+                    "x-vscode-setting": true
+                },
+                "closingEndHintMinLines": {
+                    "description": "Minimum number of lines a block must span before a closing `end` hint\nis shown.",
+                    "type": "integer",
+                    "format": "uint32",
+                    "default": 15,
+                    "minimum": 0,
+                    "x-vscode-setting": true
+                },
+                "enumParamHint": {
+                    "description": "是否启用枚举参数提示。",
+                    "type": "boolean",
+                    "default": false,
+                    "x-vscode-setting": true
+                },
+                "indexHint": {
+                    "description": "在索引表达式跨行时，显示提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "localHint": {
+                    "description": "是否启用局部变量提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "metaCallHint": {
+                    "description": "是否启用 `__call` 调用提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "overrideHint": {
+                    "description": "是否启用重写提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "paramHint": {
+                    "description": "是否启用参数提示。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcInlineValues": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "是否启用内联值。用于在调试断点时显示变量值。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcLuaVersion": {
+            "oneOf": [
+                {
+                    "description": "Lua 5.1",
+                    "type": "string",
+                    "const": "Lua5.1"
+                },
+                {
+                    "description": "LuaJIT",
+                    "type": "string",
+                    "const": "LuaJIT"
+                },
+                {
+                    "description": "Lua 5.2",
+                    "type": "string",
+                    "const": "Lua5.2"
+                },
+                {
+                    "description": "Lua 5.3",
+                    "type": "string",
+                    "const": "Lua5.3"
+                },
+                {
+                    "description": "Lua 5.4",
+                    "type": "string",
+                    "const": "Lua5.4"
+                },
+                {
+                    "description": "Lua 5.5",
+                    "type": "string",
+                    "const": "Lua5.5"
+                },
+                {
+                    "description": "Lua Latest",
+                    "type": "string",
+                    "const": "LuaLatest"
+                }
+            ]
+        },
+        "EmmyrcNonStdSymbol": {
+            "type": "string",
+            "enum": [
+                "//",
+                "/**/",
+                "`",
+                "+=",
+                "-=",
+                "*=",
+                "/=",
+                "%=",
+                "^=",
+                "//=",
+                "|=",
+                "&=",
+                "<<=",
+                ">>=",
+                "||",
+                "&&",
+                "!",
+                "!=",
+                "continue"
+            ]
+        },
+        "EmmyrcReference": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "是否启用引用搜索。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "fuzzySearch": {
+                    "description": "是否启用模糊搜索。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "shortStringSearch": {
+                    "description": "缓存短字符串用于搜索。",
+                    "type": "boolean",
+                    "default": false,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcReformat": {
+            "type": "object",
+            "properties": {
+                "configPrecedence": {
+                    "description": "Controls which takes precedence when both `.editorconfig` and `.gluarc.json` formatter settings apply to the same option: `preferEditorconfig` (default) or `preferGluarc`.",
+                    "$ref": "#/$defs/EmmyrcFormatConfigPrecedence",
+                    "default": "preferEditorconfig",
+                    "x-vscode-setting": true
+                },
+                "externalTool": {
+                    "description": "External formatter tool configuration. When set, the specified program is used for formatting instead of the built-in formatter.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcExternalTool"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "externalToolRangeFormat": {
+                    "description": "External formatter for range formatting. When set, range format requests use this tool instead of the built-in formatter.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcExternalTool"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "preset": {
+                    "description": "Built-in formatter preset. `default` uses EmmyLuaCodeStyle defaults. `cfc` applies the CFC style preset. `custom` applies no preset — only the `styleOverrides` you configure below take effect.",
+                    "$ref": "#/$defs/EmmyrcFormatPreset",
+                    "default": "default",
+                    "x-vscode-setting": true
+                },
+                "styleOverrides": {
+                    "description": "Per-key EmmyLuaCodeStyle style overrides applied on top of the selected preset. Keys not configured here inherit their value from the active preset.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/EmmyrcFormatStyleOverrides"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "x-vscode-setting": true
+                },
+                "useDiff": {
+                    "description": "Whether to use the diff algorithm for formatting.",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "EmmyrcResource": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "EmmyrcRuntime": {
+            "type": "object",
+            "properties": {
+                "extensions": {
+                    "description": "文件扩展名。例如：.lua, .lua.txt",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "nonstandardSymbol": {
+                    "description": "Non-standard symbols.",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/EmmyrcNonStdSymbol"
+                    }
+                },
+                "requireLikeFunction": {
+                    "description": "类似 require 的函数列表。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "requirePattern": {
+                    "description": "require 模式。例如：\"?.lua\", \"?/init.lua\"",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "special": {
+                    "description": "Special symbols.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/EmmyrcSpecialSymbol"
+                    },
+                    "default": {}
+                },
+                "version": {
+                    "description": "Lua 版本。",
+                    "$ref": "#/$defs/EmmyrcLuaVersion",
+                    "default": "LuaJIT"
+                }
+            }
+        },
+        "EmmyrcSemanticToken": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "是否启用语义标记。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
+                "renderDocumentationMarkup": {
+                    "description": "Render Markdown/RST in documentation. Set `doc.syntax` for this option to have effect.",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                }
+            }
+        },
+        "EmmyrcSpecialSymbol": {
+            "type": "string",
+            "enum": [
+                "none",
+                "require",
+                "error",
+                "assert",
+                "type",
+                "setmetatable"
+            ]
+        },
+        "EmmyrcStrict": {
+            "type": "object",
+            "properties": {
+                "allowNullableAsNonNullable": {
+                    "description": "Allow nullable types (T?) to be passed where non-nullable (T) is expected.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "arrayIndex": {
+                    "description": "是否启用严格模式数组索引，严格模式下数组取值返回将包含 nil。",
+                    "type": "boolean",
+                    "default": false
+                },
+                "docBaseConstMatchBaseType": {
+                    "description": "doc定义的基础常量类型可以匹配基础类型，使 int 可以匹配 `---@alias id 1|2|3`，string 同理。",
+                    "type": "boolean",
+                    "default": true
+                },
+                "inferredTypeMismatch": {
+                    "description": "Keep inferred types lenient in mismatch diagnostics.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "metaOverrideFileDefine": {
+                    "description": "`---@meta`文件的定义完全覆盖真实文件的定义。",
+                    "type": "boolean",
+                    "default": true
+                },
+                "requireExportGlobal": {
+                    "description": "This option limits the visibility of third-party libraries.\n\nWhen enabled, third-party libraries must use `---@export global` annotation to be importable (i.e., no diagnostic errors and visible in auto-import).",
+                    "type": "boolean",
+                    "default": false
+                },
+                "requirePath": {
+                    "description": "是否启用严格模式 require 路径。严格模式时 require 必须从指定的根目录开始。",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "EmmyrcWorkspace": {
+            "type": "object",
+            "properties": {
+                "enableReindex": {
+                    "description": "启用重新索引。",
+                    "type": "boolean",
+                    "default": false,
+                    "x-vscode-setting": true
+                },
+                "encoding": {
+                    "description": "编码。例如：\"utf-8\"",
+                    "type": "string",
+                    "default": "utf-8"
+                },
+                "ignoreDir": {
+                    "description": "忽略的目录。",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ignoreGlobs": {
+                    "description": "忽略的文件。例如：[\"**/*.lua\"]",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "library": {
+                    "description": "库路径。例如：\"/usr/local/share/lua/5.1\"",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/EmmyLibraryItem"
+                    }
+                },
+                "moduleMap": {
+                    "description": "模块映射列表。key 是正则表达式，value 是新的模块正则表达式\n 例如：{\n    \"^(.*)$\": \"module_$1\"\n    \"^lib(.*)$\": \"script$1\"\n}",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "$ref": "#/$defs/EmmyrcWorkspaceModuleMap"
+                    }
+                },
+                "packageDirs": {
+                    "description": "Package directories. Treat the parent directory as a `library`, but only add files from the specified directory.\neg: `/usr/local/share/lua/5.1/module`",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "reindexDuration": {
+                    "description": "当保存文件时，ls 将在指定毫秒后重新索引工作区。",
+                    "type": "integer",
+                    "format": "uint64",
+                    "default": 5000,
+                    "minimum": 0,
+                    "x-vscode-setting": true
+                },
+                "workspaceRoots": {
+                    "description": "工作区根目录列表。例如：[\"src\", \"test\"]",
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "EmmyrcWorkspaceModuleMap": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string"
+                },
+                "replace": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "pattern",
+                "replace"
+            ]
         }
-      }
-    },
-    "EmmyrcRuntime": {
-      "type": "object",
-      "properties": {
-        "extensions": {
-          "description": "file Extensions. eg: .lua, .lua.txt",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "nonstandardSymbol": {
-          "description": "Non-standard symbols.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/EmmyrcNonStdSymbol"
-          }
-        },
-        "requireLikeFunction": {
-          "description": "Functions that like require.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "requirePattern": {
-          "description": "Require pattern. eg. \"?.lua\", \"?/init.lua\"",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "special": {
-          "description": "Special symbols.",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/EmmyrcSpecialSymbol"
-          },
-          "default": {}
-        },
-        "version": {
-          "description": "Deprecated: GMod-only server always uses LuaJIT. Kept for config compatibility.",
-          "$ref": "#/$defs/EmmyrcLuaVersion",
-          "default": "LuaJIT"
-        }
-      }
-    },
-    "EmmyrcSemanticToken": {
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enable semantic tokens.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        },
-        "renderDocumentationMarkup": {
-          "description": "Render Markdown/RST in documentation. Set `doc.syntax` for this option to have effect.",
-          "type": "boolean",
-          "default": true,
-          "x-vscode-setting": true
-        }
-      }
-    },
-    "EmmyrcSpecialSymbol": {
-      "type": "string",
-      "enum": [
-        "none",
-        "require",
-        "error",
-        "assert",
-        "type",
-        "setmetatable"
-      ]
-    },
-    "EmmyrcStrict": {
-      "type": "object",
-      "properties": {
-        "allowNullableAsNonNullable": {
-          "description": "Allow nullable types (T?) to be passed where non-nullable (T) is expected.",
-          "type": "boolean",
-          "default": true
-        },
-        "arrayIndex": {
-          "description": "Whether to enable strict mode array indexing.",
-          "type": "boolean",
-          "default": false
-        },
-        "docBaseConstMatchBaseType": {
-          "description": "Base constant types defined in doc can match base types, allowing int to match `---@alias id 1|2|3`, same for string.",
-          "type": "boolean",
-          "default": true
-        },
-        "metaOverrideFileDefine": {
-          "description": "meta define overrides file define",
-          "type": "boolean",
-          "default": true
-        },
-        "requireExportGlobal": {
-          "description": "This option limits the visibility of third-party libraries.\n\nWhen enabled, third-party libraries must use `---@export global` annotation to be importable (i.e., no diagnostic errors and visible in auto-import).",
-          "type": "boolean",
-          "default": false
-        },
-        "requirePath": {
-          "description": "Whether to enable strict mode require path.",
-          "type": "boolean",
-          "default": false
-        }
-      }
-    },
-    "EmmyrcWorkspace": {
-      "type": "object",
-      "properties": {
-        "enableReindex": {
-          "description": "Enable full project reindex after changing a file.",
-          "type": "boolean",
-          "default": false,
-          "x-vscode-setting": true
-        },
-        "encoding": {
-          "description": "Encoding. eg: \"utf-8\"",
-          "type": "string",
-          "default": "utf-8"
-        },
-        "ignoreDir": {
-          "description": "Ignore directories.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "ignoreGlobs": {
-          "description": "Ignore globs. eg: [\"**/*.lua\"]",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "library": {
-          "description": "Library paths. Can be a string path or an object with path and ignore rules.\neg: [\"/usr/local/share/lua/5.1\"] or [{\"path\": \"/usr/local/share/lua/5.1\", \"ignoreDir\": [\"test\"], \"ignoreGlobs\": [\"**/*.spec.lua\"]}]",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/EmmyLibraryItem"
-          }
-        },
-        "moduleMap": {
-          "description": "Module map. key is regex, value is new module regex\neg: {\n    \"^(.*)$\": \"module_$1\"\n    \"^lib(.*)$\": \"script$1\"\n}",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/EmmyrcWorkspaceModuleMap"
-          }
-        },
-        "packageDirs": {
-          "description": "Package directories. Treat the parent directory as a `library`, but only add files from the specified directory.\neg: `/usr/local/share/lua/5.1/module`",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "reindexDuration": {
-          "description": "Delay between changing a file and full project reindex, in milliseconds.",
-          "type": "integer",
-          "format": "uint64",
-          "default": 5000,
-          "minimum": 0,
-          "x-vscode-setting": true
-        },
-        "workspaceRoots": {
-          "description": "Workspace roots. eg: [\"src\", \"test\"]",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "EmmyrcWorkspaceModuleMap": {
-      "type": "object",
-      "properties": {
-        "pattern": {
-          "type": "string"
-        },
-        "replace": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "pattern",
-        "replace"
-      ]
     }
-  }
 }

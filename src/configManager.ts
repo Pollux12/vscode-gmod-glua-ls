@@ -65,17 +65,10 @@ export class ConfigurationManager {
     }
 
     /**
-     * Get color configuration
+     * Check whether an annotator decoration underline is enabled.
      */
-    getColor(colorType: string): string | undefined {
-        return this.get<string>(`colors.${colorType}`);
-    }
-
-    /**
-     * Check if mutable variables should have underline
-     */
-    useMutableUnderline(): boolean {
-        return this.get<boolean>('colors.mutableUnderline', false) || false;
+    useDecorationUnderline(setting: string): boolean {
+        return this.get<boolean>(`decorations.${setting}`, false) || false;
     }
 
     /**

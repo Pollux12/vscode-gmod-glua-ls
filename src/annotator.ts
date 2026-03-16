@@ -24,20 +24,13 @@ let decorations: Partial<DecorationMap> = {};
 /**
  * 创建装饰器的工厂函数
  */
-const createDecoration = (key: string): vscode.TextEditorDecorationType => {
-    const cacheKey = `decoration:${key}`;
+const createDecoration = (cacheKeySuffix: string): vscode.TextEditorDecorationType => {
+    const cacheKey = `decoration:${cacheKeySuffix}`;
     if (decorationCache.has(cacheKey)) {
         return decorationCache.get(cacheKey)!;
     }
 
     const config: vscode.DecorationRenderOptions = {};
-    const color = vscode.workspace.getConfiguration("gluals").get<string>(key);
-
-    if (color) {
-        config.light = { color };
-        config.dark = { color };
-    }
-
     const decoration = vscode.window.createTextEditorDecorationType(config);
     decorationCache.set(cacheKey, decoration);
     return decoration;
@@ -46,30 +39,40 @@ const createDecoration = (key: string): vscode.TextEditorDecorationType => {
 /**
  * 创建带下划线的装饰器
  */
-const createDecorationUnderline = (key: string): vscode.TextEditorDecorationType => {
-    const cacheKey = `underline:${key}`;
+const createDecorationUnderline = (cacheKeySuffix: string): vscode.TextEditorDecorationType => {
+    const cacheKey = `underline:${cacheKeySuffix}`;
     if (decorationCache.has(cacheKey)) {
         return decorationCache.get(cacheKey)!;
     }
 
     const config: vscode.DecorationRenderOptions = {};
-    const color = vscode.workspace.getConfiguration("gluals").get<string>(key);
-
-    const textDecoration = color
-        ? `underline;text-decoration-color:${color};text-underline-offset: 4px;`
-        : 'underline;text-underline-offset: 4px;';
-
-    if (color) {
-        config.light = { color, textDecoration };
-        config.dark = { color, textDecoration };
-    } else {
-        config.light = { textDecoration };
-        config.dark = { textDecoration };
-    }
+    const textDecoration = 'underline;text-underline-offset: 4px;';
+    config.light = { textDecoration };
+    config.dark = { textDecoration };
 
     const decoration = vscode.window.createTextEditorDecorationType(config);
     decorationCache.set(cacheKey, decoration);
     return decoration;
+};
+
+const shouldUnderlineAnnotatorType = (
+    config: vscode.WorkspaceConfiguration,
+    type: AnnotatorType
+): boolean => {
+    switch (type) {
+        case AnnotatorType.ReadOnlyParam:
+            return get<boolean>(config, "gluals.decorations.readonlyParameterUnderline", false) ?? false;
+        case AnnotatorType.Global:
+            return get<boolean>(config, "gluals.decorations.globalUnderline", false) ?? false;
+        case AnnotatorType.ReadOnlyLocal:
+            return get<boolean>(config, "gluals.decorations.readonlyLocalUnderline", false) ?? false;
+        case AnnotatorType.MutLocal:
+            return get<boolean>(config, "gluals.decorations.mutableLocalUnderline", false) ?? false;
+        case AnnotatorType.MutParam:
+            return get<boolean>(config, "gluals.decorations.mutableParameterUnderline", false) ?? false;
+        default:
+            return false;
+    }
 };
 
 const createDecorationDocEm = (): vscode.TextEditorDecorationType => {
@@ -128,25 +131,42 @@ const updateDecorations = (): void => {
     }
 
     // 创建基础装饰器
-    decorations[AnnotatorType.ReadOnlyParam] = createDecoration("colors.parameter");
-    decorations[AnnotatorType.Global] = createDecoration("colors.global");
-    decorations[AnnotatorType.ReadOnlyLocal] = createDecoration("colors.local");
-
-    // 获取配置以决定是否使用下划线
     const config = vscode.workspace.getConfiguration(
         undefined,
         vscode.window.activeTextEditor?.document.uri
     );
-    const mutableUnderline = get<boolean>(config, "gluals.colors.mutableUnderline", false);
 
-    // 创建可变变量的装饰器
-    if (mutableUnderline) {
-        decorations[AnnotatorType.MutLocal] = createDecorationUnderline("colors.local");
-        decorations[AnnotatorType.MutParam] = createDecorationUnderline("colors.parameter");
-    } else {
-        decorations[AnnotatorType.MutLocal] = createDecoration("colors.local");
-        decorations[AnnotatorType.MutParam] = createDecoration("colors.parameter");
-    }
+    const createAnnotatorDecoration = (
+        type: AnnotatorType,
+        cacheKeySuffix: string
+    ): vscode.TextEditorDecorationType => {
+        if (shouldUnderlineAnnotatorType(config, type)) {
+            return createDecorationUnderline(cacheKeySuffix);
+        }
+
+        return createDecoration(cacheKeySuffix);
+    };
+
+    decorations[AnnotatorType.ReadOnlyParam] = createAnnotatorDecoration(
+        AnnotatorType.ReadOnlyParam,
+        "readonly-param"
+    );
+    decorations[AnnotatorType.Global] = createAnnotatorDecoration(
+        AnnotatorType.Global,
+        "global"
+    );
+    decorations[AnnotatorType.ReadOnlyLocal] = createAnnotatorDecoration(
+        AnnotatorType.ReadOnlyLocal,
+        "readonly-local"
+    );
+    decorations[AnnotatorType.MutLocal] = createAnnotatorDecoration(
+        AnnotatorType.MutLocal,
+        "mutable-local"
+    );
+    decorations[AnnotatorType.MutParam] = createAnnotatorDecoration(
+        AnnotatorType.MutParam,
+        "mutable-param"
+    );
 
     decorations[AnnotatorType.DocEm] = createDecorationDocEm();
     decorations[AnnotatorType.DocStrong] = createDecorationDocStrong();
