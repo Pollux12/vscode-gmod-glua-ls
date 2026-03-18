@@ -1,6 +1,10 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { extensionContext } from './extension';
+import {
+    isExpectedLifecycleRequestError,
+    sendRequestWithStartupRetry,
+} from './languageServerRequests';
 
 type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
 type GmodExplorerItemType =
@@ -159,6 +163,22 @@ interface ScriptedClassCache {
     vguiClassMap: Map<string, ScriptedClassFileEntry[]>;
 }
 
+const STARTUP_REFRESH_DELAY_MS = 1000;
+
+let registeredGmodExplorerProvider: GmodExplorerProvider | undefined;
+let pendingStartupRefresh: NodeJS.Timeout | undefined;
+
+function scheduleStartupRefresh(): void {
+    if (pendingStartupRefresh) {
+        return;
+    }
+
+    pendingStartupRefresh = setTimeout(() => {
+        pendingStartupRefresh = undefined;
+        registeredGmodExplorerProvider?.refresh();
+    }, STARTUP_REFRESH_DELAY_MS);
+}
+
 function parseLsUri(uri: string): vscode.Uri | undefined {
     try {
         return vscode.Uri.parse(uri);
@@ -174,14 +194,30 @@ export async function fetchLsScriptedClassesResult(): Promise<LsScriptedClassesR
     }
 
     try {
-        const result = await client.sendRequest<unknown>('gluals/gmodScriptedClassesV2', {});
+        const result = await sendRequestWithStartupRetry<unknown>(
+            client,
+            'gluals/gmodScriptedClassesV2',
+            {},
+        );
         return withWorkspaceFallback(normalizeLsScriptedClassesResult(result));
     } catch (v2Error) {
+        if (isExpectedLifecycleRequestError(v2Error)) {
+            scheduleStartupRefresh();
+            return withWorkspaceFallback({ definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: [] });
+        }
+
         try {
-            const legacyResult = await client.sendRequest<unknown>('gluals/gmodScriptedClasses', {});
+            const legacyResult = await sendRequestWithStartupRetry<unknown>(
+                client,
+                'gluals/gmodScriptedClasses',
+                {},
+            );
             return withWorkspaceFallback(normalizeLsScriptedClassesResult(legacyResult));
         } catch (legacyError) {
-            console.warn('Failed to fetch scripted classes from language server:', v2Error, legacyError);
+            if (!isExpectedLifecycleRequestError(legacyError)) {
+                console.warn('Failed to fetch scripted classes from language server:', v2Error, legacyError);
+            }
+
             return withWorkspaceFallback({ definitions: [...LEGACY_SCRIPTED_CLASS_DEFINITIONS], entries: [] });
         }
     }
@@ -821,12 +857,20 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     }
 
     dispose(): void {
+        if (registeredGmodExplorerProvider === this) {
+            registeredGmodExplorerProvider = undefined;
+        }
+        if (pendingStartupRefresh) {
+            clearTimeout(pendingStartupRefresh);
+            pendingStartupRefresh = undefined;
+        }
         this.onDidChangeTreeDataEmitter.dispose();
     }
 }
 
 export function registerGmodExplorer(context: vscode.ExtensionContext): GmodExplorerProvider {
     const provider = new GmodExplorerProvider();
+    registeredGmodExplorerProvider = provider;
     const treeView = vscode.window.createTreeView('gluals.gmodExplorer', {
         treeDataProvider: provider,
         showCollapseAll: true,

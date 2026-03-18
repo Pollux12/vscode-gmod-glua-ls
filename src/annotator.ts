@@ -3,6 +3,11 @@ import { AnnotatorType } from './lspExtension';
 import { LanguageClient } from 'vscode-languageclient/node';
 import * as notifications from "./lspExtension";
 import { get } from './configManager';
+import {
+    isExpectedLifecycleRequestError,
+    isServerInitializingError,
+    sendRequestWithStartupRetry,
+} from './languageServerRequests';
 
 // 装饰器类型映射接口
 interface DecorationMap {
@@ -210,7 +215,11 @@ const requestAnnotatorsImpl = async (editor: vscode.TextEditor, client: Language
     };
 
     try {
-        const annotationList = await client.sendRequest<notifications.IAnnotator[]>("gluals/annotator", params);
+        const annotationList = await sendRequestWithStartupRetry<notifications.IAnnotator[]>(
+            client,
+            "gluals/annotator",
+            params,
+        );
 
         if (!annotationList) {
             return;
@@ -240,6 +249,17 @@ const requestAnnotatorsImpl = async (editor: vscode.TextEditor, client: Language
             updateAnnotators(editor, type, ranges);
         });
     } catch (error) {
+        if (isServerInitializingError(error)) {
+            if (vscode.window.activeTextEditor?.document === editor.document) {
+                requestAnnotators(editor, client);
+            }
+            return;
+        }
+
+        if (isExpectedLifecycleRequestError(error)) {
+            return;
+        }
+
         console.error('Failed to get annotations from language server:', error);
     }
 };
