@@ -2,30 +2,35 @@
   <img src="res/gmod-glua-ls.png" width="128" alt="gmod-glua-ls icon">
 </p>
 
-# Garry's Mod Language Server (GLua)
-
-Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server and debugger built specifically for Garry's Mod (GLua), with the goal of delivering the ultimate Garry's Mod development experience.
+# Garry's Mod Language Server (VSCode)
 
 > [!IMPORTANT]
-> This is an early release. There may be some minor bugs, such as false-positive diagostics or unsupported configurations. Please report any issues you run into! You may be able to resolve some issues via the config editor (e.g. disabling diagnostics or changing folder paths).
+> This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
+
+Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and development enviroment built specifically for Garry's Mod (GLua), with the goal of delivering the ultimate Garry's Mod development experience.
 
 [Annotation Documentation](https://github.com/Pollux12/gmod-glua-ls/blob/main/docs/annotations/README.md)
+
+<details>
+<summary>Media</summary>
+
+</details>
 
 ---
 
 ## ⚡ Performance & Architecture
 
-* **Rust-Powered Backend:** Delivers near-instant indexing and minimal memory footprint - over 10x quicker than others on large projects while delivering more functionality.
-* **Advanced Language Server**: Includes everything you'd expect from a language server, such as syntax highligting, diagnostics, symbol renaming, type resolution, and more, alongside Garry's Mod specific features. This is the only thing you need for Garry's Mod development.
-* **Easy Setup:** Designed to be as easy to setup and use as possible. The extension will take care of setting everything up for you, including automatically downloading and updating annotations and setting up the debugger. Advanced scope resolution drastically reduces the amount of manual annotations required. A custom settings menu is available for any manual configuration or tuning required.
+* **Rust-Powered Backend:** Delivers near-instant indexing and minimal memory footprint - over 10x quicker than others on large projects while delivering more features.
+* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highligting, diagnostics, symbol renaming, type resolution, goto, formatting and more. Advanced scope resolution and inference drastically reduces the amount of manual annotations required.
+* **Easy Setup:** Designed to "just work", the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy manual configuration.
 
 ## 🧠 Garry's Mod Specific Features
 
-* **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. Advanced inferred class and variable system drastically reduces the amount of manual annotations required.
+* **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. NetworkVars, AccessorFuncs and VGUI panels are all registered as well.
 * **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Delivers realm-aware suggestions by filtering autocomplete based on realm.
-* **Network Analysis:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
+* **Network Validation:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
 * **Smart Hook Integration:** Intelligent autocomplete and signature resolution for all hooks, `GM:` overrides, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
-* **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a one-click template creation system.
+* **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a configurable template system for easy creation.
 
 ## 🐞 Integrated Server (SRCDS) Debugger
 
@@ -45,6 +50,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 ## 🛠 Workspace Tooling & Configuration
 
 * **Interactive Configuration UI:** Built-in settings panel to easily toggle diagnostics, formatters, and workspace parameters saved to a workspace local `.gluarc.json`. Useful for if a specific diagnostic is giving too many false-positives in your codebase (please let me know if this happens!).
+* **Built-In Formatter:** Formatter configured with presets such as CFC, advanced customisation options available.
 * **Automatic File Resolution:** Automatically detects and parses addon and gamemode structures, enabling you to get started with all features and diagnostics without a ton of configuration.
 * **Automatic Setup & Updates:** Designed to work with minimal setup, the extension can handle updates for annotations and the debugger, alongside setting it all up for you on initial load.
 * **Multi-Root Workspace Support:** Designed to work in large codebases, especially with many different folders open within a workspace.  Perfect for working on complex gamemodes alongside many addons, such as within a [multi-root workspace.](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces)
@@ -64,4 +70,9 @@ If you have any advanced configuration (e.g. not using standard Garry's Mod fold
 
 ---
 
-This project started as a fork of [emmylua-analyzer-rust](https://github.com/EmmyLuaLs/emmylua-analyzer-rust) due to LuaLS taking many minutes to diagnose and process my codebase. While originally intended to be a quick day-long project to add a few basic features to EmmyLua, it quickly grew into something much bigger (we love scope creep). Some of the code is a bit slop due to this, especially since this is the first time I've ever used Rust. I do intend to improve this over time with new features and fixes - let me know if you have any cool ideas or run into any issues!
+
+
+This is a hard fork of [EmmyLua Analyzer Rust](https://github.com/CppCXY/emmylua-analyzer-rust), maintained specifically for Garry's Mod GLua.
+The original EmmyLua project does not support plugins, nor does it have any plan for any, making it difficult to fully adapt for Garry's Mod.
+While LuaLS has plugin support, it was annoyingly slow to use. Many features here are based on my [LuaLS plugin](https://github.com/Pollux12/gmod-luals-addon).
+

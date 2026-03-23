@@ -1,6 +1,6 @@
 import { LanguageConfiguration, IndentAction, IndentationRule, OnEnterRule } from 'vscode';
 import { ConfigurationManager } from './configManager';
-import { LUA_END_CLOSER_PATTERN, LUA_FUNCTION_BLOCK_START_PATTERNS } from './luaEnterPatterns';
+import { LUA_AUTO_END_BLOCK_START_PATTERNS, LUA_EXISTING_CLOSER_PATTERN } from './luaEnterPatterns';
 
 /**
  * Lua language configuration for VS Code
@@ -25,9 +25,9 @@ export class LuaLanguageConfiguration implements LanguageConfiguration {
      * Build on-enter rules for auto-indentation and annotation completion
      */
     private buildOnEnterRules(enableAnnotationCompletion: boolean): OnEnterRule[] {
-        const baseRules: OnEnterRule[] = LUA_FUNCTION_BLOCK_START_PATTERNS.map((beforeText) => ({
+        const baseRules: OnEnterRule[] = LUA_AUTO_END_BLOCK_START_PATTERNS.map((beforeText) => ({
             beforeText,
-            afterText: LUA_END_CLOSER_PATTERN,
+            afterText: LUA_EXISTING_CLOSER_PATTERN,
             action: {
                 indentAction: IndentAction.IndentOutdent,
                 appendText: '\t'

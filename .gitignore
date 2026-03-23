@@ -14,3 +14,11 @@ temp
 /server
 /package-lock.json
 /temp
+
+.idea/
+.cursor/
+.claude/
+.opencode/
+.serena/
+.agents/skills/
+.grepai/

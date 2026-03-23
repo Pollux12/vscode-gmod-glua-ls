@@ -143,7 +143,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.showServerMenu', handler: showServerMenu },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
-        { id: 'gluals.language.smartEnter', handler: handleLuaSmartEnter },
+        { id: 'gluals.language.smartEnter', handler: () => handleLuaSmartEnter(() => extensionContext.client) },
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
@@ -581,6 +581,7 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
     const platform = os.platform();
     const executableName = platform === 'win32' ? 'glua_ls.exe' : 'glua_ls';
     const envPath = process.env['EMMY_DEV_LS_PATH']?.trim();
+    const envPath = process.env['GLUALS_DEV_LS_PATH']?.trim();
 
     const candidates: string[] = [];
     if (envPath) {
