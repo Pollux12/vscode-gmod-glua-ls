@@ -6,7 +6,16 @@ import {
     sendRequestWithStartupRetry,
 } from './languageServerRequests';
 
-type ResourceCategory = 'models' | 'materials' | 'sounds' | 'other';
+type ResourceCategory =
+    | 'models'
+    | 'materials'
+    | 'sounds'
+    | 'particles'
+    | 'vehicles'
+    | 'localization'
+    | 'dataStatic'
+    | 'shaders'
+    | 'other';
 type GmodExplorerItemType =
     | 'category'
     | 'scriptedClassType'
@@ -167,6 +176,54 @@ const STARTUP_REFRESH_DELAY_MS = 1000;
 
 let registeredGmodExplorerProvider: GmodExplorerProvider | undefined;
 let pendingStartupRefresh: NodeJS.Timeout | undefined;
+
+interface ResourceCategoryConfig {
+    label: string;
+    patterns: string[];
+    groupFolder: string;
+}
+
+const RESOURCE_CATEGORY_CONFIG: Record<ResourceCategory, ResourceCategoryConfig> = {
+    models: { label: 'Models', patterns: ['**/models/**/*'], groupFolder: 'models' },
+    materials: { label: 'Materials', patterns: ['**/materials/**/*'], groupFolder: 'materials' },
+    sounds: { label: 'Sounds', patterns: ['**/sound/**/*'], groupFolder: 'sound' },
+    particles: { label: 'Particles', patterns: ['**/particles/**/*'], groupFolder: 'particles' },
+    vehicles: { label: 'Vehicle Scripts', patterns: ['**/scripts/vehicles/**/*'], groupFolder: 'vehicles' },
+    localization: { label: 'Localization', patterns: ['**/resource/localization/**/*'], groupFolder: 'localization' },
+    dataStatic: { label: 'Data Static', patterns: ['**/data_static/**/*'], groupFolder: 'data_static' },
+    shaders: { label: 'Shaders', patterns: ['**/shaders/fxc/**/*'], groupFolder: 'fxc' },
+    other: { label: 'Other', patterns: ['**/scenes/**/*', '**/resource/fonts/**/*', '**/maps/**/*'], groupFolder: 'other' },
+};
+
+const RESOURCE_CATEGORY_ORDER: ResourceCategory[] = [
+    'models',
+    'materials',
+    'sounds',
+    'particles',
+    'vehicles',
+    'localization',
+    'dataStatic',
+    'shaders',
+    'other',
+];
+
+const RESOURCE_FILE_EXTENSIONS: Record<ResourceCategory, Set<string>> = {
+    models: new Set(['.mdl', '.phy', '.ani', '.vvd', '.vtx']),
+    materials: new Set(['.vmt', '.vtf', '.png', '.jpg', '.jpeg', '.raw']),
+    sounds: new Set(['.wav', '.mp3', '.ogg']),
+    particles: new Set(['.pcf']),
+    vehicles: new Set(['.txt']),
+    localization: new Set(['.properties']),
+    dataStatic: new Set(['.txt', '.dat', '.json', '.xml', '.csv']),
+    shaders: new Set(['.vcs']),
+    other: new Set(['.vcd', '.ttf', '.bsp', '.lmp', '.nav', '.ain', '.png']),
+};
+
+const INVALID_MODEL_VTX_SUFFIXES = ['.sw.vtx', '.360.vtx', '.xbox.vtx'];
+
+function toPosixLowerPath(uri: vscode.Uri): string {
+    return uri.fsPath.replace(/\\/g, '/').toLowerCase();
+}
 
 function scheduleStartupRefresh(): void {
     if (pendingStartupRefresh) {
@@ -469,13 +526,68 @@ export class GmodExplorerItem extends vscode.TreeItem {
 }
 
 function extractResourceGroup(uri: vscode.Uri, rcType: ResourceCategory): string {
-    const folderName = rcType === 'sounds' ? 'sound' : rcType === 'other' ? 'resource' : rcType;
+    const folderName = RESOURCE_CATEGORY_CONFIG[rcType].groupFolder;
     const parts = uri.fsPath.replace(/\\/g, '/').split('/');
     const idx = parts.lastIndexOf(folderName);
     if (idx < 0 || idx + 2 > parts.length - 1) {
         return '';
     }
     return parts[idx + 1];
+}
+
+function isResourceFileForCategory(uri: vscode.Uri, rcType: ResourceCategory): boolean {
+    const normalizedPath = toPosixLowerPath(uri);
+    const ext = path.extname(uri.fsPath).toLowerCase();
+
+    if (!RESOURCE_FILE_EXTENSIONS[rcType].has(ext)) {
+        return false;
+    }
+
+    if (rcType === 'models' && ext === '.vtx') {
+        return !INVALID_MODEL_VTX_SUFFIXES.some((suffix) => normalizedPath.endsWith(suffix));
+    }
+
+    if (rcType === 'materials' && ext === '.raw') {
+        return normalizedPath.includes('/materials/colorcorrection/');
+    }
+
+    if (rcType === 'vehicles') {
+        return normalizedPath.includes('/scripts/vehicles/');
+    }
+
+    if (rcType === 'localization') {
+        return /\/resource\/localization\/[^/]+\/[^/]+\.properties$/.test(normalizedPath);
+    }
+
+    if (rcType === 'dataStatic') {
+        return normalizedPath.includes('/data_static/');
+    }
+
+    if (rcType === 'shaders') {
+        return normalizedPath.includes('/shaders/fxc/');
+    }
+
+    if (rcType === 'other') {
+        if (ext === '.vcd') {
+            return normalizedPath.includes('/scenes/');
+        }
+
+        if (ext === '.ttf') {
+            return normalizedPath.includes('/resource/fonts/');
+        }
+
+        if (ext === '.png') {
+            return normalizedPath.includes('/maps/thumb/');
+        }
+
+        if (ext === '.bsp' || ext === '.lmp' || ext === '.nav' || ext === '.ain') {
+            return normalizedPath.includes('/maps/');
+        }
+
+        return false;
+    }
+
+    return RESOURCE_FILE_EXTENSIONS[rcType].has(ext);
 }
 
 export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplorerItem>, vscode.Disposable {
@@ -523,12 +635,14 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 case 'Scripted Classes':
                     return this.getScriptedClassTypeItems(undefined);
                 case 'Resources':
-                    return [
-                        new GmodExplorerItem({ type: 'resourceCategory', label: 'Models', collapsible: vscode.TreeItemCollapsibleState.Collapsed, rcType: 'models' }),
-                        new GmodExplorerItem({ type: 'resourceCategory', label: 'Materials', collapsible: vscode.TreeItemCollapsibleState.Collapsed, rcType: 'materials' }),
-                        new GmodExplorerItem({ type: 'resourceCategory', label: 'Sounds', collapsible: vscode.TreeItemCollapsibleState.Collapsed, rcType: 'sounds' }),
-                        new GmodExplorerItem({ type: 'resourceCategory', label: 'Other', collapsible: vscode.TreeItemCollapsibleState.Collapsed, rcType: 'other' }),
-                    ];
+                    return RESOURCE_CATEGORY_ORDER.map((rcType) =>
+                        new GmodExplorerItem({
+                            type: 'resourceCategory',
+                            label: RESOURCE_CATEGORY_CONFIG[rcType].label,
+                            collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                            rcType,
+                        })
+                    );
             }
         }
 
@@ -833,22 +947,25 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         const cache = new Map<ResourceCategory, Map<string, vscode.Uri[]>>();
         const LIMIT = 500;
 
-        const patterns: [ResourceCategory, string][] = [
-            ['models', '**/models/**/*'],
-            ['materials', '**/materials/**/*'],
-            ['sounds', '**/sound/**/*'],
-            ['other', '**/resource/**/*'],
-        ];
-
-        await Promise.all(patterns.map(async ([rcType, pattern]) => {
-            const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', LIMIT);
+        await Promise.all(RESOURCE_CATEGORY_ORDER.map(async (rcType) => {
             const groupMap = new Map<string, vscode.Uri[]>();
-            for (const uri of files) {
-                const groupKey = extractResourceGroup(uri, rcType);
-                const existing = groupMap.get(groupKey) ?? [];
-                existing.push(uri);
-                groupMap.set(groupKey, existing);
+            const seen = new Set<string>();
+
+            for (const pattern of RESOURCE_CATEGORY_CONFIG[rcType].patterns) {
+                const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', LIMIT);
+                for (const uri of files) {
+                    if (seen.has(uri.fsPath) || !isResourceFileForCategory(uri, rcType)) {
+                        continue;
+                    }
+
+                    seen.add(uri.fsPath);
+                    const groupKey = extractResourceGroup(uri, rcType);
+                    const existing = groupMap.get(groupKey) ?? [];
+                    existing.push(uri);
+                    groupMap.set(groupKey, existing);
+                }
             }
+
             cache.set(rcType, groupMap);
         }));
 
