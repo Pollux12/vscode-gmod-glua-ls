@@ -7,9 +7,9 @@
 > [!IMPORTANT]
 > This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
 
-Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and development enviroment built specifically for Garry's Mod (GLua), with the goal of delivering the ultimate Garry's Mod development experience.
+Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod development.
 
-[Annotation Documentation](https://github.com/Pollux12/gmod-glua-ls/blob/main/docs/annotations/README.md)
+[Documentation](https://github.com/Pollux12/gmod-glua-ls/blob/main/docs/annotations/README.md)
 
 <details>
 <summary>Media</summary>

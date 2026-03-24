@@ -64,19 +64,6 @@ export interface SyntaxTreeResponse {
     content: string;
 }
 
-export interface AutoInsertEndParams {
-    uri: string;
-    position: IServerPosition;
-    version: number;
-}
-
-export interface AutoInsertEndResponse {
-    shouldInsert: boolean;
-    closeKeyword: 'end' | 'until' | string;
-    blockKind?: string;
-    reason?: string;
-}
-
 export interface GluaDocSearchParams {
     query: string;
     limit?: number;

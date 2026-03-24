@@ -9,7 +9,7 @@ export const LUA_FUNCTION_BLOCK_START_PATTERNS: readonly RegExp[] = LUA_FUNCTION
     (source) => new RegExp(`^${source}$`)
 );
 
-export const LUA_AUTO_END_BLOCK_START_PATTERNS: readonly RegExp[] = [
+export const LUA_BLOCK_START_PATTERNS: readonly RegExp[] = [
     /^\s*if\b.+\bthen\s*$/,
     /^\s*elseif\b.+\bthen\s*$/,
     /^\s*else\s*$/,
@@ -19,9 +19,4 @@ export const LUA_AUTO_END_BLOCK_START_PATTERNS: readonly RegExp[] = [
     ...LUA_FUNCTION_BLOCK_START_PATTERNS,
 ];
 
-export const LUA_END_CLOSER_PATTERN = /^\s*end\s*$/;
 export const LUA_EXISTING_CLOSER_PATTERN = /^\s*(end|else|elseif|until)\b/;
-
-export function isLuaAutoEndBlockStart(text: string): boolean {
-    return LUA_AUTO_END_BLOCK_START_PATTERNS.some((pattern) => pattern.test(text));
-}

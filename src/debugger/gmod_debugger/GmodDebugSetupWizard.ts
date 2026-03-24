@@ -14,6 +14,7 @@ const GITHUB_RELEASE_HEADERS = {
     'X-GitHub-Api-Version': '2022-11-28',
 };
 export const DEFAULT_RDB_PORT = 21111;
+export const DEFAULT_RDB_CLIENT_PORT = 21112;
 const LEGACY_LOADER_START_MARKER = '-- gm_rdb debugger loader (added by GLuaLS)';
 const LEGACY_LOADER_END_MARKER = '-- end gm_rdb';
 
@@ -25,6 +26,15 @@ const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
 };
 
 const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS);
+
+const GM_RDB_CLIENT_PLATFORM_DLLS: Record<string, string> = {
+    'Windows 64-bit': 'gmcl_rdb_client_win64.dll',
+    'Windows 32-bit': 'gmcl_rdb_client_win32.dll',
+    'Linux 64-bit': 'gmcl_rdb_client_linux64.dll',
+    'Linux 32-bit': 'gmcl_rdb_client_linux.dll',
+};
+
+export const ALL_RDB_CLIENT_DLLS = Object.values(GM_RDB_CLIENT_PLATFORM_DLLS);
 
 interface DebugConfig {
     type: string;
@@ -188,6 +198,21 @@ function detectGmRdb(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
+export function detectGmRdbClient(garrysmodPath: string): string | undefined {
+    const binDir = path.join(garrysmodPath, 'lua', 'bin');
+    if (!fs.existsSync(binDir)) {
+        return undefined;
+    }
+
+    for (const dllName of ALL_RDB_CLIENT_DLLS) {
+        if (fs.existsSync(path.join(binDir, dllName))) {
+            return dllName;
+        }
+    }
+
+    return undefined;
+}
+
 function isPreReleaseExtension(): boolean {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     if (!extension) {
@@ -251,7 +276,7 @@ export async function fetchReleaseForCurrentExtensionChannel(): Promise<GmRdbRel
     return fetchLatestRelease();
 }
 
-function buildSharedAutorunLua(port: number): string {
+function buildSharedAutorunLua(port: number, clientPort?: number): string {
     return [
         '-- [GLuaLS] Auto-managed by GLuaLS extension. Do not edit.',
         '_GLUALS = _GLUALS or {}',
@@ -391,16 +416,21 @@ function buildSharedAutorunLua(port: number): string {
         '',
         '        ErrorNoHalt("[GLuaLS] Unknown exec kind: " .. tostring(kind) .. "\\n")',
         '    end)',
+        ...(clientPort !== undefined ? [
+            '    if pcall(require, "rdb_client") then',
+            `        rdb_client.activate(${clientPort})`,
+            '    end',
+        ] : []),
         'end',
         '',
     ].join('\n');
 }
 
-export function writeAutorunFile(garrysmodPath: string, port: number): void {
-    syncAutorunFile(garrysmodPath, port);
+export function writeAutorunFile(garrysmodPath: string, port: number, clientPort?: number): void {
+    syncAutorunFile(garrysmodPath, port, clientPort);
 }
 
-export function syncAutorunFile(garrysmodPath: string, port: number): AutorunSyncStatus {
+export function syncAutorunFile(garrysmodPath: string, port: number, clientPort?: number): AutorunSyncStatus {
     const autorunDir = path.join(garrysmodPath, 'lua', 'autorun');
     // the debugger runtime script used to live at sh_luals.lua; we now create debug.lua
     const autorunPath = path.join(autorunDir, 'debug.lua');
@@ -415,7 +445,7 @@ export function syncAutorunFile(garrysmodPath: string, port: number): AutorunSyn
         }
     }
 
-    const content = buildSharedAutorunLua(port);
+    const content = buildSharedAutorunLua(port, clientPort);
     const hadExistingFile = fs.existsSync(autorunPath);
 
     if (hadExistingFile) {

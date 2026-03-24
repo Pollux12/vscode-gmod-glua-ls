@@ -78,10 +78,4 @@ export class ConfigurationManager {
         return this.get<boolean>('language.completeAnnotation', true) ?? true;
     }
 
-    /**
-     * Check if auto-inserting `end` for Lua block starters is enabled
-     */
-    isAutoInsertEndEnabled(): boolean {
-        return this.get<boolean>('language.autoInsertEnd', true) ?? true;
-    }
 }

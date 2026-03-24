@@ -1,4 +1,3 @@
-import { CancellationTokenSource } from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 const CONTENT_MODIFIED_ERROR_CODE = -32801;
@@ -59,28 +58,6 @@ export async function sendRequestWithStartupRetry<T>(
             attempt += 1;
             await delay(retryDelayMs * attempt);
         }
-    }
-}
-
-export async function sendRequestWithTimeout<T>(
-    client: LanguageClient,
-    method: string,
-    params: unknown,
-    timeoutMs: number,
-): Promise<T | undefined> {
-    const timeoutTokenSource = new CancellationTokenSource();
-    const timeout = setTimeout(() => timeoutTokenSource.cancel(), timeoutMs);
-
-    try {
-        return await client.sendRequest<T>(method, params, timeoutTokenSource.token);
-    } catch (error) {
-        if (isRequestCancelledError(error)) {
-            return undefined;
-        }
-        throw error;
-    } finally {
-        clearTimeout(timeout);
-        timeoutTokenSource.dispose();
     }
 }
 

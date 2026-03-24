@@ -50,11 +50,6 @@
                 "icon": "$(symbol-structure)"
             },
             {
-                "command": "gluals.language.smartEnter",
-                "title": "Lua: Smart Enter",
-                "category": "GLuaLS"
-            },
-            {
                 "command": "gluals.gmod.updateAnnotations",
                 "title": "Update GLuaLS Annotations",
                 "category": "GLuaLS"
@@ -66,19 +61,19 @@
             },
             {
                 "command": "gluals.gmod.openSettings",
-                "title": "Open Workspace Config",
+                "title": "Open GLuaLS Settings",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.createSettings",
-                "title": "Create Workspace Config",
+                "title": "Create GLuaLS Settings",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
             {
                 "command": "gluals.gmod.editSettings",
-                "title": "Edit Workspace Config",
+                "title": "Edit GLuaLS Settings",
                 "category": "GLuaLS",
                 "icon": "$(settings-gear)"
             },
@@ -114,19 +109,19 @@
             },
             {
                 "command": "gluals.gmod.runFile",
-                "title": "Run Lua File",
+                "title": "Run GLua File",
                 "category": "GLuaLS",
                 "icon": "$(run)"
             },
             {
                 "command": "gluals.gmod.refreshFile",
-                "title": "Refresh Lua File",
+                "title": "Refresh GLua File",
                 "category": "GLuaLS",
                 "icon": "$(refresh)"
             },
             {
                 "command": "gluals.gmod.runSelection",
-                "title": "Run Lua Selection",
+                "title": "Run Selected GLua",
                 "category": "GLuaLS",
                 "icon": "$(run-all)"
             },
@@ -137,12 +132,12 @@
             },
             {
                 "command": "gluals.gmod.showRealmMenu",
-                "title": "Select GMod Lua Execution Realm",
+                "title": "Open GMod Realm Menu",
                 "category": "GLua"
             },
             {
                 "command": "gluals.gmod.setRealm",
-                "title": "Set Lua Execution Realm",
+                "title": "Set GLua Execution Realm",
                 "category": "GLuaLS"
             },
             {
@@ -197,6 +192,12 @@
             {
                 "command": "gmodRdb.checkForUpdates",
                 "title": "%command.gmodRdb.checkForUpdates.title%",
+                "category": "GLuaLS",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "gmodRdbClient.checkForUpdates",
+                "title": "Check for rdb_client Updates",
                 "category": "GLuaLS",
                 "icon": "$(cloud-download)"
             },
@@ -453,6 +454,12 @@
                 "configuration": "./language-configuration.json"
             }
         ],
+        "snippets": [
+            {
+                "language": "lua",
+                "path": "./snippets/lua.json"
+            }
+        ],
         "grammars": [
             {
                 "scopeName": "gluals.lua.injection",
@@ -485,13 +492,6 @@
             {
                 "id": "object",
                 "description": "Lua value that refers to an object-like instance"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "gluals.language.smartEnter",
-                "key": "enter",
-                "when": "editorTextFocus && !editorReadonly && !suggestWidgetVisible && !inSnippetMode && editorLangId == lua && config.gluals.language.autoInsertEnd"
             }
         ],
         "breakpoints": [
@@ -688,6 +688,88 @@
                             "stopOnEntry": true,
                             "stopOnError": false,
                             "realm": "server"
+                        }
+                    }
+                ],
+                "languages": [
+                    "lua"
+                ]
+            },
+            {
+                "type": "gluals_gmod_client",
+                "label": "GMod Client Remote Debug",
+                "program": "./out/debugger/gmod_debugger/GmodDebugAdapter.js",
+                "runtime": "node",
+                "configurationAttributes": {
+                    "attach": {
+                        "required": [
+                            "sourceRoot"
+                        ],
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "description": "%debug.gmod.host%",
+                                "default": "127.0.0.1"
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "%debug.gmod.port%",
+                                "default": 21112
+                            },
+                            "sourceRoot": {
+                                "type": "string",
+                                "description": "%debug.gmod.sourceRoot%",
+                                "default": "${workspaceFolder}"
+                            },
+                            "sourceFileMap": {
+                                "type": "object",
+                                "description": "%debug.gmod.sourceFileMap%",
+                                "default": {}
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnEntry%",
+                                "default": true
+                            },
+                            "stopOnError": {
+                                "type": "boolean",
+                                "description": "%debug.gmod.stopOnError%",
+                                "default": false
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "gluals_gmod_client",
+                        "request": "attach",
+                        "name": "Attach to GMod Client (rdb_client)",
+                        "host": "127.0.0.1",
+                        "port": 21112,
+                        "sourceRoot": "${workspaceFolder}",
+                        "sourceFileMap": {
+                            "${workspaceFolder}": "."
+                        },
+                        "stopOnEntry": true,
+                        "stopOnError": false
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "GMod Client: Attach (rdb_client)",
+                        "description": "Attach the GLuaLS debugger to a running GMod client via rdb_client.",
+                        "body": {
+                            "type": "gluals_gmod_client",
+                            "request": "attach",
+                            "name": "Attach to GMod Client (rdb_client)",
+                            "host": "127.0.0.1",
+                            "port": 21112,
+                            "sourceRoot": "${workspaceFolder}",
+                            "sourceFileMap": {
+                                "${workspaceFolder}": "."
+                            },
+                            "stopOnEntry": true,
+                            "stopOnError": false
                         }
                     }
                 ],
@@ -1712,6 +1794,11 @@
                         "default": true,
                         "markdownDescription": "%config.gmod.debugger.autoUpdateRdb.description%"
                     },
+                    "gluals.gmod.debugger.autoUpdateClientRdb": {
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "Automatically prompt to update `rdb_client` (the GMod client-side debug module) when a version mismatch is detected."
+                    },
                     "gluals.gmod.mcp.enabled": {
                         "type": "boolean",
                         "default": true,
@@ -1782,12 +1869,6 @@
                         "default": true,
                         "markdownDescription": "%config.emmylua.language.completeAnnotation.description%"
                     },
-                    "gluals.language.autoInsertEnd": {
-                        "type": "boolean",
-                        "default": true,
-                        "scope": "resource",
-                        "markdownDescription": "%config.emmylua.language.autoInsertEnd.description%"
-                    },
                     "gluals.misc.autoInsertTripleDash": {
                         "type": "boolean",
                         "default": true,
@@ -1847,6 +1928,7 @@
                     "comments": true,
                     "strings": true
                 },
+                "editor.snippetSuggestions": "top",
                 "editor.wordBasedSuggestions": "off"
             }
         },

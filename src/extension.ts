@@ -11,7 +11,6 @@ import { EmmyContext } from './emmyContext';
 import { IServerLocation, IServerPosition } from './lspExtension';
 import { onDidChangeConfiguration } from './annotator';
 import { ConfigurationManager } from './configManager';
-import { handleLuaSmartEnter } from './luaSmartEnter';
 import * as Annotator from './annotator';
 import { EmmyrcSchemaContentProvider } from './emmyrcSchemaContentProvider';
 import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
@@ -41,6 +40,7 @@ import { GmodRunCommandTool } from './tools/gmodRunCommandTool';
 import { GmodRunFileTool } from './tools/gmodRunFileTool';
 import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
+import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import {
     hasAnyGmodDebugConfiguration,
     readAllWorkspaceLaunchConfigurations,
@@ -62,6 +62,7 @@ let activeEditor: vscode.TextEditor | undefined;
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodRdbUpdater: GmodRdbUpdater | undefined;
+let gmodClientRdbUpdater: GmodClientRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
@@ -143,11 +144,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.showServerMenu', handler: showServerMenu },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
-        { id: 'gluals.language.smartEnter', handler: () => handleLuaSmartEnter(() => extensionContext.client) },
         // GMod annotations commands
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
+        { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodClientRdbUpdates },
         { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
         { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
@@ -205,6 +206,26 @@ function registerCommands(context: vscode.ExtensionContext): void {
             if (!text) return;
             const session = vscode.debug.activeDebugSession;
             if (!session) return;
+            if (session.type === 'gluals_gmod_client') {
+                // Client session: evaluation is only available when paused. No control channel.
+                const activeItem = vscode.debug.activeStackItem;
+                const frameId = activeItem instanceof vscode.DebugStackFrame ? activeItem.frameId : undefined;
+                if (frameId === undefined) {
+                    vscode.debug.activeDebugConsole.appendLine('[GLuaLS] Client evaluation is only available when execution is paused.');
+                    return;
+                }
+                try {
+                    const result = await session.customRequest('evaluate', { expression: '=' + text, context: 'repl', frameId });
+                    const output = typeof result?.result === 'string' ? result.result : JSON.stringify(result);
+                    if (output) {
+                        vscode.debug.activeDebugConsole.appendLine(output);
+                    }
+                } catch (error) {
+                    const msg = error instanceof Error ? error.message : String(error);
+                    vscode.debug.activeDebugConsole.appendLine(`Evaluate error: ${msg}`);
+                }
+                return;
+            }
             if (session.type !== 'gluals_gmod') {
                 // Non-GMod session: fall back to standard evaluate behaviour.
                 const activeItem = vscode.debug.activeStackItem;
@@ -311,6 +332,7 @@ async function initializeExtension(): Promise<void> {
     // Initialize GMod annotation manager
     gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
     gmodRdbUpdater = new GmodRdbUpdater(extensionContext.vscodeContext);
+    gmodClientRdbUpdater = new GmodClientRdbUpdater(extensionContext.vscodeContext);
     void gmodRdbUpdater.ensureRuntimeFilesUpToDate();
 
     // Initialize annotations before starting server
@@ -580,10 +602,13 @@ function resolveExecutablePath(
 function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string | undefined {
     const platform = os.platform();
     const executableName = platform === 'win32' ? 'glua_ls.exe' : 'glua_ls';
-    const envPath = process.env['EMMY_DEV_LS_PATH']?.trim();
+    const legacyEnvPath = process.env['EMMY_DEV_LS_PATH']?.trim();
     const envPath = process.env['GLUALS_DEV_LS_PATH']?.trim();
 
     const candidates: string[] = [];
+    if (legacyEnvPath) {
+        candidates.push(path.normalize(legacyEnvPath));
+    }
     if (envPath) {
         candidates.push(path.normalize(envPath));
     }
@@ -724,6 +749,15 @@ async function checkForGmodRdbUpdates(): Promise<void> {
     }
 
     await gmodRdbUpdater.runManualUpdateCommand();
+}
+
+async function checkForGmodClientRdbUpdates(): Promise<void> {
+    if (!gmodClientRdbUpdater) {
+        vscode.window.showErrorMessage('rdb_client updater is not initialized');
+        return;
+    }
+
+    await gmodClientRdbUpdater.runManualUpdateCommand();
 }
 
 type GmodControlCommand =
@@ -907,23 +941,26 @@ async function setGmodRealm(realm?: string): Promise<void> {
 }
 
 function onDidStartDebugSession(session: vscode.DebugSession): void {
-    if (session.type !== 'gluals_gmod') {
-        return;
+    if (session.type === 'gluals_gmod') {
+        void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
+        gmodErrorStore?.clear();
+        gmodEntityExplorerProvider?.clear();
+        gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
+        gmodRealmProvider?.refresh();
+    } else if (session.type === 'gluals_gmod_client') {
+        void gmodClientRdbUpdater?.ensureRuntimeFilesUpToDate(session);
+        gmodErrorStore?.clear();
     }
-    void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
-    gmodErrorStore?.clear();
-    gmodEntityExplorerProvider?.clear();
-    gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
-    gmodRealmProvider?.refresh();
 }
 
 function onDidTerminateDebugSession(session: vscode.DebugSession): void {
-    if (session.type !== 'gluals_gmod') {
-        return;
+    if (session.type === 'gluals_gmod') {
+        gmodEntityExplorerProvider?.clear();
+        gmodSessionRealms.delete(session.id);
+        gmodRealmProvider?.refresh();
+    } else if (session.type === 'gluals_gmod_client') {
+        gmodSessionRealms.delete(session.id);
     }
-    gmodEntityExplorerProvider?.clear();
-    gmodSessionRealms.delete(session.id);
-    gmodRealmProvider?.refresh();
 }
 
 function initializeGmodExplorer(context: vscode.ExtensionContext): void {
@@ -1659,15 +1696,25 @@ interface GmodRdbVersionMismatchBody {
 }
 
 function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEvent): void {
-    if (event.session.type !== 'gluals_gmod') {
+    if (event.session.type !== 'gluals_gmod' && event.session.type !== 'gluals_gmod_client') {
         return;
     }
 
-    if (event.event === 'gmod.rdb.versionMismatch') {
+    if (event.event === 'gmod.rdb.versionMismatch' && event.session.type === 'gluals_gmod') {
         if (event.body && typeof event.body === 'object') {
             const body = event.body as GmodRdbVersionMismatchBody;
             if (typeof body.moduleVersion === 'string' && gmodRdbUpdater) {
                 void gmodRdbUpdater.handleVersionMismatch(body.moduleVersion);
+            }
+        }
+        return;
+    }
+
+    if (event.event === 'gmod.rdb.client.versionMismatch' && event.session.type === 'gluals_gmod_client') {
+        if (event.body && typeof event.body === 'object') {
+            const body = event.body as GmodRdbVersionMismatchBody;
+            if (typeof body.moduleVersion === 'string' && gmodClientRdbUpdater) {
+                void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);
             }
         }
         return;

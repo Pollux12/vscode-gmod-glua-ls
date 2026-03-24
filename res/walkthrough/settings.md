@@ -5,4 +5,11 @@ The extension automatically parses and resolves gamemode and addon folders. The 
 - **Formatting:** Configure code style formatting rules like indentation, spacing, and alignment.
 - **Environment:** Toggle code lenses, background parsing, and network capture limits.
 
-Click the action button to open the workspace settings UI.
+To open the GLuaLS Settings Menu:
+- Command Palette (Ctrl+Shift+P) → GLua: Open Settings
+- Click the GLuaLS item in the status bar
+- Right-click any .gluarc.json file in the Explorer → Open GLua Settings
+
+If a `.gluarc.json` file does not yet exist, you can create one by right clicking on the workspace root and selecting
+
+**Click the action button to open the workspace settings UI.**

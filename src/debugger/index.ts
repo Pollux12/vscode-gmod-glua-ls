@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { extensionContext } from "../extension";
 import { InlineDebugAdapterFactory } from "./DebugFactory";
 import { GmodDebuggerProvider } from "./gmod_debugger/GmodDebuggerProvider";
+import { GmodClientDebuggerProvider } from "./gmod_debugger/GmodClientDebuggerProvider";
 
 
 /**
@@ -18,6 +19,7 @@ export function registerDebuggers(): void {
 
     const debuggerConfigs: DebuggerConfig[] = [
         { type: "gluals_gmod", provider: new GmodDebuggerProvider("gluals_gmod", context) },
+        { type: "gluals_gmod_client", provider: new GmodClientDebuggerProvider("gluals_gmod_client", context) },
     ];
 
     debuggerConfigs.forEach(({ type, provider }) => {

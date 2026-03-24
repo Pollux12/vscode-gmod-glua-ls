@@ -1,11 +1,11 @@
 This extension provides powerful language support and live debugging features tailored specifically for Garry's Mod.
 
-### Core Features
-- **Realm Detection:** Automatically tracks serverside vs clientside states across functions, identifying mismatch boundaries instantly.
-- **Hook Recognition:** Smart autocomplete for standard Engine hooks, `GM:` method hooks, and custom APIs via `---@hook`.
-- **Advanced Class Support:** First-class resolution for `ENT`, `SWEP`, `TOOL`, and dynamic object properties (like `NetworkVar` and `AccessorFunc`).
-- **Dynamic Field Inference:** Autocomplete tracks fields assigned dynamically onto generic entities and players, minimizing the need for manual type casting.
-- **Full LSP Suite:** Fast rename refactoring, go-to-definition, hover definitions, inlay hints, and customizable severity diagnostics.
+Things you need to know:
+- **This is an early release, there may be bugs or other issues.**
+- The extension is designed to handle setup for you, with most setups requiring little to no manual configuration.
+- Annotations are required for the language server to work, this is automatically downloaded for you.
+- There is an optional debugger that you can install, see the relevant section on how to do this.
+- Documentation is available at:
 
 This setup guide covers:
 - Downloading API annotations for type-checking.
