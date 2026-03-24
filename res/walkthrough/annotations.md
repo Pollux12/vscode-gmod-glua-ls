@@ -7,6 +7,6 @@ When the annotations are downloaded, hundreds of standard engine APIs—from `ne
 
 These syntax hints can also be used to document internal codebase functions. The extension implements custom tags specific to Garry's Mod concepts, enabling the definition of custom classes, instance-specific objects, and custom hook architectures.
 
-[View the Annotation Documentation](https://github.com/Pollux12/gmod-glua-ls/tree/main/docs/annotations)
+[View the Annotation Documentation](https://gluals.arnux.net/annotations)
 
-> **Tip:** The annotations will automatically update themselves in the background to ensure you never fall out-of-sync with engine updates.
+> **Note:** The annotations have an automatic update system - you will be prompted if an update is available.

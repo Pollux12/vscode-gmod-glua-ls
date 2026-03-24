@@ -238,6 +238,11 @@ export class EmmyContext implements vscode.Disposable {
                 detail: 'Run diagnostics and select repair actions for detected problems',
             },
             {
+                label: '$(settings-gear) Open GLuaLS Settings',
+                description: 'Open project .gluarc settings panel',
+                detail: 'Choose a workspace folder in multi-root workspaces',
+            },
+            {
                 label: '$(info) Show Server Info',
                 description: 'Display server information',
                 detail: 'Show detailed server status and configuration',
@@ -274,6 +279,8 @@ export class EmmyContext implements vscode.Disposable {
             await vscode.commands.executeCommand('gluals.gmod.onboarding.start');
         } else if (selected.label.includes('Diagnostics & Repair')) {
             await vscode.commands.executeCommand('gluals.gmod.diagnostics.repair');
+        } else if (selected.label.includes('Open GLuaLS Settings')) {
+            await vscode.commands.executeCommand('gluals.gmod.openSettings');
         } else if (selected.label.includes('Server Info')) {
             this.showServerInfo();
         } else if (selected.label.includes('Output')) {

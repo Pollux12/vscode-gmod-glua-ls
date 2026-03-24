@@ -17,6 +17,7 @@ async function loadGrammar() {
             { include: "#function-declaration-name" },
             { include: "#keywords" },
             { include: "#self" },
+            { include: "#library-call" },
             { include: "#member-call" },
             { include: "#property-access" }
         ],
@@ -77,7 +78,7 @@ async function loadGrammar() {
                         begin: "\\b(?:(local)\\s+)?(function)\\s+([A-Za-z_][A-Za-z0-9_]*)(:|\\.)([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
                         beginCaptures: {
                             "1": { name: "keyword.local.lua" },
-                            "2": { name: "keyword.control.lua" },
+                            "2": { name: "storage.type.function.lua" },
                             "3": { name: "support.class.lua" },
                             "5": { name: "entity.name.function.lua" }
                         },
@@ -93,7 +94,7 @@ async function loadGrammar() {
                         begin: "\\b(?:(local)\\s+)?(function)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
                         beginCaptures: {
                             "1": { name: "keyword.local.lua" },
-                            "2": { name: "keyword.control.lua" },
+                            "2": { name: "storage.type.function.lua" },
                             "3": { name: "entity.name.function.lua" }
                         },
                         end: "\\)",
@@ -127,6 +128,14 @@ async function loadGrammar() {
                     {
                         match: "\\bself\\b",
                         name: "variable.language.self.lua"
+                    }
+                ]
+            },
+            "library-call": {
+                patterns: [
+                    {
+                        match: "\\b(hook)\\b(?=\\.[A-Za-z_][A-Za-z0-9_]*\\s*\\()",
+                        name: "support.function.library.lua"
                     }
                 ]
             },
