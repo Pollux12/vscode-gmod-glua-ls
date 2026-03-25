@@ -46,6 +46,10 @@ import {
     readAllWorkspaceLaunchConfigurations,
     runGmodDebugSetupWizard,
 } from './debugger/gmod_debugger/GmodDebugSetupWizard';
+import {
+    isExpectedLifecycleRequestError,
+    sendRequestWithStartupRetry,
+} from './languageServerRequests';
 
 /**
  * Command registration entry
@@ -76,6 +80,8 @@ const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
 const GMOD_DEBUG_CONFIG_CONTEXT_KEY = 'gluals.gmod.hasDebugConfig';
 const GMOD_DEBUG_SETUP_CONTEXT_KEY = 'gluals.gmod.needsDebugSetup';
 const GMOD_TOOL_LOG_MAX_SIZE = 1000;
+const DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES = 6;
+const DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS = 250;
 
 interface GmodToolLogEntry {
     readonly timestamp: string;
@@ -266,6 +272,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
  */
 function registerEventListeners(context: vscode.ExtensionContext): void {
     const eventListeners = [
+        vscode.workspace.onDidOpenTextDocument(onDidOpenTextDocument),
         vscode.workspace.onDidChangeTextDocument(onDidChangeTextDocument),
         vscode.window.onDidChangeActiveTextEditor(onDidChangeActiveTextEditor),
         vscode.workspace.onDidChangeConfiguration(onConfigurationChanged),
@@ -416,6 +423,14 @@ function onWorkspaceFoldersChanged(): void {
     void refreshGmodDebugConfigContext();
 }
 
+function onDidOpenTextDocument(document: vscode.TextDocument): void {
+    if (!extensionContext.client || !isLuaDocumentForLanguageServer(document)) {
+        return;
+    }
+
+    void warmupDocumentSymbolsForDocument(document);
+}
+
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
     if (activeEditor &&
         activeEditor.document === event.document &&
@@ -436,12 +451,54 @@ function onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): voi
     }
 }
 
+function isLuaDocumentForLanguageServer(document: vscode.TextDocument): boolean {
+    return document.languageId === extensionContext.LANGUAGE_ID && document.uri.scheme === 'file';
+}
+
+async function warmupOpenDocumentSymbols(): Promise<void> {
+    const candidates = vscode.workspace.textDocuments.filter((document) => isLuaDocumentForLanguageServer(document));
+    await Promise.all(candidates.map((document) => warmupDocumentSymbolsForDocument(document)));
+}
+
+async function warmupDocumentSymbolsForDocument(document: vscode.TextDocument): Promise<void> {
+    const client = extensionContext.client;
+    if (!client || !isLuaDocumentForLanguageServer(document)) {
+        return;
+    }
+
+    const params = {
+        textDocument: {
+            uri: document.uri.toString(),
+        },
+    };
+
+    for (let attempt = 0; attempt <= DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES; attempt += 1) {
+        try {
+            await sendRequestWithStartupRetry<unknown[]>(client, 'textDocument/documentSymbol', params, 1, 0);
+            return;
+        } catch (error) {
+            if (!isExpectedLifecycleRequestError(error) || attempt >= DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES) {
+                return;
+            }
+
+            await delay(DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS * (attempt + 1));
+        }
+    }
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
 
 async function startServer(): Promise<void> {
     try {
         extensionContext.setServerStarting();
         await doStartServer();
         extensionContext.setServerRunning();
+        void warmupOpenDocumentSymbols();
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
