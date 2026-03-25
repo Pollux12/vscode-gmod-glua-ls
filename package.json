@@ -2260,13 +2260,13 @@
                 "steps": [
                     {
                         "id": "welcomeOnboard",
-                        "title": "Diagnostic Wizard",
-                        "description": "Run the diagnostic wizard to verify workspace paths and dependencies.\n\n[Run Wizard](command:gluals.gmod.onboarding.start)",
+                        "title": "Read the Documentation",
+                        "description": "Open the official GLuaLS docs for setup and usage guidance.\n\n[Open Documentation](command:gluals.openDocumentation)",
                         "media": {
                             "markdown": "res/walkthrough/welcome.md"
                         },
                         "completionEvents": [
-                            "onCommand:gluals.gmod.onboarding.start"
+                            "onCommand:gluals.openDocumentation"
                         ]
                     },
                     {
@@ -2282,7 +2282,7 @@
                     },
                     {
                         "id": "configureDebugger",
-                        "title": "Setup Live Debugging",
+                        "title": "Setup Debugging",
                         "description": "Install the debugger module to the local Garry's Mod instance.\n\n[Configure Debugger](command:gluals.gmod.configureDebugger)",
                         "media": {
                             "markdown": "res/walkthrough/debugger.md"

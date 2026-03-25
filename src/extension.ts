@@ -172,6 +172,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.setRealm', handler: setGmodRealm },
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
         { id: 'gluals.gmod.scaffold.new', handler: (treeItemOrUri?: any) => scaffoldNewScriptedClass(treeItemOrUri, context) },
+        { id: 'gluals.openDocumentation', handler: openDocumentation },
         { id: 'gluals.gmod.onboarding.start', handler: runGmodOnboarding },
         { id: 'gluals.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
         { id: 'gluals.gmod.mcp.startHost', handler: startGmodMcpHost },
@@ -1469,6 +1470,11 @@ async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
     }
 
     return issues;
+}
+
+async function openDocumentation(): Promise<void> {
+    const url = 'https://gluals.arnux.net/';
+    await vscode.env.openExternal(vscode.Uri.parse(url));
 }
 
 async function runGmodOnboarding(): Promise<void> {
