@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { resolve } from "path";
 import decompress from "decompress";
 import decompressTarGz from "decompress-targz";
@@ -184,6 +184,11 @@ async function build() {
     }
     if (!existsSync("server")) {
         mkdirSync("server");
+    }
+
+    // Ensure we only ship the target language server binary for this package.
+    for (const entry of readdirSync("server")) {
+        rmSync(resolve("server", entry), { recursive: true, force: true });
     }
 
     const languageServerSource = await resolveLanguageServerSource(languageServerAssetName);
