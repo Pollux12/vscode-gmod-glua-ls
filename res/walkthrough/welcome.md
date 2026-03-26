@@ -4,8 +4,8 @@ Things you need to know:
 - **This is an early release, there may be bugs or other issues.**
 - The extension is designed to handle setup for you, with most setups requiring little to no manual configuration.
 - Annotations are required for the language server to work, this is automatically downloaded for you.
-- There is an optional debugger that you can install, see the relevant section on how to do this.
-- Documentation is available at https://gluals.arnux.net/ with more detailed guidance.
+- There is an optional debugger that you can install to unlock more advanced features.
+- Documentation is available if you need help configuring or understanding any features.
 
 This setup guide covers:
 - Viewing documentation
