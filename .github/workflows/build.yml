@@ -5,12 +5,18 @@ on:
     branches:
       - main
     tags:
+      - "*.*.*"
       - "v*.*.*"
-  release:
-    types: [released]
 
 jobs:
   build:
+    outputs:
+      build_channel: ${{ steps.release_meta.outputs.build_channel }}
+      publish_channel: ${{ steps.release_meta.outputs.publish_channel }}
+      tag_name: ${{ steps.release_meta.outputs.tag_name }}
+      tag_version: ${{ steps.release_meta.outputs.tag_version }}
+      is_publish_event: ${{ steps.release_meta.outputs.is_publish_event }}
+      language_server_version: ${{ steps.release_meta.outputs.language_server_version }}
     strategy:
       matrix:
         include:
@@ -21,50 +27,48 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Resolve channel and tag metadata
+    - name: Resolve channel and version metadata
       id: release_meta
       shell: bash
       env:
         GH_EVENT_NAME: ${{ github.event_name }}
-        GH_EVENT_ACTION: ${{ github.event.action }}
-        GH_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        GH_REF: ${{ github.ref }}
+        GH_REF_NAME: ${{ github.ref_name }}
       run: |
-        CHANNEL="stable"
+        SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
+
+        BUILD_CHANNEL="stable"
+        PUBLISH_CHANNEL="stable"
         TAG_NAME=""
+        TAG_VERSION=""
+        LS_VERSION=""
         IS_PUBLISH_EVENT="false"
 
-        if [[ "$GH_EVENT_NAME" == "release" && "$GH_EVENT_ACTION" == "released" ]]; then
-          CHANNEL="stable"
-          TAG_NAME="$GH_RELEASE_TAG"
+        if [[ "$GH_EVENT_NAME" == "push" && "$GH_REF" == refs/tags/* ]]; then
+          TAG_NAME="$GH_REF_NAME"
+          TAG_VERSION="${TAG_NAME#v}"
+          LS_VERSION="$TAG_VERSION"
           IS_PUBLISH_EVENT="true"
-        elif [[ "$GH_EVENT_NAME" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          CHANNEL="prerelease"
-          TAG_NAME="${GITHUB_REF_NAME}"
-          IS_PUBLISH_EVENT="true"
+          if ! [[ "$TAG_VERSION" =~ $SEMVER_RE ]]; then
+            echo "Tag '$TAG_NAME' must be semver (examples: 1.0.5, v1.1.0)." >&2
+            exit 1
+          fi
+          IFS='.' read -r _ _ PATCH <<< "$TAG_VERSION"
+          if (( PATCH == 0 )); then
+            BUILD_CHANNEL="stable"
+            PUBLISH_CHANNEL="stable"
+          else
+            BUILD_CHANNEL="prerelease"
+            PUBLISH_CHANNEL="prerelease"
+          fi
         fi
 
-        TAG_VERSION="${TAG_NAME#v}"
-
-        echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+        echo "build_channel=${BUILD_CHANNEL}" >> "$GITHUB_OUTPUT"
+        echo "publish_channel=${PUBLISH_CHANNEL}" >> "$GITHUB_OUTPUT"
         echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
         echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
         echo "is_publish_event=${IS_PUBLISH_EVENT}" >> "$GITHUB_OUTPUT"
-    - name: Validate pre-release tag parity
-      if: steps.release_meta.outputs.channel == 'prerelease'
-      shell: bash
-      run: |
-        TAG_VERSION="${{ steps.release_meta.outputs.tag_version }}"
-        IFS='.' read -r MAJOR MINOR PATCH <<< "$TAG_VERSION"
-
-        if [[ -z "$MINOR" || ! "$MINOR" =~ ^[0-9]+$ ]]; then
-          echo "Failed to parse minor version from tag version '$TAG_VERSION'."
-          exit 1
-        fi
-
-        if (( MINOR % 2 == 0 )); then
-          echo "Tag has even minor version ($MINOR), but odd minor is required for pre-release publishing. See version convention docs."
-          exit 1
-        fi
+        echo "language_server_version=${LS_VERSION}" >> "$GITHUB_OUTPUT"
     - name: Set up Node 20.x
       uses: actions/setup-node@v4
       with:
@@ -74,24 +78,6 @@ jobs:
       shell: bash
       run: |
         npm version "${{ steps.release_meta.outputs.tag_version }}" --no-git-tag-version
-
-        if [[ "${{ steps.release_meta.outputs.channel }}" == "stable" ]]; then
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-          if [[ -z "$MINOR" || ! "$MINOR" =~ ^[0-9]+$ ]]; then
-            echo "Failed to parse minor version from package version '$CURRENT_VERSION'."
-            exit 1
-          fi
-
-          if (( MINOR % 2 != 0 )); then
-            STABLE_VERSION="${MAJOR}.$((MINOR + 1)).0"
-            npm version "$STABLE_VERSION" --no-git-tag-version
-            echo "Promoted odd minor version $CURRENT_VERSION to stable version $STABLE_VERSION"
-          else
-            echo "Version $CURRENT_VERSION already has an even minor; keeping as-is for stable channel"
-          fi
-        fi
 
         echo "Extension version for this build: $(node -p "require('./package.json').version")"
     - name: Install yarn
@@ -104,7 +90,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        node ./build/prepare.js ${{ matrix.file }} --channel ${{ steps.release_meta.outputs.channel }}
+        PREPARE_ARGS=("${{ matrix.file }}" "--channel" "${{ steps.release_meta.outputs.build_channel }}")
+        if [[ -n "${{ steps.release_meta.outputs.language_server_version }}" ]]; then
+          PREPARE_ARGS+=("--ls-version" "${{ steps.release_meta.outputs.language_server_version }}")
+        fi
+
+        node ./build/prepare.js "${PREPARE_ARGS[@]}"
         npx vsce package -o vscode-gmod-ls-${{ matrix.target }}.vsix --target ${{ matrix.target }}
     - name: Upload
       uses: actions/upload-artifact@v4
@@ -115,34 +106,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [build]
-    if: success() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'release' && github.event.action == 'released'))
+    if: needs.build.outputs.is_publish_event == 'true'
     steps:
-      - name: Resolve channel and tag metadata
-        id: release_meta
-        shell: bash
-        env:
-          GH_EVENT_NAME: ${{ github.event_name }}
-          GH_EVENT_ACTION: ${{ github.event.action }}
-          GH_RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          CHANNEL="stable"
-          TAG_NAME=""
-
-          if [[ "$GH_EVENT_NAME" == "release" && "$GH_EVENT_ACTION" == "released" ]]; then
-            CHANNEL="stable"
-            TAG_NAME="$GH_RELEASE_TAG"
-          else
-            CHANNEL="prerelease"
-            TAG_NAME="${GITHUB_REF_NAME}"
-          fi
-
-          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
       - name: Ensure GitHub pre-release exists for tag pushes
-        if: steps.release_meta.outputs.channel == 'prerelease'
+        if: needs.build.outputs.publish_channel == 'prerelease'
         uses: actions/github-script@v7
         env:
-          TAG_NAME: ${{ steps.release_meta.outputs.tag_name }}
+          TAG_NAME: ${{ needs.build.outputs.tag_name }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -188,7 +158,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "${{ steps.release_meta.outputs.channel }}" == "prerelease" ]]; then
+          if [[ "${{ needs.build.outputs.publish_channel }}" == "prerelease" ]]; then
             npx vsce publish --pre-release --packagePath ${PACKAGE_PATHS}
           else
             npx vsce publish --packagePath ${PACKAGE_PATHS}

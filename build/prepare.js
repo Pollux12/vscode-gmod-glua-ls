@@ -11,6 +11,8 @@ const RELEASE_CHANNELS = new Set(["stable", "prerelease"]);
 
 const GITHUB_RELEASES_API =
     "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases?per_page=100";
+const GITHUB_RELEASE_BY_TAG_API =
+    "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases/tags";
 const BASE_GITHUB_API_HEADERS = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -60,6 +62,10 @@ function getReleaseChannel() {
     return channel;
 }
 
+function getLanguageServerVersionOverride() {
+    return getArgValue("--ls-version")?.trim();
+}
+
 function getLanguageServerExecutableName(assetName) {
     return assetName.includes("win32") ? "glua_ls.exe" : "glua_ls";
 }
@@ -93,6 +99,19 @@ async function resolveLanguageServerSource(assetName) {
     }
 
     const downloadPath = `temp/${assetName}`;
+    const languageServerVersionOverride = getLanguageServerVersionOverride();
+
+    if (languageServerVersionOverride) {
+        const releaseAssetUrl = await resolveReleaseAssetUrlByTag(
+            languageServerVersionOverride,
+            assetName
+        );
+        console.log(
+            `Downloading language server ${languageServerVersionOverride} from ${releaseAssetUrl}`
+        );
+        await downloadTo(releaseAssetUrl, downloadPath);
+        return downloadPath;
+    }
 
     if (getReleaseChannel() === "prerelease") {
         try {
@@ -115,6 +134,62 @@ async function resolveLanguageServerSource(assetName) {
     );
 
     return downloadPath;
+}
+
+function getTagCandidates(versionOrTag) {
+    const value = versionOrTag.trim();
+    if (!value) {
+        return [];
+    }
+
+    if (value.startsWith("v")) {
+        return [value, value.slice(1)].filter(Boolean);
+    }
+
+    return [value, `v${value}`];
+}
+
+async function resolveReleaseAssetUrlByTag(versionOrTag, assetName) {
+    let lastError;
+    for (const tagCandidate of getTagCandidates(versionOrTag)) {
+        try {
+            const release = await fetchReleaseByTag(tagCandidate);
+            const asset = release.assets?.find(
+                (entry) =>
+                    entry?.name === assetName &&
+                    typeof entry.browser_download_url === "string"
+            );
+
+            if (!asset) {
+                throw new Error(
+                    `Release ${release.tag_name} does not include asset ${assetName}`
+                );
+            }
+
+            console.log(`Using language server release ${release.tag_name}`);
+            return asset.browser_download_url;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(
+        `Unable to resolve language server release '${versionOrTag}' for asset ${assetName} (${errorMessage})`
+    );
+}
+
+async function fetchReleaseByTag(tagName) {
+    const response = await fetch(
+        `${GITHUB_RELEASE_BY_TAG_API}/${encodeURIComponent(tagName)}`,
+        { headers: getGitHubApiHeaders() }
+    );
+
+    if (!response.ok) {
+        throw new Error(`GitHub release lookup for ${tagName} returned ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
 }
 
 async function resolveLatestPreReleaseAssetUrl(assetName) {

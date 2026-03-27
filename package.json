@@ -2,7 +2,7 @@
     "name": "gmod-glua-ls",
     "displayName": "Garry's Mod Language Server",
     "description": "Language Server for Garry's Mod GLua",
-    "version": "0.0.4",
+    "version": "1.0.0",
     "icon": "res/gmod-glua-ls.png",
     "publisher": "Pollux",
     "license": "MIT",
@@ -2000,7 +2000,6 @@
                         "variable.other.property",
                         "entity.other.attribute.lua"
                     ],
-
                     "keyword.async": [
                         "keyword",
                         "storage.modifier"
