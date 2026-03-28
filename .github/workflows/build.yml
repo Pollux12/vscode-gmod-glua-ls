@@ -108,17 +108,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Ensure GitHub pre-release exists for tag pushes
-        if: needs.build.outputs.publish_channel == 'prerelease'
+      - name: Ensure GitHub release exists for tag
         uses: actions/github-script@v7
         env:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
+          PUBLISH_CHANNEL: ${{ needs.build.outputs.publish_channel }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const tag = process.env.TAG_NAME;
+            const prerelease = process.env.PUBLISH_CHANNEL === 'prerelease';
 
             try {
               const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
@@ -128,15 +129,11 @@ jobs:
                 release_id: existing.data.id,
                 tag_name: tag,
                 name: tag,
-                prerelease: true,
+                prerelease,
                 draft: false,
               });
-              core.info(`Updated release ${tag} to pre-release.`);
+              core.info(`Updated release ${tag} (prerelease=${prerelease}).`);
             } catch (error) {
-              if (error.status === 403) {
-                core.warning(`Skipping GitHub pre-release sync for ${tag}: ${error.message}`);
-                return;
-              }
               if (error.status !== 404) {
                 throw error;
               }
@@ -146,12 +143,27 @@ jobs:
                 repo,
                 tag_name: tag,
                 name: tag,
-                prerelease: true,
+                prerelease,
                 draft: false,
               });
-              core.info(`Created pre-release ${tag}.`);
+              core.info(`Created release ${tag} (prerelease=${prerelease}).`);
             }
       - uses: actions/download-artifact@v4
+      - name: Upload VSIX artifacts to GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mapfile -t PACKAGE_PATHS < <(find vscode-gmod-ls* -iname "*.vsix" -type f)
+
+          if [[ "${#PACKAGE_PATHS[@]}" -eq 0 ]]; then
+            echo "No VSIX package found to upload."
+            exit 1
+          fi
+
+          gh release upload "$TAG_NAME" --repo "$REPOSITORY" "${PACKAGE_PATHS[@]}" --clobber
       - name: Publish to VS Code Marketplace
         shell: bash
         run: |
