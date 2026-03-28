@@ -10,25 +10,25 @@
 
 <p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/badge/View%20on-Marketplace-007ACC.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="View on VS Code Marketplace">
+    <img src="https://img.shields.io/badge/View%20on-Marketplace-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="View on VS Code Marketplace">
   </a>
   <a href="vscode:extension/Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/badge/Open%20in-VS%20Code-007ACC.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code">
+    <img src="https://img.shields.io/badge/Open%20in-VS%20Code-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code">
   </a>
   <a href="vscode-insiders:extension/Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/badge/Open%20in-VS%20Code%20Insiders-24BFA5.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code Insiders">
+    <img src="https://img.shields.io/badge/Open%20in-VS%20Code%20Insiders-24BFA5?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code Insiders">
   </a>
 </p>
 
 <p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/visual-studio-marketplace/v/Pollux.gmod-glua-ls.png?style=flat-square&label=VSCode" alt="VSCode Version">
+    <img src="https://img.shields.io/visual-studio-marketplace/v/Pollux.gmod-glua-ls?style=flat-square&label=VSCode" alt="VSCode Version">
   </a>
   <a href="https://github.com/Pollux12/gmod-glua-ls/releases">
-    <img src="https://img.shields.io/github/v/release/Pollux12/gmod-glua-ls.png?style=flat-square&label=gLuaLS" alt="gLuaLS Version">
+    <img src="https://img.shields.io/github/v/release/Pollux12/gmod-glua-ls?style=flat-square&label=gLuaLS" alt="gLuaLS Version">
   </a>
   <a href="https://github.com/Pollux12/gmod-luals-addon/tree/gluals-annotations">
-    <img src="https://img.shields.io/github/last-commit/Pollux12/gmod-luals-addon/gluals-annotations.png?style=flat-square&label=Annotations%20Updated" alt="Annotations Updated">
+    <img src="https://img.shields.io/github/last-commit/Pollux12/gmod-luals-addon/gluals-annotations?style=flat-square&label=Annotations%20Updated" alt="Annotations Updated">
   </a>
 </p>
 
