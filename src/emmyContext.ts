@@ -228,16 +228,6 @@ export class EmmyContext implements vscode.Disposable {
 
         items.push(
             {
-                label: '$(rocket) Run Setup Wizard',
-                description: 'Run guided GMod setup checks',
-                detail: 'Execute onboarding for debugger mapping, realm, and MCP health',
-            },
-            {
-                label: '$(tools) Run Diagnostics & Repair',
-                description: 'Detect and fix common GMod setup issues',
-                detail: 'Run diagnostics and select repair actions for detected problems',
-            },
-            {
                 label: '$(settings-gear) Open GLuaLS Settings',
                 description: 'Open project .gluarc settings panel',
                 detail: 'Choose a workspace folder in multi-root workspaces',
@@ -275,10 +265,6 @@ export class EmmyContext implements vscode.Disposable {
             await vscode.commands.executeCommand('gluals.stopServer');
         } else if (selected.label.includes('Start')) {
             await vscode.commands.executeCommand('gluals.startServer');
-        } else if (selected.label.includes('Setup Wizard')) {
-            await vscode.commands.executeCommand('gluals.gmod.onboarding.start');
-        } else if (selected.label.includes('Diagnostics & Repair')) {
-            await vscode.commands.executeCommand('gluals.gmod.diagnostics.repair');
         } else if (selected.label.includes('Open GLuaLS Settings')) {
             await vscode.commands.executeCommand('gluals.gmod.openSettings');
         } else if (selected.label.includes('Server Info')) {

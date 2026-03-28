@@ -173,18 +173,6 @@
                 "category": "GLua"
             },
             {
-                "command": "gluals.gmod.onboarding.start",
-                "title": "Run Setup Wizard",
-                "category": "GLuaLS",
-                "icon": "$(rocket)"
-            },
-            {
-                "command": "gluals.gmod.diagnostics.repair",
-                "title": "Run Diagnostics and Repair",
-                "category": "GLuaLS",
-                "icon": "$(tools)"
-            },
-            {
                 "command": "gluals.gmod.configureDebugger",
                 "title": "Configure Debugger",
                 "category": "GLuaLS",
@@ -866,14 +854,6 @@
                 }
             ],
             "commandPalette": [
-                {
-                    "command": "gluals.gmod.onboarding.start",
-                    "when": "resourceExtname == .lua"
-                },
-                {
-                    "command": "gluals.gmod.diagnostics.repair",
-                    "when": "resourceExtname == .lua"
-                },
                 {
                     "command": "gluals.gmod.mcp.healthCheck",
                     "when": "resourceExtname == .lua"

@@ -43,7 +43,6 @@ import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import {
     hasAnyGmodDebugConfiguration,
-    readAllWorkspaceLaunchConfigurations,
     runGmodDebugSetupWizard,
 } from './debugger/gmod_debugger/GmodDebugSetupWizard';
 import {
@@ -173,8 +172,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
         { id: 'gluals.gmod.scaffold.new', handler: (treeItemOrUri?: any) => scaffoldNewScriptedClass(treeItemOrUri, context) },
         { id: 'gluals.openDocumentation', handler: openDocumentation },
-        { id: 'gluals.gmod.onboarding.start', handler: runGmodOnboarding },
-        { id: 'gluals.gmod.diagnostics.repair', handler: runGmodDiagnosticsRepair },
         { id: 'gluals.gmod.mcp.startHost', handler: startGmodMcpHost },
         { id: 'gluals.gmod.mcp.stopHost', handler: stopGmodMcpHost },
         { id: 'gluals.gmod.mcp.restartHost', handler: restartGmodMcpHost },
@@ -1332,209 +1329,9 @@ async function refreshGmodDebugConfigContext(): Promise<void> {
     gmodRealmProvider?.refresh();
 }
 
-interface GmodSetupIssue {
-    readonly id: string;
-    readonly severity: 'warning' | 'error';
-    readonly message: string;
-    readonly repairLabel: string;
-    readonly repair: () => Promise<void>;
-}
-
-function getBundledServerExecutablePath(): string {
-    const executableName = os.platform() === 'win32' ? 'glua_ls.exe' : 'glua_ls';
-    return path.join(extensionContext.vscodeContext.extensionPath, 'server', executableName);
-}
-
-async function readLaunchConfigurations(): Promise<Record<string, unknown>[]> {
-    return readAllWorkspaceLaunchConfigurations();
-}
-
-function getGmodMcpHealth(): ReturnType<GmodMcpHost['getHealth']> | undefined {
-    return gmodMcpHost?.getHealth();
-}
-
-async function collectGmodSetupIssues(): Promise<GmodSetupIssue[]> {
-    const issues: GmodSetupIssue[] = [];
-    const lsConfig = vscode.workspace.getConfiguration('gluals.ls', getConfigurationScope());
-    const configuredExecutable = (lsConfig.get<string>('executablePath') ?? '').trim();
-    if (configuredExecutable.length > 0 && !fs.existsSync(configuredExecutable)) {
-        issues.push({
-            id: 'missing-configured-binary',
-            severity: 'error',
-            message: `Configured language server binary is missing: ${configuredExecutable}`,
-            repairLabel: 'Open GLua Language Server Binary Setting',
-            repair: async () => {
-                await vscode.commands.executeCommand('workbench.action.openSettings', 'gluals.ls.executablePath');
-            }
-        });
-    }
-
-    if (configuredExecutable.length === 0 && !fs.existsSync(getBundledServerExecutablePath())) {
-        issues.push({
-            id: 'missing-bundled-binary',
-            severity: 'error',
-            message: 'Bundled GLua Language Server binary is missing from the extension server folder.',
-            repairLabel: 'Open GLua Language Server Binary Setting',
-            repair: async () => {
-                await vscode.commands.executeCommand('workbench.action.openSettings', 'gluals.ls.executablePath');
-            }
-        });
-    }
-
-    const launchConfigs = await readLaunchConfigurations();
-    const gmodConfigs = launchConfigs.filter((entry) => entry['type'] === 'gluals_gmod');
-    if (gmodConfigs.length === 0) {
-        issues.push({
-            id: 'missing-gmod-launch-config',
-            severity: 'warning',
-            message: 'No `gluals_gmod` debug configuration found in workspace launch.json files.',
-            repairLabel: 'Run GMod Debugger Setup',
-            repair: async () => {
-                await configureGmodDebugger();
-            }
-        });
-    } else {
-        const hasValidSourceMap = gmodConfigs.some((config) => {
-            const sourceMap = config['sourceFileMap'];
-            if (!sourceMap || typeof sourceMap !== 'object' || Array.isArray(sourceMap)) {
-                return false;
-            }
-            return Object.keys(sourceMap).some((key) => key.includes('${workspaceFolder}') || key.includes('${workspaceRoot}'));
-        });
-        if (!hasValidSourceMap) {
-            issues.push({
-                id: 'bad-source-file-map',
-                severity: 'error',
-                message: 'GMod debug configuration is missing a workspace `sourceFileMap` mapping.',
-                repairLabel: 'Open launch.json',
-                repair: async () => {
-                    await vscode.commands.executeCommand('workbench.action.openLaunchJson');
-                }
-            });
-        }
-    }
-
-    const health = getGmodMcpHealth();
-    const mcpConfig = vscode.workspace.getConfiguration('gluals.gmod.mcp');
-    const mcpEnabled = mcpConfig.get<boolean>('enabled', true);
-    const configuredToken = (mcpConfig.get<string>('authToken', '') ?? '').trim();
-
-    if (!mcpEnabled) {
-        issues.push({
-            id: 'mcp-disabled',
-            severity: 'error',
-            message: 'GMod MCP host is disabled.',
-            repairLabel: 'Enable MCP Host',
-            repair: async () => {
-                await mcpConfig.update('enabled', true, vscode.ConfigurationTarget.Global);
-                await startGmodMcpHost(false);
-            }
-        });
-    }
-
-    if (mcpEnabled && health && !health.running) {
-        issues.push({
-            id: 'mcp-stopped',
-            severity: 'warning',
-            message: 'GMod MCP host is enabled but not running.',
-            repairLabel: 'Start MCP Host',
-            repair: async () => {
-                await startGmodMcpHost(false);
-            }
-        });
-    }
-
-    if (mcpEnabled && health?.running && !getActiveGmodDebugSession()) {
-        issues.push({
-            id: 'stale-session',
-            severity: 'warning',
-            message: 'MCP host is running without an active GMod debug session (possible stale runtime target).',
-            repairLabel: 'Restart MCP Host',
-            repair: async () => {
-                await restartGmodMcpHost(false);
-            }
-        });
-    }
-
-    if (configuredToken.length > 0 && configuredToken.length < 12) {
-        issues.push({
-            id: 'weak-mcp-token',
-            severity: 'warning',
-            message: 'Configured MCP auth token is short and easy to mistype for external clients.',
-            repairLabel: 'Reset MCP Token',
-            repair: async () => {
-                await mcpConfig.update('authToken', '', vscode.ConfigurationTarget.Global);
-                await restartGmodMcpHost(false);
-            }
-        });
-    }
-
-    return issues;
-}
-
 async function openDocumentation(): Promise<void> {
     const url = 'https://gluals.arnux.net/';
     await vscode.env.openExternal(vscode.Uri.parse(url));
-}
-
-async function runGmodOnboarding(): Promise<void> {
-    const start = await vscode.window.showInformationMessage(
-        'GMod setup wizard will verify debugger mapping, runtime realm, and MCP health.',
-        'Start',
-        'Cancel'
-    );
-    if (start !== 'Start') {
-        return;
-    }
-
-    await setGmodRealm();
-    const issues = await collectGmodSetupIssues();
-    if (issues.length === 0) {
-        vscode.window.showInformationMessage('GMod setup complete. Diagnostics found no common issues.');
-        return;
-    }
-
-    const action = await vscode.window.showWarningMessage(
-        `GMod setup found ${issues.length} issue(s).`,
-        'Repair All',
-        'Review'
-    );
-    if (action === 'Repair All') {
-        for (const issue of issues) {
-            await issue.repair();
-        }
-        vscode.window.showInformationMessage('GMod setup repairs completed.');
-        return;
-    }
-
-    if (action === 'Review') {
-        await runGmodDiagnosticsRepair();
-    }
-}
-
-async function runGmodDiagnosticsRepair(): Promise<void> {
-    const issues = await collectGmodSetupIssues();
-    if (issues.length === 0) {
-        vscode.window.showInformationMessage('GMod diagnostics: no issues detected.');
-        return;
-    }
-
-    const picks = issues.map((issue) => ({
-        label: issue.severity === 'error' ? `$(error) ${issue.message}` : `$(warning) ${issue.message}`,
-        description: issue.repairLabel,
-        issue
-    }));
-    const selected = await vscode.window.showQuickPick(picks, {
-        title: 'GMod Diagnostics & Repair',
-        placeHolder: 'Select an issue to repair',
-        ignoreFocusOut: true
-    });
-    if (!selected) {
-        return;
-    }
-
-    await selected.issue.repair();
-    vscode.window.showInformationMessage(`GMod diagnostics repair applied: ${selected.issue.id}`);
 }
 
 function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
@@ -1613,17 +1410,7 @@ function healthCheckGmodMcpHost(): void {
     }
 
     const health = gmodMcpHost.getHealth();
-    vscode.window.showInformationMessage(
-        `GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`,
-        'Run Diagnostics',
-        'Setup Wizard'
-    ).then((action) => {
-        if (action === 'Run Diagnostics') {
-            void runGmodDiagnosticsRepair();
-        } else if (action === 'Setup Wizard') {
-            void runGmodOnboarding();
-        }
-    });
+    void vscode.window.showInformationMessage(`GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`);
 }
 
 function getGmodDebugState(): Record<string, unknown> {
