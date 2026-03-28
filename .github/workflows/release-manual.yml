@@ -15,10 +15,6 @@ on:
         description: Optional explicit version (x.y.z). Leave blank to auto-increment.
         required: false
         type: string
-      language_server_version:
-        description: Optional LS release version to pin in build/config.json (e.g. 1.1.0)
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -93,30 +89,6 @@ jobs:
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Optionally pin language server version
-        if: inputs.language_server_version != ''
-        shell: bash
-        env:
-          LS_VERSION_RAW: ${{ inputs.language_server_version }}
-          TARGET_BRANCH: ${{ github.ref_name }}
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-        run: |
-          set -euo pipefail
-
-          ls_version="${LS_VERSION_RAW}"
-          if ! [[ "${ls_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "language_server_version must be x.y.z." >&2
-            exit 1
-          fi
-
-          LS_VERSION="${ls_version}" node -e "const fs=require('fs');const p='build/config.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));if(c.newLanguageServerVersion!==process.env.LS_VERSION){c.newLanguageServerVersion=process.env.LS_VERSION;fs.writeFileSync(p,JSON.stringify(c,null,4)+'\n');}"
-
-          if ! git diff --quiet -- build/config.json; then
-            git add build/config.json
-            git commit -m "chore(release): pin LS ${ls_version} for ${RELEASE_TAG}"
-            git push origin "HEAD:${TARGET_BRANCH}"
-          fi
 
       - name: Create and push tag
         shell: bash

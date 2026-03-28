@@ -2,7 +2,6 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { resolve } from "path";
 import decompress from "decompress";
 import decompressTarGz from "decompress-targz";
-import config from "./config.json" with { type: "json" };
 import { downloadTo } from "./util.js";
 
 const args = process.argv;
@@ -70,6 +69,10 @@ function getLanguageServerExecutableName(assetName) {
     return assetName.includes("win32") ? "glua_ls.exe" : "glua_ls";
 }
 
+function getInstalledLanguageServerPath(assetName) {
+    return resolve("server", getLanguageServerExecutableName(assetName));
+}
+
 function resolveLocalLanguageServerSource(assetName) {
     const executableName = getLanguageServerExecutableName(assetName);
     const cliLocalPath = getArgValue("--local-ls");
@@ -113,28 +116,14 @@ async function resolveLanguageServerSource(assetName) {
         return downloadPath;
     }
 
-    const useLatestPrereleaseLanguageServer =
-        getReleaseChannel() === "prerelease" && hasFlag("--latest-prerelease-ls");
-
-    if (useLatestPrereleaseLanguageServer) {
-        try {
-            const prereleaseAssetUrl = await resolveLatestPreReleaseAssetUrl(assetName);
-            console.log(`Downloading pre-release language server from ${prereleaseAssetUrl}`);
-            await downloadTo(prereleaseAssetUrl, downloadPath);
-            return downloadPath;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(
-                `Warning: failed to resolve latest pre-release language server, falling back to configured pinned version ${config.newLanguageServerVersion}. (${errorMessage})`
-            );
-        }
-    }
-
-    console.log(`Downloading language server from ${config.newLanguageServerUrl}/${config.newLanguageServerVersion}/${assetName}`);
-    await downloadTo(
-        `${config.newLanguageServerUrl}/${config.newLanguageServerVersion}/${assetName}`,
-        downloadPath
+    const includePrereleases = getReleaseChannel() === "prerelease";
+    const releaseAssetUrl = await resolveLatestReleaseAssetUrl(assetName, {
+        includePrereleases,
+    });
+    console.log(
+        `Downloading ${includePrereleases ? "latest available" : "latest stable"} language server from ${releaseAssetUrl}`
     );
+    await downloadTo(releaseAssetUrl, downloadPath);
 
     return downloadPath;
 }
@@ -195,7 +184,7 @@ async function fetchReleaseByTag(tagName) {
     return response.json();
 }
 
-async function resolveLatestPreReleaseAssetUrl(assetName) {
+async function fetchReleases() {
     const response = await fetch(GITHUB_RELEASES_API, {
         headers: getGitHubApiHeaders(),
     });
@@ -209,25 +198,46 @@ async function resolveLatestPreReleaseAssetUrl(assetName) {
         throw new Error("GitHub API response was not an array of releases");
     }
 
-    const preRelease = releases.find((release) => {
-        return release?.prerelease === true && Array.isArray(release.assets);
+    return releases;
+}
+
+async function resolveLatestReleaseAssetUrl(assetName, options = {}) {
+    const includePrereleases = options.includePrereleases === true;
+    const releases = await fetchReleases();
+
+    const release = releases.find((entry) => {
+        if (!entry || !Array.isArray(entry.assets)) {
+            return false;
+        }
+
+        if (!includePrereleases && entry.prerelease) {
+            return false;
+        }
+
+        return entry.assets.some(
+            (asset) =>
+                asset?.name === assetName &&
+                typeof asset.browser_download_url === "string"
+        );
     });
 
-    if (!preRelease) {
-        throw new Error("No pre-release found in gmod-glua-ls releases list");
+    if (!release) {
+        throw new Error(
+            `No ${includePrereleases ? "release" : "stable release"} found in gmod-glua-ls releases list for asset ${assetName}`
+        );
     }
 
-    const asset = preRelease.assets.find(
+    const asset = release.assets.find(
         (entry) => entry?.name === assetName && typeof entry.browser_download_url === "string"
     );
 
     if (!asset) {
         throw new Error(
-            `Pre-release ${preRelease.tag_name} does not include asset ${assetName}`
+            `Release ${release.tag_name} does not include asset ${assetName}`
         );
     }
 
-    console.log(`Using pre-release language server ${preRelease.tag_name}`);
+    console.log(`Using language server release ${release.tag_name}`);
     return asset.browser_download_url;
 }
 
@@ -247,6 +257,16 @@ async function installLanguageServerFromSource(sourcePath, assetName) {
     const executableName = getLanguageServerExecutableName(assetName);
     const destinationPath = `server/${executableName}`;
     copyFileSync(sourcePath, destinationPath);
+}
+
+function assertLanguageServerInstalled(assetName) {
+    const installedPath = getInstalledLanguageServerPath(assetName);
+    if (!existsSync(installedPath)) {
+        const entries = readdirSync("server");
+        throw new Error(
+            `Expected bundled language server at ${installedPath}, but it was not found. Server directory contains: ${entries.join(", ") || "<empty>"}`
+        );
+    }
 }
 
 async function build() {
@@ -272,6 +292,10 @@ async function build() {
     const languageServerSource = await resolveLanguageServerSource(languageServerAssetName);
 
     await installLanguageServerFromSource(languageServerSource, languageServerAssetName);
+    assertLanguageServerInstalled(languageServerAssetName);
 }
 
-build().catch(console.error);
+build().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

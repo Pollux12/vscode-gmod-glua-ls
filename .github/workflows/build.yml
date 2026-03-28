@@ -95,6 +95,9 @@ jobs:
 
         node ./build/prepare.js "${PREPARE_ARGS[@]}"
         npx @vscode/vsce package "${PACKAGE_ARGS[@]}"
+    - name: Verify bundled language server
+      run: |
+        node ./build/verify-vsix.js "vscode-gmod-ls-${{ matrix.target }}.vsix" "${{ matrix.target }}"
     - name: Upload
       uses: actions/upload-artifact@v4
       with:

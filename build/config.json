@@ -1,5 +1,5 @@
 {
-    "newLanguageServerVersion": "0.20.0",
+    "newLanguageServerVersion": "1.0.5",
     "newLanguageServerUrl": "https://github.com/Pollux12/gmod-glua-ls/releases/download",
     "newLanguageServerSchemaUrl": "https://raw.githubusercontent.com/Pollux12/gmod-glua-ls/refs/tags/{{tag}}/crates/glua_code_analysis/resources/schema.json"
 }
