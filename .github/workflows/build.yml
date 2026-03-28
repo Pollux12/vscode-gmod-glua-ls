@@ -87,9 +87,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         PREPARE_ARGS=("${{ matrix.file }}" "--channel" "${{ steps.release_meta.outputs.build_channel }}")
+        PACKAGE_ARGS=("-o" "vscode-gmod-ls-${{ matrix.target }}.vsix" "--target" "${{ matrix.target }}")
+
+        if [[ "${{ steps.release_meta.outputs.publish_channel }}" == "prerelease" ]]; then
+          PACKAGE_ARGS+=("--pre-release")
+        fi
 
         node ./build/prepare.js "${PREPARE_ARGS[@]}"
-        npx vsce package -o vscode-gmod-ls-${{ matrix.target }}.vsix --target ${{ matrix.target }}
+        npx @vscode/vsce package "${PACKAGE_ARGS[@]}"
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
@@ -100,6 +105,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     if: needs.build.outputs.is_publish_event == 'true'
+    permissions:
+      contents: write
     steps:
       - name: Ensure GitHub pre-release exists for tag pushes
         if: needs.build.outputs.publish_channel == 'prerelease'
@@ -126,6 +133,10 @@ jobs:
               });
               core.info(`Updated release ${tag} to pre-release.`);
             } catch (error) {
+              if (error.status === 403) {
+                core.warning(`Skipping GitHub pre-release sync for ${tag}: ${error.message}`);
+                return;
+              }
               if (error.status !== 404) {
                 throw error;
               }
@@ -152,9 +163,9 @@ jobs:
           fi
 
           if [[ "${{ needs.build.outputs.publish_channel }}" == "prerelease" ]]; then
-            npx vsce publish --pre-release --packagePath ${PACKAGE_PATHS}
+            npx @vscode/vsce publish --pre-release --packagePath ${PACKAGE_PATHS}
           else
-            npx vsce publish --packagePath ${PACKAGE_PATHS}
+            npx @vscode/vsce publish --packagePath ${PACKAGE_PATHS}
           fi
         env:
           VSCE_PAT: ${{ secrets.VSCE_ACCESS_TOKEN }}

@@ -12,12 +12,6 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=Pollux.gmod-glua-ls">
     <img src="https://img.shields.io/badge/View%20on-Marketplace-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="View on VS Code Marketplace">
   </a>
-  <a href="vscode:extension/Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/badge/Open%20in-VS%20Code-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code">
-  </a>
-  <a href="vscode-insiders:extension/Pollux.gmod-glua-ls">
-    <img src="https://img.shields.io/badge/Open%20in-VS%20Code%20Insiders-24BFA5?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code Insiders">
-  </a>
 </p>
 
 <p align="center">
