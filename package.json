@@ -1930,7 +1930,8 @@
                     "strings": true
                 },
                 "editor.snippetSuggestions": "top",
-                "editor.wordBasedSuggestions": "off"
+                "editor.wordBasedSuggestions": "off",
+                "editor.stickyScroll.defaultModel": "foldingProviderModel"
             }
         },
         "colors": [],
