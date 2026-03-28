@@ -113,7 +113,10 @@ async function resolveLanguageServerSource(assetName) {
         return downloadPath;
     }
 
-    if (getReleaseChannel() === "prerelease") {
+    const useLatestPrereleaseLanguageServer =
+        getReleaseChannel() === "prerelease" && hasFlag("--latest-prerelease-ls");
+
+    if (useLatestPrereleaseLanguageServer) {
         try {
             const prereleaseAssetUrl = await resolveLatestPreReleaseAssetUrl(assetName);
             console.log(`Downloading pre-release language server from ${prereleaseAssetUrl}`);
@@ -121,8 +124,8 @@ async function resolveLanguageServerSource(assetName) {
             return downloadPath;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(
-                `ERROR: --channel prerelease was specified but no pre-release of gmod-glua-ls was found. Cannot build pre-release extension. (${errorMessage})`
+            console.warn(
+                `Warning: failed to resolve latest pre-release language server, falling back to configured pinned version ${config.newLanguageServerVersion}. (${errorMessage})`
             );
         }
     }

@@ -220,13 +220,13 @@ function isPreReleaseExtension(): boolean {
     }
 
     const version = String(extension.packageJSON?.version ?? '');
-    const minorPart = version.split('.')[1];
-    const minor = parseInt(minorPart, 10);
-    if (!Number.isFinite(minor)) {
+    const patchPart = version.split('.')[2];
+    const patch = parseInt(patchPart, 10);
+    if (!Number.isFinite(patch)) {
         return false;
     }
 
-    return minor % 2 !== 0;
+    return patch > 0;
 }
 
 export async function fetchLatestRelease(): Promise<GmRdbRelease | null> {
@@ -263,14 +263,43 @@ async function fetchLatestPreRelease(): Promise<GmRdbRelease | null> {
     }
 }
 
+async function fetchLatestReleaseIncludingPreReleases(): Promise<GmRdbRelease | null> {
+    try {
+        const releases = await fetchJson<GmRdbRelease[]>(`https://api.github.com/repos/${GM_RDB_REPO}/releases`, {
+            headers: GITHUB_RELEASE_HEADERS,
+        });
+
+        const latest = releases.find((release) => {
+            if (!Array.isArray(release?.assets) || release.assets.length === 0) {
+                return false;
+            }
+
+            return release.assets.some((asset) => {
+                return typeof asset?.name === 'string'
+                    && (ALL_RDB_DLLS.includes(asset.name) || ALL_RDB_CLIENT_DLLS.includes(asset.name))
+                    && typeof asset?.browser_download_url === 'string';
+            });
+        }) ?? null;
+
+        return latest;
+    } catch {
+        return null;
+    }
+}
+
 export async function fetchReleaseForCurrentExtensionChannel(): Promise<GmRdbRelease | null> {
     if (isPreReleaseExtension()) {
+        const latest = await fetchLatestReleaseIncludingPreReleases();
+        if (latest) {
+            return latest;
+        }
+
         const preRelease = await fetchLatestPreRelease();
         if (preRelease) {
             return preRelease;
         }
 
-        console.warn('No gm_rdb pre-release release with assets is available yet. Falling back to latest stable release.');
+        console.warn('No gm_rdb release with assets is available yet. Falling back to latest stable release.');
     }
 
     return fetchLatestRelease();
