@@ -1,26 +1,57 @@
 <p align="center">
-  <img src="res/gmod-glua-ls.png" width="128" alt="gmod-glua-ls icon">
+  <img src="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/res/gmod-glua-ls.png" width="128" alt="Garry's Mod Language Server icon">
 </p>
 
-# Garry's Mod Language Server (VSCode)
+<h1 align="center">Garry's Mod Language Server</h1>
+
+<p align="center">
+  Lightning-fast GLua language support, debugging, and tooling for Visual Studio Code.
+</p>
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=Pollux.gmod-glua-ls">
+    <img src="https://img.shields.io/badge/View%20on-Marketplace-007ACC.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="View on VS Code Marketplace">
+  </a>
+  <a href="vscode:extension/Pollux.gmod-glua-ls">
+    <img src="https://img.shields.io/badge/Open%20in-VS%20Code-007ACC.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code">
+  </a>
+  <a href="vscode-insiders:extension/Pollux.gmod-glua-ls">
+    <img src="https://img.shields.io/badge/Open%20in-VS%20Code%20Insiders-24BFA5.png?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Open in VS Code Insiders">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=Pollux.gmod-glua-ls">
+    <img src="https://img.shields.io/visual-studio-marketplace/v/Pollux.gmod-glua-ls.png?style=flat-square&label=VSCode" alt="VSCode Version">
+  </a>
+  <a href="https://github.com/Pollux12/gmod-glua-ls/releases">
+    <img src="https://img.shields.io/github/v/release/Pollux12/gmod-glua-ls.png?style=flat-square&label=gLuaLS" alt="gLuaLS Version">
+  </a>
+  <a href="https://github.com/Pollux12/gmod-luals-addon/tree/gluals-annotations">
+    <img src="https://img.shields.io/github/last-commit/Pollux12/gmod-luals-addon/gluals-annotations.png?style=flat-square&label=Annotations%20Updated" alt="Annotations Updated">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://gluals.arnux.net/">Documentation</a>
+  ·
+  <a href="https://github.com/Pollux12/gmod-glua-ls/issues">Issues</a>
+  ·
+  <a href="https://github.com/Pollux12/gmod-glua-ls">GLuaLS Server</a>
+</p>
 
 > [!IMPORTANT]
 > This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
-
-[Documentation](https://gluals.arnux.net/)
+> Report bugs or suggest features here: https://github.com/Pollux12/gmod-glua-ls/issues
 
 Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod development.
-
-<details>
-<summary>Media</summary>
-</details>
 
 ---
 
 ## ⚡ Performance & Architecture
 
-* **Rust-Powered Backend:** Delivers near-instant indexing and minimal memory footprint - over 10x quicker than others on large projects while delivering more features.
-* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highligting, diagnostics, symbol renaming, type resolution, goto, formatting and more. Advanced scope resolution and inference drastically reduces the amount of manual annotations required.
+* **Rust-Powered Backend:** Delivers full workspace indexing and diagnosis in seconds with a minimal memory footprint - over 10x quicker on large projects while delivering more features.
+* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
 * **Easy Setup:** Designed to "just work", the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy manual configuration.
 
 ## 🧠 Garry's Mod Specific Features
@@ -53,7 +84,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 * **Automatic File Resolution:** Automatically detects and parses addon and gamemode structures, enabling you to get started with all features and diagnostics without a ton of configuration.
 * **Automatic Setup & Updates:** Designed to work with minimal setup, the extension can handle updates for annotations and the debugger, alongside setting it all up for you on initial load.
 * **Multi-Root Workspace Support:** Designed to work in large codebases, especially with many different folders open within a workspace.  Perfect for working on complex gamemodes alongside many addons, such as within a [multi-root workspace.](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces)
-* **AI & Copilot Integration:** Integrates with GitHub Copilot and other tools with a custom MCP server - enables AI agents to interact directly with the game server and get accurate documentation for your codebase.
+* **Configurable Templates:** Ability to create and easily use custom templates to scaffold classes via the class explorer, helping reduce boilerplate. Templates for entities and other common classes included, with options to easily add more such as for plugin systems.
 
 ---
 
