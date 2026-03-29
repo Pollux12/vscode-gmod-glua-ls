@@ -233,6 +233,11 @@ export class EmmyContext implements vscode.Disposable {
                 detail: 'Choose a workspace folder in multi-root workspaces',
             },
             {
+                label: '$(debug) Setup Debugger',
+                description: 'Configure GMod debugger',
+                detail: 'Run the debugger configuration wizard',
+            },
+            {
                 label: '$(info) Show Server Info',
                 description: 'Display server information',
                 detail: 'Show detailed server status and configuration',
@@ -267,6 +272,8 @@ export class EmmyContext implements vscode.Disposable {
             await vscode.commands.executeCommand('gluals.startServer');
         } else if (selected.label.includes('Open GLuaLS Settings')) {
             await vscode.commands.executeCommand('gluals.gmod.openSettings');
+        } else if (selected.label.includes('Setup Debugger')) {
+            await vscode.commands.executeCommand('gluals.gmod.configureDebugger');
         } else if (selected.label.includes('Server Info')) {
             this.showServerInfo();
         } else if (selected.label.includes('Output')) {
