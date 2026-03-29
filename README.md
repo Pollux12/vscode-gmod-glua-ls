@@ -5,7 +5,7 @@
 <h1 align="center">Garry's Mod Language Server</h1>
 
 <p align="center">
-  Lightning-fast GLua language support, debugging, and tooling for Visual Studio Code.
+  Advanced Gmod GLua language server for Visual Studio Code.
 </p>
 
 <p align="center">
@@ -37,21 +37,23 @@
 > [!IMPORTANT]
 > This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
 > Report bugs or suggest features here: https://github.com/Pollux12/gmod-glua-ls/issues
+>
+> **Using the latest pre-release version is recommended**
 
 Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod development.
 
 ---
 
-## ⚡ Performance & Architecture
+## ⚡ Performance & Overview
 
 * **Rust-Powered Backend:** Delivers full workspace indexing and diagnosis in seconds with a minimal memory footprint - over 10x quicker on large projects while delivering more features.
-* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
+* **Full Language Server**: Includes everything you'd expect from a language server and more, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
 * **Easy Setup:** Designed to "just work", the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy manual configuration.
 
-## 🧠 Garry's Mod Specific Features
+## 🧠 Designed for Garry's Mod
 
 * **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. NetworkVars, AccessorFuncs and VGUI panels are all registered as well.
-* **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Delivers realm-aware suggestions by filtering autocomplete based on realm.
+* **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Intellisense filters by realm to only deliver relevant suggestions.
 * **Network Validation:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
 * **Smart Hook Integration:** Intelligent autocomplete and signature resolution for all hooks, `GM:` overrides, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
 * **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a configurable template system for easy creation.
@@ -66,8 +68,8 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 ## ✨ Advanced Code Intelligence
 
-* **AI & Copilot Integration:** Supercharge GitHub Copilot Chat with LM tools and MCP integration - allowing it to search documentation, get the console output, recent errors and even run lua directly on the server.
-* **Self-Updating Wiki Annotations:** The latest annotations generated from the Garry's Mod wiki will be automatically downloaded and setup for you. Includes options to disable and override if required.
+* **AI & Copilot Integration:** Supercharge GitHub Copilot Chat with LM tools and MCP integration - allowing it to search documentation, get console output, recent errors and even execute lua to validate its work.
+* **Self-Updating Wiki Annotations:** The latest annotations, generated from the Garry's Mod wiki, will be automatically downloaded and setup for you.
 * **VGUI & Entity Assistance:** Dynamic CodeLens and inlay hints specifically for VGUI elements - designed to prevent you from getting lost in massive derma files.
 * **Workspace-Wide Refactoring:** Reliable symbol renaming, finding all references, and jumping straight to definitions. Find anything with ease with proper symbol mapping and outline view.
 
@@ -79,6 +81,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 * **Automatic Setup & Updates:** Designed to work with minimal setup, the extension can handle updates for annotations and the debugger, alongside setting it all up for you on initial load.
 * **Multi-Root Workspace Support:** Designed to work in large codebases, especially with many different folders open within a workspace.  Perfect for working on complex gamemodes alongside many addons, such as within a [multi-root workspace.](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces)
 * **Configurable Templates:** Ability to create and easily use custom templates to scaffold classes via the class explorer, helping reduce boilerplate. Templates for entities and other common classes included, with options to easily add more such as for plugin systems.
+* **Detailed Documentation:** Everything you need to know, from annotations to features, is documented on the wiki: https://gluals.arnux.net/
 
 ---
 

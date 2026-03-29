@@ -1,7 +1,7 @@
 {
     "name": "gmod-glua-ls",
     "displayName": "Garry's Mod Language Server",
-    "description": "Language Server for Garry's Mod GLua",
+    "description": "Advanced GLua language server for Visual Studio Code - IntelliSense, debugger, formatter, and more for Garry's Mod development.",
     "version": "1.0.1",
     "preview": true,
     "icon": "res/gmod-glua-ls.png",
@@ -13,15 +13,20 @@
     },
     "categories": [
         "Programming Languages",
-        "Debuggers"
+        "Debuggers",
+        "Linters",
+        "Formatters",
+        "Snippets"
     ],
     "keywords": [
         "lua",
         "gmod",
         "glua",
+        "gluals",
+        "garrysmod",
+        "garrys mod",
         "Garry's Mod",
-        "language server",
-        "debugger"
+        "Garry's Mod Lua"
     ],
     "repository": {
         "type": "git",
@@ -30,6 +35,8 @@
     "bugs": {
         "url": "https://github.com/Pollux12/gmod-glua-ls/issues"
     },
+    "qna": false,
+    "markdown": "github",
     "main": "./out/extension",
     "contributes": {
         "commands": [
