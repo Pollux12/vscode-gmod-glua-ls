@@ -6,6 +6,8 @@
 
 <p align="center">
   Advanced Gmod GLua language server for Visual Studio Code.
+  <br>
+  <b>Using the latest pre-release version is recommended</b>
 </p>
 
 <p align="center">
