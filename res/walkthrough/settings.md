@@ -12,4 +12,11 @@ To open the GLuaLS Settings Menu:
 
 If a `.gluarc.json` file does not yet exist, you can create one by right clicking on the workspace root and selecting
 
+
+### Recommended Configuration
+
+It is recommended that you configure the global variable overrides and formatter for your workspace.
+
+You may encounter errors for `undefined-global`, which is often caused by referencing addons that exist outside of your own workspace. To fix this, you can either add conditional checks, or add that global as a known value in the config if you know it'll always be available.
+
 **Click the action button to open the workspace settings UI.**
