@@ -7,13 +7,18 @@ import { fetchJson, downloadAndExtractZip } from './netHelpers';
  * Manages Garry's Mod GLuaLS annotations
  * Handles downloading and updating from the gluals-annotations branch
  */
-export class GmodAnnotationManager {
+export class GmodAnnotationManager implements vscode.Disposable {
     private readonly ZIP_URL = 'https://github.com/Pollux12/gmod-luals-addon/archive/refs/heads/gluals-annotations.zip';
     private readonly ZIP_INNER_FOLDER = 'gmod-luals-addon-gluals-annotations';
     private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/gluals-annotations/__metadata.json';
     private readonly annotationsPath: string;
+    private readonly MIN_UPDATE_CHECK_INTERVAL_MINUTES = 5;
+    private readonly MAX_UPDATE_CHECK_INTERVAL_MINUTES = 1440;
+    private updateCheckInterval: NodeJS.Timeout | undefined;
+    private readonly context: vscode.ExtensionContext;
 
     constructor(context: vscode.ExtensionContext) {
+        this.context = context;
         // Store annotations in extension's global storage
         this.annotationsPath = path.join(
             context.globalStorageUri.fsPath,
@@ -63,11 +68,65 @@ export class GmodAnnotationManager {
             console.log('GMod annotations already exist at', this.annotationsPath);
             // Fire-and-forget: check for updates in the background without blocking startup
             void this.checkForUpdates();
+            // Start periodic update checks
+            this.startPeriodicUpdateChecks();
             return;
         }
 
         console.log('GMod annotations not found, downloading...');
         await this.downloadAnnotations();
+        // Start periodic update checks after initial download
+        this.startPeriodicUpdateChecks();
+    }
+
+    /**
+     * Start periodic background checks for annotation updates (once per hour by default)
+     */
+    private startPeriodicUpdateChecks(): void {
+        // Clear any existing interval
+        this.stopPeriodicUpdateChecks();
+
+        const config = vscode.workspace.getConfiguration('gluals');
+        const autoCheckEnabled = config.get<boolean>('gmod.autoCheckAnnotationUpdates', true);
+        
+        if (!autoCheckEnabled) {
+            console.log('[GLuaLS] Annotation auto-update checks are disabled');
+            return;
+        }
+
+        const configuredMinutes = config.get<number>('gmod.annotationUpdateCheckIntervalMinutes', 60);
+        const normalizedMinutes = Number.isFinite(configuredMinutes)
+            ? Math.min(this.MAX_UPDATE_CHECK_INTERVAL_MINUTES, Math.max(this.MIN_UPDATE_CHECK_INTERVAL_MINUTES, Math.floor(configuredMinutes)))
+            : 60;
+        const checkIntervalMs = normalizedMinutes * 60 * 1000;
+
+        console.log(`[GLuaLS] Starting periodic annotation update checks every ${normalizedMinutes} minutes`);
+        
+        this.updateCheckInterval = setInterval(() => {
+            void this.checkForUpdates();
+        }, checkIntervalMs);
+
+        // Register for cleanup when extension deactivates
+        this.context.subscriptions.push({
+            dispose: () => this.stopPeriodicUpdateChecks()
+        });
+    }
+
+    /**
+     * Stop periodic update checks
+     */
+    private stopPeriodicUpdateChecks(): void {
+        if (this.updateCheckInterval) {
+            clearInterval(this.updateCheckInterval);
+            this.updateCheckInterval = undefined;
+        }
+    }
+
+    /**
+     * Dispose of resources
+     */
+    public dispose(): void {
+        this.stopPeriodicUpdateChecks();
     }
 
     /**
