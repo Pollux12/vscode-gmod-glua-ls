@@ -20,9 +20,9 @@ const LEGACY_LOADER_END_MARKER = '-- end gm_rdb';
 
 const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
     'Windows 64-bit': 'gmsv_rdb_win64.dll',
-    'Windows 32-bit (default SRCDS)': 'gmsv_rdb_win32.dll',
+    'Windows 32-bit': 'gmsv_rdb_win32.dll',
     'Linux 64-bit': 'gmsv_rdb_linux64.dll',
-    'Linux 32-bit (default SRCDS)': 'gmsv_rdb_linux.dll',
+    'Linux 32-bit': 'gmsv_rdb_linux.dll',
 };
 
 const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS);
@@ -183,7 +183,7 @@ function detectWorkspaceSrcdsLayout(workspaceFolder: vscode.WorkspaceFolder): Wo
     return undefined;
 }
 
-function detectGmRdb(garrysmodPath: string): string | undefined {
+export function detectGmRdb(garrysmodPath: string): string | undefined {
     const binDir = path.join(garrysmodPath, 'lua', 'bin');
     if (!fs.existsSync(binDir)) {
         return undefined;
@@ -193,6 +193,22 @@ function detectGmRdb(garrysmodPath: string): string | undefined {
         if (fs.existsSync(path.join(binDir, dllName))) {
             return dllName;
         }
+    }
+
+    return undefined;
+}
+
+export function getDllForSrcdsExecutable(srcdsRoot: string): 'gmsv_rdb_win64.dll' | 'gmsv_rdb_win32.dll' | undefined {
+    if (process.platform !== 'win32') {
+        return undefined;
+    }
+
+    if (fs.existsSync(path.join(srcdsRoot, 'srcds_win64.exe'))) {
+        return 'gmsv_rdb_win64.dll';
+    }
+
+    if (fs.existsSync(path.join(srcdsRoot, 'srcds.exe'))) {
+        return 'gmsv_rdb_win32.dll';
     }
 
     return undefined;
@@ -520,9 +536,20 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
         description: dll,
     }));
 
+    const srcdsRoot = path.dirname(garrysmodPath);
+    const detectedDll = getDllForSrcdsExecutable(srcdsRoot);
+    if (detectedDll) {
+        const detectedIndex = platformItems.findIndex((item) => item.description === detectedDll);
+        if (detectedIndex >= 0) {
+            const [detectedItem] = platformItems.splice(detectedIndex, 1);
+            detectedItem.label = `${detectedItem.label} (detected)`;
+            platformItems.unshift(detectedItem);
+        }
+    }
+
     const platformChoice = await vscode.window.showQuickPick(platformItems, {
-        title: 'Install gm_rdb — Select Platform',
-        placeHolder: 'Which platform is your SRCDS running on?',
+        title: 'Install gm_rdb — Select Server Platform',
+        placeHolder: 'Which platform is your SRCDS (server) running on? (NOT your client)',
         ignoreFocusOut: true,
     });
     if (!platformChoice?.description) {
@@ -848,7 +875,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
     const requestPick = await vscode.window.showQuickPick(
         [
             {
-                label: '$(plug) Attach',
+                label: '$(plug) Attach (recommended)',
                 description: 'Connect to an already running SRCDS process',
                 value: 'attach' as const,
             },

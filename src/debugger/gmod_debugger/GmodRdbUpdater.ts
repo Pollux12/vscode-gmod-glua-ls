@@ -6,6 +6,7 @@ import { downloadFile } from '../../netHelpers';
 import {
     cleanupLegacyInitInjection,
     DEFAULT_RDB_PORT,
+    getDllForSrcdsExecutable,
     fetchReleaseForCurrentExtensionChannel,
     getStoredGarrysmodPath,
     GmRdbRelease,
@@ -149,7 +150,7 @@ export class GmodRdbUpdater {
                         throw new Error('Failed to fetch gm_rdb release metadata.');
                     }
 
-                    const asset = this.findAssetForCurrentPlatform(release);
+                    const asset = this.findAssetForUpdate(release, garrysmodPath);
                     if (!asset) {
                         const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
                         throw new Error(`No compatible gm_rdb server binary found for ${os.platform()} (${os.arch()}). Available assets: ${available}`);
@@ -199,6 +200,32 @@ export class GmodRdbUpdater {
         }
 
         return undefined;
+    }
+
+    private findAssetForUpdate(release: GmRdbRelease, garrysmodPath: string): ReleaseAsset | undefined {
+        if (process.platform === 'win32') {
+            const binDir = path.join(garrysmodPath, 'lua', 'bin');
+            const hasWin64 = fs.existsSync(path.join(binDir, 'gmsv_rdb_win64.dll'));
+            const hasWin32 = fs.existsSync(path.join(binDir, 'gmsv_rdb_win32.dll'));
+
+            let installed: string | undefined;
+            if (hasWin64 && hasWin32) {
+                installed = getDllForSrcdsExecutable(path.dirname(garrysmodPath));
+            } else if (hasWin64) {
+                installed = 'gmsv_rdb_win64.dll';
+            } else if (hasWin32) {
+                installed = 'gmsv_rdb_win32.dll';
+            }
+
+            if (installed === 'gmsv_rdb_win64.dll' || installed === 'gmsv_rdb_win32.dll') {
+                const asset = release.assets.find((entry) => entry.name === installed);
+                if (asset) {
+                    return asset;
+                }
+            }
+        }
+
+        return this.findAssetForCurrentPlatform(release);
     }
 
     private getAssetCandidatesForCurrentPlatform(): string[] {
