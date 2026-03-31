@@ -15,6 +15,7 @@ import * as Annotator from './annotator';
 import { EmmyrcSchemaContentProvider } from './emmyrcSchemaContentProvider';
 import { SyntaxTreeManager, setClientGetter } from './syntaxTreeProvider';
 import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
+import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions';
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
@@ -119,6 +120,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerLanguageConfiguration(context);
     registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
+    registerUndefinedGlobalCodeActions(context);
 
     // Initialize features
     await initializeExtension();

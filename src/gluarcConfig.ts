@@ -86,20 +86,23 @@ export async function readGluarcConfig(workspaceFolder: vscode.WorkspaceFolder):
 /**
  * Writes the config object as pretty-printed JSON to .gluarc.json.
  * Shows an error message if write fails.
+ * Returns true on success, false on failure.
  */
 export async function writeGluarcConfig(
     workspaceFolder: vscode.WorkspaceFolder,
     config: Record<string, unknown>
-): Promise<void> {
+): Promise<boolean> {
     const gluarcUri = getGluarcUri(workspaceFolder);
 
     try {
         const serialized = `${JSON.stringify(config, null, 2)}\n`;
         const encoded = UTF8_ENCODER.encode(serialized);
         await vscode.workspace.fs.writeFile(gluarcUri, encoded);
+        return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Failed to write ${GLUARC_FILE_NAME}: ${message}`);
+        return false;
     }
 }
 

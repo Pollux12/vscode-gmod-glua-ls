@@ -86,6 +86,11 @@
                 "icon": "$(settings-gear)"
             },
             {
+                "command": "gluals.addUndefinedGlobalToGlobals",
+                "title": "Add unknown variable to Global Table (config)",
+                "category": "GLuaLS"
+            },
+            {
                 "command": "gluals.gmod.pauseSoft",
                 "title": "Debug: Pause (Soft)",
                 "category": "GLuaLS"
@@ -826,6 +831,11 @@
                     "command": "gluals.gmod.refreshFile",
                     "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
                     "group": "gmod@4"
+                },
+                {
+                    "command": "gluals.addUndefinedGlobalToGlobals",
+                    "when": "resourceLangId == lua && gluals.hasUndefinedGlobalAtCursor",
+                    "group": "gluals@1"
                 }
             ],
             "view/title": [

@@ -155,7 +155,11 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                         this.config['$schema'] = schemaRef;
                     }
                     this._isSelfWrite = true;
-                    await writeGluarcConfig(this.workspaceFolder, this.config);
+                    const writeSucceeded = await writeGluarcConfig(this.workspaceFolder, this.config);
+                    if (!writeSucceeded) {
+                        this._isSelfWrite = false;
+                        return;
+                    }
                     this._hasUnsavedChanges = false;
                     setTimeout(() => { this._isSelfWrite = false; }, 500);
                     await this.panel.webview.postMessage({
@@ -279,7 +283,11 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         }
 
         this._isSelfWrite = true;
-        await writeGluarcConfig(this.workspaceFolder, this.config);
+        const writeSucceeded = await writeGluarcConfig(this.workspaceFolder, this.config);
+        if (!writeSucceeded) {
+            this._isSelfWrite = false;
+            return;
+        }
         this._hasUnsavedChanges = false;
         setTimeout(() => { this._isSelfWrite = false; }, 500);
         await this.panel.webview.postMessage({ type: 'saved' });
