@@ -26,11 +26,43 @@ export class GmodAnnotationManager implements vscode.Disposable {
         );
     }
 
+    private getAnnotationPathOverride(): string | undefined {
+        const configuredPath = vscode.workspace.getConfiguration('gluals').get<string>('ls.annotationPath');
+        if (!configuredPath) {
+            return undefined;
+        }
+
+        const normalizedPath = configuredPath.trim();
+        return normalizedPath.length > 0 ? normalizedPath : undefined;
+    }
+
+    private isAccessibleDirectory(dirPath: string): boolean {
+        try {
+            return fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory();
+        } catch {
+            return false;
+        }
+    }
+
     /**
      * Get the path to annotations (only if enabled and available)
      */
     public getAnnotationsPath(): string | undefined {
         const config = vscode.workspace.getConfiguration('gluals');
+
+        // Check for annotation path override first
+        const overridePath = this.getAnnotationPathOverride();
+        if (overridePath) {
+            // When override is set, use it directly without checking autoLoadAnnotations
+            // Verify the path exists
+            if (this.isAccessibleDirectory(overridePath)) {
+                return overridePath;
+            }
+            console.warn(`[GLuaLS] Configured annotation override path is invalid, inaccessible, or not a directory: ${overridePath}`);
+            return undefined;
+        }
+        
+        // No override, check built-in annotations
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
 
         if (!enabled) {
@@ -58,6 +90,18 @@ export class GmodAnnotationManager implements vscode.Disposable {
     public async initializeAnnotations(): Promise<void> {
         const config = vscode.workspace.getConfiguration('gluals');
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
+        const overridePath = this.getAnnotationPathOverride();
+
+        // If override path is set, skip built-in annotation management entirely
+        if (overridePath) {
+            console.log(`[GLuaLS] Using custom annotation path override: ${overridePath}`);
+            if (!this.isAccessibleDirectory(overridePath)) {
+                vscode.window.showWarningMessage(
+                    `Configured annotation path is invalid, inaccessible, or not a directory: ${overridePath}`
+                );
+            }
+            return;
+        }
 
         if (!enabled) {
             console.log('GMod annotations auto-load is disabled');

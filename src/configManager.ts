@@ -44,6 +44,13 @@ export class ConfigurationManager {
     }
 
     /**
+     * Get GMod annotations path override
+     */
+    getAnnotationPath(): string | undefined {
+        return this.get<string>('ls.annotationPath');
+    }
+
+    /**
      * Get language server global config path
      */
     getGlobalConfigPath(): string | undefined {

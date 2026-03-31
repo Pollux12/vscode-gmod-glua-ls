@@ -1904,6 +1904,11 @@
                         "default": "",
                         "markdownDescription": "%config.emmylua.ls.executablePath.description%"
                     },
+                    "gluals.ls.annotationPath": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "Override path to GMod annotations directory. When set, disables built-in annotations and uses the specified path instead. Useful for testing and debugging with custom annotation sets."
+                    },
                     "gluals.ls.globalConfigPath": {
                         "type": "string",
                         "default": "",
