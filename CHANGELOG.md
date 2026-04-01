@@ -2,6 +2,51 @@
 
 [中文Log](CHANGELOG_CN.md)
 
+## [0.9.36] - 2026-4-1
+
+### ✨ Added
+
+- **Support for `@return_overload` annotation**: Added support for `@return_overload` , which allow you define function return like pcall
+```lua
+---@return_overload true, string
+---@return_overload false, integer
+local function func()
+end
+```
+then the two variables in `local ok, res = func()` will be correctly inferred as `ok: true, res: string` and `ok: false, res: integer` respectively.
+
+- **Ready for New Formatter**: The language server plans to introduce a new formatter in version 0.23.0. This formatter can currently be experienced in CLI mode. You can download the latest formatter `luafmt` from the release page. For related documentation, please refer to [EmmyLua Formatter Documentation Index](docs/emmylua_formatter/README_EN.md). This formatting tool draws inspiration from Prettier while maintaining more style options from EmmyLua CodeStyle. After replacing the original formatter, emmylua_ls will no longer depend on high-version C++ compilers, and formatting results will be more stable. However, there are still some edge cases with suboptimal formatting, which will be continuously fixed in subsequent versions.
+
+
+- **Support @schema url annotation**: Added support for `@schema` annotation,
+which can be use to add completion and hover for json-schema-defined APIs. For example:
+```lua
+---@schema https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json
+local c = {
+  -- will suggest `diagnostics` and more
+}
+
+```
+
+### 🔧 Changed
+
+- **Update luars to 0.17.0**: Updated the `luars` dependency to version 0.17.0.
+- **Improve performance**: Properly improved performance through a series of measures
+
+### 🐛 Fixed
+
+- fix package.searchpath returns nil+error if none succeeds
+- fix module recursive
+- fix shebang support
+- fix global declaration support
+- fix select(n, func()) correctly narrows type when func returns multiple values
+- fix resolve alias-call returns and simplify flow assignments
+- fix the next returned by pairs should accept 2 arguments
+- fix enforce segment-boundary fuzzy require matching
+- fix stabilize fuzzy require resolution across duplicate suffix matches
+- fix package.searchpath returns nil+error if none succeeds
+- fix lua5.5 named vararg support: donot report syntax-error
+
 ## [0.9.35] - 2026-2-2
 
 ### ✨ Added

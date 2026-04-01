@@ -389,6 +389,11 @@
           "const": "cast-type-mismatch"
         },
         {
+          "description": "unresolved-require",
+          "type": "string",
+          "const": "unresolved-require"
+        },
+        {
           "description": "require-module-not-visible",
           "type": "string",
           "const": "require-module-not-visible"
@@ -432,6 +437,11 @@
           "description": "invert-if",
           "type": "string",
           "const": "invert-if"
+        },
+        {
+          "description": "Call to a non-callable value",
+          "type": "string",
+          "const": "call-non-callable"
         }
       ]
     },

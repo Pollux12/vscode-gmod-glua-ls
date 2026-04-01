@@ -1,5 +1,48 @@
 # 🚀 Change Log
 
+## [0.9.36] - 2026-4-1
+
+### ✨ 新增
+
+- **支持 `@return_overload` 注解**：新增对 `@return_overload` 注解的支持，允许像 pcall 一样定义函数返回值
+```lua
+---@return_overload true, string
+---@return_overload false, integer
+local function func()
+end
+```
+此时 `local ok, res = func()` 中的两个变量将被正确推断为 `ok: true, res: string` 和 `ok: false, res: integer`。
+
+- **新格式化器准备**：语言服务器计划在 0.23.0 版本引入新的格式化器。该格式化器目前可在 CLI 模式中体验。您可以从发布页面下载最新的格式化工具 `luafmt`。相关文档请参阅 [EmmyLua 格式化器文档索引](docs/emmylua_formatter/README_EN.md)。该格式化工具受 Prettier 启发，同时保留了 EmmyLua CodeStyle 的更多风格选项。在原有格式化器被替换后，emmylua_ls 将不再依赖高版本 C++ 编译器，格式化结果也将更加稳定。但仍存在一些格式化效果欠佳的边界情况，将在后续版本中持续修复。
+
+- **支持 `@schema` URL 注解**：新增对 `@schema` 注解的支持，可用于为 json-schema 定义的 API 添加代码补全和悬停提示。例如：
+```lua
+---@schema https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json
+local c = {
+  -- 将建议 `diagnostics` 等字段
+}
+
+```
+
+### 🔧 变更
+
+- **更新 luars 至 0.17.0**：将 `luars` 依赖更新至 0.17.0 版本。
+- **性能优化**：通过一系列措施进一步优化了性能
+
+### 🐛 修复
+
+- 修复了 package.searchpath 在无匹配时返回 nil+error 的问题
+- 修复了模块递归问题
+- 修复了 shebang 支持
+- 修复了全局声明支持
+- 修复了 select(n, func()) 在 func 返回多个值时正确收窄类型
+- 修复了 alias-call 返回值解析并简化流赋值
+- 修复了 pairs 返回的 next 应接受 2 个参数
+- 修复了分段边界模糊 require 匹配的强制执行
+- 修复了在重复后缀匹配中稳定模糊 require 解析
+- 修复了 package.searchpath 在无匹配时返回 nil+error 的问题
+- 修复了 lua5.5 命名 vararg 支持：不再报告语法错误
+
 ## [0.9.35] - 2026-2-2
 
 ### ✨ 新增
