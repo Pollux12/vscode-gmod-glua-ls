@@ -14,8 +14,11 @@ All notable changes to the GLuaLS project (VS Code extension and language server
 
 ### Language Server
 - Add module support
-- Fix many incorrect realm issues
-- Fix validation not correctly narrowing type
+- Fix various realm related issues
+- Fix various undefined-global issues by improving infer system
+- Fix validation not correctly narrowing type in some cases
+- Fix types not correctly showing for some variables after narrowing
+- Update documentation related to debugger
 
 ### Debugger
 - Fix x64 windows crash
