@@ -1,8 +1,6 @@
 ﻿# Changelog
 
-All notable changes to the GLuaLS project (VS Code extension and language server) are documented in this file.
-
-## [1.0.7] - Unreleased
+## [1.0.7] - 2026-04-02
 
 ### VS Code Extension
 - Add 32/64-bit debugger binary auto-detection on Windows
