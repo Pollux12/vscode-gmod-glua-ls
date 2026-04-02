@@ -333,11 +333,30 @@
                 "enableReindex": false,
                 "encoding": "utf-8",
                 "ignoreDir": [],
+                "ignoreDirDefaults": [
+                    {
+                        "glob": "**/gmod_wire_expression2/**",
+                        "id": "wire-expression2"
+                    },
+                    {
+                        "glob": "**/wire_expression*.lua",
+                        "id": "wire-expression-files"
+                    },
+                    {
+                        "glob": "**/tests/**",
+                        "id": "tests"
+                    },
+                    {
+                        "glob": "**/test/**",
+                        "id": "test"
+                    }
+                ],
                 "ignoreGlobs": [],
                 "library": [],
                 "moduleMap": [],
                 "packageDirs": [],
                 "reindexDuration": 5000,
+                "useDefaultIgnores": true,
                 "workspaceRoots": []
             }
         }
@@ -2781,6 +2800,32 @@
                         "type": "string"
                     }
                 },
+                "ignoreDirDefaults": {
+                    "description": "默认忽略的目录/glob。接受字符串（旧版）或包含 id、可选 glob、label 和 disabled 的对象。对象是基于增量的：disabled:true 可按 id 移除内置项；新 id 可添加自定义默认值；已有 id 配合 glob 可覆盖内置规则。",
+                    "type": "array",
+                    "default": [
+                        {
+                            "glob": "**/gmod_wire_expression2/**",
+                            "id": "wire-expression2"
+                        },
+                        {
+                            "glob": "**/wire_expression*.lua",
+                            "id": "wire-expression-files"
+                        },
+                        {
+                            "glob": "**/tests/**",
+                            "id": "tests"
+                        },
+                        {
+                            "glob": "**/test/**",
+                            "id": "test"
+                        }
+                    ],
+                    "items": {
+                        "$ref": "#/$defs/IgnoreDirDefaultEntry"
+                    },
+                    "x-gluals-editor": "ignoreDirDefaults"
+                },
                 "ignoreGlobs": {
                     "description": "忽略的文件。例如：[\"**/*.lua\"]",
                     "type": "array",
@@ -2821,6 +2866,12 @@
                     "minimum": 0,
                     "x-vscode-setting": true
                 },
+                "useDefaultIgnores": {
+                    "description": "是否应用默认忽略目录。设为 false 可禁用 E2 文件和测试目录等默认排除项。",
+                    "type": "boolean",
+                    "default": true,
+                    "x-vscode-setting": true
+                },
                 "workspaceRoots": {
                     "description": "工作区根目录列表。例如：[\"src\", \"test\"]",
                     "type": "array",
@@ -2844,6 +2895,53 @@
             "required": [
                 "pattern",
                 "replace"
+            ]
+        },
+        "IgnoreDirDefaultDefinition": {
+            "description": "workspace.ignoreDirDefaults 条目的对象形式。",
+            "type": "object",
+            "properties": {
+                "disabled": {
+                    "description": "设为 true 可在当前工作区移除该内置默认项。",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "glob": {
+                    "description": "要应用的 glob 规则。仅使用 disabled 时可省略。",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "id": {
+                    "description": "稳定标识符。内置 id：\"wire-expression2\"、\"wire-expression-files\"、\"tests\"、\"test\"。自定义 id 可为任意非空字符串。",
+                    "type": "string"
+                },
+                "label": {
+                    "description": "可选的人类可读标签（仅供参考）。",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "id"
+            ]
+        },
+        "IgnoreDirDefaultEntry": {
+            "description": "workspace.ignoreDirDefaults 的一个条目。接受旧版 glob 字符串（向后兼容）或对象（可覆盖、禁用或添加内置默认列表中的项）。",
+            "anyOf": [
+                {
+                    "description": "旧版字符串 glob — 当整个列表为纯字符串时，完全替换内置默认项。",
+                    "type": "string"
+                },
+                {
+                    "description": "对象条目，用于对内置默认项进行细粒度覆盖。",
+                    "$ref": "#/$defs/IgnoreDirDefaultDefinition"
+                }
             ]
         }
     }

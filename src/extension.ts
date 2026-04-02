@@ -157,7 +157,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodClientRdbUpdates },
         { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
-        { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
+        { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         // GMod debug control commands
         { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },

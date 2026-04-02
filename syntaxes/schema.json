@@ -333,11 +333,30 @@
         "enableReindex": false,
         "encoding": "utf-8",
         "ignoreDir": [],
+        "ignoreDirDefaults": [
+          {
+            "glob": "**/gmod_wire_expression2/**",
+            "id": "wire-expression2"
+          },
+          {
+            "glob": "**/wire_expression*.lua",
+            "id": "wire-expression-files"
+          },
+          {
+            "glob": "**/tests/**",
+            "id": "tests"
+          },
+          {
+            "glob": "**/test/**",
+            "id": "test"
+          }
+        ],
         "ignoreGlobs": [],
         "library": [],
         "moduleMap": [],
         "packageDirs": [],
         "reindexDuration": 5000,
+        "useDefaultIgnores": true,
         "workspaceRoots": []
       }
     }
@@ -2781,6 +2800,32 @@
             "type": "string"
           }
         },
+        "ignoreDirDefaults": {
+          "description": "Default directories/globs to ignore. Accepts strings (legacy, replaces built-ins) or\nobjects with `id`, optional `label`, `glob`, and `disabled`. Objects start from the\nbuilt-in list and apply overrides: `disabled: true` removes a built-in by id; a new id\nadds a custom default; an existing id with a `glob` changes the built-in's pattern.\nSet `useDefaultIgnores` to `false` to suppress all resolved defaults at runtime.",
+          "type": "array",
+          "default": [
+            {
+              "glob": "**/gmod_wire_expression2/**",
+              "id": "wire-expression2"
+            },
+            {
+              "glob": "**/wire_expression*.lua",
+              "id": "wire-expression-files"
+            },
+            {
+              "glob": "**/tests/**",
+              "id": "tests"
+            },
+            {
+              "glob": "**/test/**",
+              "id": "test"
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/IgnoreDirDefaultEntry"
+          },
+          "x-gluals-editor": "ignoreDirDefaults"
+        },
         "ignoreGlobs": {
           "description": "Ignore globs. eg: [\"**/*.lua\"]",
           "type": "array",
@@ -2821,6 +2866,12 @@
           "minimum": 0,
           "x-vscode-setting": true
         },
+        "useDefaultIgnores": {
+          "description": "Whether to apply default ignore directories. Set to false to disable\ndefault exclusions like E2 files and test directories.",
+          "type": "boolean",
+          "default": true,
+          "x-vscode-setting": true
+        },
         "workspaceRoots": {
           "description": "Workspace roots. eg: [\"src\", \"test\"]",
           "type": "array",
@@ -2844,6 +2895,53 @@
       "required": [
         "pattern",
         "replace"
+      ]
+    },
+    "IgnoreDirDefaultDefinition": {
+      "description": "Object form for `workspace.ignoreDirDefaults` entries.",
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "description": "Set to `true` to remove this built-in default for the workspace.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "glob": {
+          "description": "The glob pattern to apply. Omit when only using `disabled`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable identifier. Built-in ids: `\"wire-expression2\"`, `\"wire-expression-files\"`,\n`\"tests\"`, `\"test\"`. Custom ids can be any non-empty string.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Optional human-readable label (informational only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "IgnoreDirDefaultEntry": {
+      "description": "An entry in `workspace.ignoreDirDefaults`. Accepts either a legacy glob string (backward\ncompatible) or an object that can override, disable, or add to the built-in default list.",
+      "anyOf": [
+        {
+          "description": "Legacy string glob — when the whole list is pure strings, replaces built-ins entirely.",
+          "type": "string"
+        },
+        {
+          "description": "Object entry for granular override of built-in defaults.",
+          "$ref": "#/$defs/IgnoreDirDefaultDefinition"
+        }
       ]
     }
   }

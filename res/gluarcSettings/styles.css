@@ -1650,3 +1650,34 @@
 .modal-btn-confirm:hover {
     filter: brightness(1.15);
 }
+
+
+/* ─── Ignore Dir Defaults Editor ──────────────────────────────────────────── */
+
+.ignore-dir-defaults-container {
+    width: 100%;
+}
+
+.ignore-dir-defaults-header,
+.ignore-dir-defaults-add-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.mapping-table-header.ignore-dir-defaults-header {
+    grid-template-columns: 1fr auto auto;
+}
+
+.ignore-dir-defaults-container .mapping-table-row .is-path {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ignore-dir-defaults-container .mapping-table-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    align-items: center;
+}

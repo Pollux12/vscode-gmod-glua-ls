@@ -142,6 +142,31 @@ export function setNestedValue(obj: Record<string, unknown>, path: string[], val
 }
 
 /**
+ * Ensures a .gluarc.json file exists in the workspace folder.
+ * If the file already exists this is a no-op (returns true without modifying it).
+ * Creates a minimal `{}` skeleton if the file is missing.
+ * Returns true on success, false on failure.
+ */
+export async function ensureGluarcExists(workspaceFolder: vscode.WorkspaceFolder): Promise<boolean> {
+    const gluarcUri = getGluarcUri(workspaceFolder);
+
+    try {
+        await vscode.workspace.fs.stat(gluarcUri);
+        // File already exists — nothing to do
+        return true;
+    } catch (error) {
+        if (!(error instanceof vscode.FileSystemError && error.code === 'FileNotFound')) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to check ${GLUARC_FILE_NAME}: ${message}`);
+            return false;
+        }
+    }
+
+    // File does not exist — create a minimal skeleton
+    return writeGluarcConfig(workspaceFolder, {});
+}
+
+/**
  * Gets a value from a nested object by path array.
  * Returns undefined if any segment is missing.
  */

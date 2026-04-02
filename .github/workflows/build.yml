@@ -82,6 +82,14 @@ jobs:
       run: yarn install --frozen-lockfile
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Validate schema files
+      run: npm run test:schema
+    - name: Run grammar tests
+      run: npm run test:grammar
+    - name: Run debugger parity tests
+      run: npm run test:parity
+    - name: Run extension-host tests
+      run: xvfb-run -a npm run test:extension
     - name: Build
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

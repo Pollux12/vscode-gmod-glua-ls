@@ -789,6 +789,12 @@
         "en": "Ignore directories.",
         "zh-CN": "忽略的目录。"
     },
+    "EmmyrcWorkspace.ignoreDirDefaults": {
+        "en": "Default directories/globs to ignore. Accepts strings (legacy) or objects with id, optional glob, label, and disabled. Objects are delta-based: disabled:true removes a built-in by id; a new id adds a custom default; an existing id with a glob overrides the built-in pattern."
+    },
+    "EmmyrcWorkspace.useDefaultIgnores": {
+        "en": "Whether to apply default ignore directories. Set to false to disable default exclusions like E2 files and test directories."
+    },
     "EmmyrcWorkspace.ignoreGlobs": {
         "en": "Ignore globs. eg: [\"**/*.lua\"]",
         "zh-CN": "忽略的文件。例如：[\"**/*.lua\"]"

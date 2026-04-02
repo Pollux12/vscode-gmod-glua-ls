@@ -1,4 +1,4 @@
-import { PATH_FIELD_KEYWORDS } from "../data.js";
+﻿import { PATH_FIELD_KEYWORDS } from "../data.js";
 import { showConfirmDialog } from "./dialog.js";
 
 function getFieldTokens(field) {
@@ -1960,3 +1960,609 @@ export function renderObjectArrayEditor(field, value, onChange, options) {
     return container;
 }
 
+
+// ─── Ignore Dir Defaults Editor ────────────────────────────────────────────────
+// NOTE: The pure-logic functions below (normalizeIgnoreDirEntry, getIgnoreDirDefaults,
+// isLegacyReplaceMode, buildIgnoreDirPayload) are mirrored in
+// src/ignoreDirDefaultsLogic.ts for deterministic unit testing without a browser.
+// Keep them in sync when making behavioral changes.
+
+/**
+ * Normalise a raw ignoreDirDefaults entry (string or object) to a canonical
+ * { id, glob, label, disabled, wasObject } form. Returns null for invalid entries.
+ *
+ * `wasObject` is true when the source entry was an object (not a legacy string),
+ * so round-trip serialization can preserve the object form and avoid data loss.
+ */
+function normalizeIgnoreDirEntry(entry) {
+    if (typeof entry === "string") {
+        const trimmed = entry.trim();
+        if (!trimmed) return null;
+        // Legacy string — treat the string itself as both id and glob
+        return { id: trimmed, glob: trimmed, label: null, disabled: false, wasObject: false };
+    }
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const id = typeof entry.id === "string" ? entry.id.trim() : "";
+    if (!id) return null;
+    const glob = typeof entry.glob === "string" ? entry.glob.trim() : "";
+    const label = typeof entry.label === "string" ? entry.label.trim() : "";
+    const disabled = entry.disabled === true;
+    return { id, glob: glob || null, label: label || null, disabled, wasObject: true };
+}
+
+function getIgnoreDirDefaults(field) {
+    if (!Array.isArray(field.default)) return [];
+    return field.default
+        .map(normalizeIgnoreDirEntry)
+        .filter((entry) => entry !== null);
+}
+
+/**
+ * Detect whether a raw value array is in "legacy replace mode":
+ * all entries are plain strings with no object overrides/disables.
+ * In this mode the array REPLACES the built-in defaults entirely.
+ */
+function isLegacyReplaceMode(val) {
+    if (!Array.isArray(val) || val.length === 0) return false;
+    return val.every((entry) => typeof entry === "string");
+}
+
+/**
+ * Build a serializable payload from the raw overrides map plus the built-in
+ * defaults. Only emits entries that differ from the defaults.
+ *
+ * Built-in overrides/disables are serialized as objects (e.g. `{ id, glob }`,
+ * `{ id, disabled: true }`). Custom entries (delta-mode additions) are always
+ * serialized as `{ id, glob }` objects regardless of how they were created.
+ * This ensures the saved array is never all-strings in delta mode, so reloading
+ * never misidentifies it as legacy replace mode and delta mode persists correctly.
+ * Existing `label` metadata is preserved when present.
+ *
+ * The only code path that produces plain strings is the legacy-mode serializer
+ * inside `commit()`, which runs only while `legacyMode` is still true.
+ */
+function buildIgnoreDirPayload(builtinDefaults, overrides) {
+    const builtinById = new Map(builtinDefaults.map((entry) => [entry.id, entry]));
+    const entries = [];
+
+    overrides.forEach((override, id) => {
+        const builtin = builtinById.get(id);
+        if (builtin) {
+            if (override.disabled) {
+                // Preserve label from the builtin if future schema defaults include one
+                const obj = { id, disabled: true };
+                const effectiveLabel = override.label ?? builtin.label ?? null;
+                if (effectiveLabel) obj.label = effectiveLabel;
+                entries.push(obj);
+                return;
+            }
+            // Only write if glob actually changed from the built-in default
+            if (override.glob !== null && override.glob !== builtin.glob) {
+                const obj = { id, glob: override.glob };
+                // Preserve label: from the override if set, otherwise fall back to builtin
+                const effectiveLabel = override.label ?? builtin.label ?? null;
+                if (effectiveLabel) obj.label = effectiveLabel;
+                entries.push(obj);
+            }
+            // Matches default — nothing to write
+        } else {
+            // Custom entry (not in built-ins) — always serialize as an object so
+            // the saved array is never all-strings and delta mode persists across reload.
+            if (!override.disabled && override.glob) {
+                const obj = { id, glob: override.glob };
+                if (override.label) obj.label = override.label;
+                entries.push(obj);
+            }
+        }
+    });
+
+    return entries;
+}
+
+/**
+ * Render a simple table UI for workspace.ignoreDirDefaults.
+ * - Shows built-in defaults with their glob and a source badge.
+ * - Allows disabling a built-in, overriding its glob, or resetting.
+ * - Allows adding custom entries (only glob needed).
+ *
+ * LEGACY REPLACE MODE: if the persisted value contains only plain strings
+ * (no objects), it fully replaces the built-in list rather than overlaying it.
+ * In that mode the editor shows the strings as the complete active list and
+ * surfaces a warning + conversion button so the user can migrate to delta mode.
+ */
+export function renderIgnoreDirDefaultsEditor(field, value, onChange, options = {}) {
+    const builtinDefaults = getIgnoreDirDefaults(field);
+    const builtinById = new Map(builtinDefaults.map((entry) => [entry.id, entry]));
+    // defaultsActive reflects workspace.useDefaultIgnores (true unless explicitly false)
+    const defaultsActive = options.defaultsActive !== false;
+
+    // Detect legacy replace mode up front; only reassessed on full re-init (external change).
+    let legacyMode = isLegacyReplaceMode(value);
+
+    /**
+     * @type {Map<string, {id: string, glob: string|null, label: string|null, disabled: boolean, wasObject: boolean}>}
+     */
+    let rawOverrides = new Map();
+
+    const parseValue = (val, isLegacy = false) => {
+        const map = new Map();
+        if (!Array.isArray(val)) return map;
+        val.forEach((entry) => {
+            const normalized = normalizeIgnoreDirEntry(entry);
+            if (!normalized) return;
+            if (isLegacy) {
+                // In legacy replace mode every string entry is kept verbatim, even if
+                // its value happens to equal a built-in id. The map key is the glob
+                // string itself so identical duplicates are de-duped, but the entry
+                // is always stored and never silently dropped.
+                map.set(normalized.id, { ...normalized });
+                return;
+            }
+            const builtin = builtinById.get(normalized.id);
+            if (builtin) {
+                if (normalized.disabled) {
+                    map.set(normalized.id, { ...normalized });
+                    return;
+                }
+                const globDiffers = normalized.glob !== null && normalized.glob !== builtin.glob;
+                if (globDiffers) {
+                    map.set(normalized.id, { ...normalized });
+                }
+                // Matches default — no override needed
+            } else {
+                // Custom entry — always store, preserving wasObject flag
+                map.set(normalized.id, { ...normalized });
+            }
+        });
+        return map;
+    };
+
+    rawOverrides = parseValue(value, legacyMode);
+
+    const container = document.createElement("div");
+    container.className = "mapping-table-container ignore-dir-defaults-container";
+
+    // Warning banner shown in legacy replace mode
+    const legacyBanner = document.createElement("div");
+    legacyBanner.className = "mapping-table-note ignore-dir-defaults-legacy-banner";
+    container.appendChild(legacyBanner);
+
+    const note = document.createElement("div");
+    note.className = "mapping-table-note";
+    container.appendChild(note);
+
+    const shell = document.createElement("div");
+    shell.className = "mapping-table-shell";
+    container.appendChild(shell);
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "mapping-table-header ignore-dir-defaults-header";
+    [
+        { kind: "path", label: "Glob / Path" },
+        { kind: "source", label: "Source" },
+        { kind: "actions", label: "Actions" },
+    ].forEach(({ kind, label }) => {
+        const cell = document.createElement("div");
+        cell.className = `mapping-table-cell is-${kind} mapping-table-heading`;
+        cell.textContent = label;
+        header.appendChild(cell);
+    });
+    shell.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "mapping-table-body";
+    shell.appendChild(body);
+
+    // Add row
+    const addRow = document.createElement("div");
+    addRow.className = "mapping-table-add-row ignore-dir-defaults-add-row";
+
+    const addGlobInput = document.createElement("input");
+    addGlobInput.type = "text";
+    addGlobInput.placeholder = "Glob pattern, e.g. **/vendor/**";
+
+    const addGlobCell = document.createElement("div");
+    addGlobCell.className = "mapping-table-cell is-path";
+    addGlobCell.appendChild(addGlobInput);
+    addRow.appendChild(addGlobCell);
+
+    const addSourceCell = document.createElement("div");
+    addSourceCell.className = "mapping-table-cell is-source";
+    addRow.appendChild(addSourceCell);
+
+    const addActionsCell = document.createElement("div");
+    addActionsCell.className = "mapping-table-cell is-actions";
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-btn";
+    addBtn.type = "button";
+    addBtn.textContent = "+ Add";
+    addActionsCell.appendChild(addBtn);
+    addRow.appendChild(addActionsCell);
+    shell.appendChild(addRow);
+
+    /**
+     * Commit a new overrides map and emit the serialized payload.
+     * In legacy replace mode, serialize the map back to plain strings (preserve mode semantics).
+     * As soon as forceDeltaMode is true, we exit legacy mode and switch to delta serialization.
+     */
+    const commit = (overrides, forceDeltaMode = false) => {
+        rawOverrides = overrides;
+
+        if (legacyMode && !forceDeltaMode) {
+            // Stay in legacy mode: emit every active glob verbatim as a plain string.
+            // Entries whose id matches a built-in must also be emitted — in legacy replace
+            // mode the array replaces built-ins entirely, so every string matters.
+            const legacyEntries = [];
+            overrides.forEach((override) => {
+                if (!override.disabled && override.glob) {
+                    legacyEntries.push(override.glob);
+                }
+            });
+            if (legacyEntries.length === 0) {
+                // All legacy entries removed — transition to delta view immediately
+                // instead of staying in a stale empty legacy mode.
+                legacyMode = false;
+            }
+            onChange(legacyEntries.length > 0 ? legacyEntries : null);
+        } else {
+            if (forceDeltaMode) {
+                legacyMode = false;
+            }
+            const payload = buildIgnoreDirPayload(builtinDefaults, rawOverrides);
+            onChange(payload.length > 0 ? payload : null);
+        }
+    };
+
+    const renderRows = () => {
+        // Legacy mode banner
+        if (legacyMode) {
+            legacyBanner.style.display = "";
+            legacyBanner.innerHTML = "";
+
+            const bannerText = document.createElement("span");
+            bannerText.textContent =
+                "⚠️ Legacy replace mode: this list fully replaces the built-in defaults. " +
+                "Built-in entries are not active unless listed here.";
+            legacyBanner.appendChild(bannerText);
+
+            const convertBtn = document.createElement("button");
+            convertBtn.type = "button";
+            convertBtn.className = "mapping-table-inline-btn";
+            convertBtn.style.marginLeft = "8px";
+            convertBtn.textContent = "Convert to delta mode";
+            convertBtn.title =
+                "Switch to delta mode: built-in defaults stay active and only your " +
+                "explicit disables / glob overrides are stored. Your custom string entries " +
+                "will be preserved as custom entries in the new format.";
+            convertBtn.onclick = () => {
+                showConfirmDialog({
+                    title: "Convert to Delta Mode",
+                    message:
+                        "This will switch from legacy replace mode to delta mode. " +
+                        "Built-in defaults will become active again, and your custom globs " +
+                        "will be kept as additional custom entries. Continue?",
+                    confirmLabel: "Convert",
+                    onConfirm: () => {
+                        // Keep only non-builtin custom entries; drop any that match a builtin id.
+                        // Mark wasObject=true so buildIgnoreDirPayload serializes them as
+                        // { id, glob } objects rather than plain strings. This ensures the
+                        // saved array is no longer all-strings, so reloading the panel will
+                        // not fall back into legacy replace mode.
+                        const nextOverrides = new Map();
+                        rawOverrides.forEach((override, id) => {
+                            if (!builtinById.has(id) && !override.disabled && override.glob) {
+                                nextOverrides.set(id, { ...override, wasObject: true });
+                            }
+                        });
+                        commit(nextOverrides, true);
+                        renderRows();
+                    },
+                });
+            };
+            legacyBanner.appendChild(convertBtn);
+        } else {
+            legacyBanner.style.display = "none";
+        }
+
+        const totalOverrides = rawOverrides.size;
+        note.textContent = legacyMode
+            ? `${totalOverrides} glob${totalOverrides === 1 ? "" : "s"} listed. These replace built-in defaults entirely — built-ins are not applied.`
+            : !defaultsActive
+                ? "Built-in ignore defaults are suppressed — workspace.useDefaultIgnores is disabled. Entries below have no effect on built-ins until it is re-enabled."
+                : (totalOverrides === 0
+                    ? "Built-in ignore defaults are active. You can disable or override individual entries below."
+                    : "Workspace overrides are delta-based — future built-in additions will still apply unless explicitly disabled.");
+
+        body.innerHTML = "";
+
+        if (legacyMode) {
+            // In legacy replace mode: only show the string entries (no built-in rows)
+            rawOverrides.forEach((override, id) => {
+                if (override.disabled || !override.glob) return;
+
+                const row = document.createElement("div");
+                row.className = "mapping-table-row is-custom";
+
+                const globInput = document.createElement("input");
+                globInput.type = "text";
+                globInput.value = override.glob;
+                globInput.placeholder = "Glob pattern...";
+
+                const pathCell = document.createElement("div");
+                pathCell.className = "mapping-table-cell is-path";
+                pathCell.appendChild(globInput);
+                row.appendChild(pathCell);
+
+                const badge = document.createElement("span");
+                badge.className = "mapping-table-badge is-custom";
+                badge.textContent = "Active";
+                const sourceCell = document.createElement("div");
+                sourceCell.className = "mapping-table-cell is-source";
+                sourceCell.appendChild(badge);
+                row.appendChild(sourceCell);
+
+                globInput.addEventListener("change", () => {
+                    const nextGlob = globInput.value.trim();
+                    if (!nextGlob) {
+                        globInput.value = override.glob;
+                        return;
+                    }
+                    const nextOverrides = new Map(rawOverrides);
+                    if (id !== nextGlob) {
+                        nextOverrides.delete(id);
+                    }
+                    nextOverrides.set(nextGlob, { id: nextGlob, glob: nextGlob, label: null, disabled: false, wasObject: false });
+                    commit(nextOverrides);
+                    renderRows();
+                });
+
+                const actionsDiv = document.createElement("div");
+                actionsDiv.className = "mapping-table-actions mapping-table-row-actions";
+
+                const removeBtn = document.createElement("button");
+                removeBtn.className = "remove-btn";
+                removeBtn.type = "button";
+                removeBtn.textContent = "×";
+                removeBtn.setAttribute("aria-label", `Remove entry: ${id}`);
+                removeBtn.title = "Remove this entry";
+                removeBtn.onclick = () => {
+                    showConfirmDialog({
+                        title: "Remove Ignore Entry",
+                        message: `Are you sure you want to remove the ignore entry "${id}"?`,
+                        confirmLabel: "Remove",
+                        onConfirm: () => {
+                            const nextOverrides = new Map(rawOverrides);
+                            nextOverrides.delete(id);
+                            commit(nextOverrides);
+                            renderRows();
+                        },
+                    });
+                };
+                actionsDiv.appendChild(removeBtn);
+
+                const actionsCell = document.createElement("div");
+                actionsCell.className = "mapping-table-cell is-actions";
+                actionsCell.appendChild(actionsDiv);
+                row.appendChild(actionsCell);
+
+                body.appendChild(row);
+            });
+        } else {
+            // Delta mode: show all built-in rows + custom entries
+            const allIds = [
+                ...builtinDefaults.map((entry) => entry.id),
+                ...[...rawOverrides.keys()].filter((id) => !builtinById.has(id)),
+            ];
+
+            allIds.forEach((id) => {
+                const builtin = builtinById.get(id);
+                const override = rawOverrides.get(id);
+                const isCustom = !builtin;
+                const isDisabled = override?.disabled === true;
+                const isOverride = !isCustom && override && !isDisabled && override.glob !== null && override.glob !== builtin.glob;
+                const effectiveGlob = isDisabled
+                    ? (builtin?.glob ?? "")
+                    : (override?.glob ?? builtin?.glob ?? "");
+
+                const row = document.createElement("div");
+                row.className = "mapping-table-row";
+                if (isDisabled) row.classList.add("is-inactive");
+                if (isOverride) row.classList.add("is-overridden");
+                if (isCustom) row.classList.add("is-custom");
+
+                // Glob cell (editable)
+                const globInput = document.createElement("input");
+                globInput.type = "text";
+                globInput.value = effectiveGlob;
+                globInput.disabled = isDisabled;
+                globInput.placeholder = builtin?.glob ?? "";
+
+                const pathCell = document.createElement("div");
+                pathCell.className = "mapping-table-cell is-path";
+                pathCell.appendChild(globInput);
+                row.appendChild(pathCell);
+
+                // Source badge cell
+                const badge = document.createElement("span");
+                badge.className = "mapping-table-badge";
+                if (isDisabled) {
+                    badge.textContent = "Disabled";
+                    badge.classList.add("is-removed");
+                } else if (isOverride) {
+                    badge.textContent = "Override";
+                    badge.classList.add("is-override");
+                } else if (isCustom) {
+                    badge.textContent = "Custom";
+                    badge.classList.add("is-custom");
+                } else {
+                    badge.textContent = "Default";
+                    badge.classList.add("is-default");
+                }
+
+                const sourceCell = document.createElement("div");
+                sourceCell.className = "mapping-table-cell is-source";
+                sourceCell.appendChild(badge);
+                row.appendChild(sourceCell);
+
+                // Glob change handler
+                globInput.addEventListener("change", () => {
+                    const nextGlob = globInput.value.trim();
+                    if (!nextGlob) {
+                        globInput.value = effectiveGlob;
+                        return;
+                    }
+                    const nextOverrides = new Map(rawOverrides);
+                    if (builtin) {
+                        if (nextGlob === builtin.glob) {
+                            // Restored to default — remove override
+                            nextOverrides.delete(id);
+                        } else {
+                            // Preserve existing label from override or builtin
+                            const existingBuiltinOverride = rawOverrides.get(id);
+                            const preservedLabel = existingBuiltinOverride?.label ?? builtin.label ?? null;
+                            nextOverrides.set(id, { id, glob: nextGlob, label: preservedLabel, disabled: false, wasObject: false });
+                        }
+                    } else {
+                        // Custom entry glob edit.
+                        // - wasObject=true (object-backed): the id is a stable identifier independent
+                        //   of the glob, so keep the same map key/id and just update the glob.
+                        // - wasObject=false (string-backed): the id IS the glob (plain-string
+                        //   round-trip key), so a glob edit is also a rename — delete the old key
+                        //   and re-insert under the new glob as key/id. This prevents stale keys
+                        //   and duplicate add-guard misses after a rename.
+                        const existing = rawOverrides.get(id);
+                        const wasObj = existing?.wasObject ?? false;
+                        if (wasObj) {
+                            // Object-backed: preserve stable id; only the glob changes.
+                            const stableId = existing?.id ?? id;
+                            const stableLabel = existing?.label ?? null;
+                            if (id !== stableId) {
+                                nextOverrides.delete(id);
+                            }
+                            nextOverrides.set(stableId, { id: stableId, glob: nextGlob, label: stableLabel, disabled: false, wasObject: true });
+                        } else {
+                            // String-backed: rename key and id to the new glob value.
+                            nextOverrides.delete(id);
+                            nextOverrides.set(nextGlob, { id: nextGlob, glob: nextGlob, label: null, disabled: false, wasObject: false });
+                        }
+                    }
+                    commit(nextOverrides);
+                    renderRows();
+                });
+
+                // Actions cell
+                const actionsDiv = document.createElement("div");
+                actionsDiv.className = "mapping-table-actions mapping-table-row-actions";
+
+                if (isDisabled) {
+                    // "Restore" button — re-enables the built-in
+                    const restoreBtn = document.createElement("button");
+                    restoreBtn.type = "button";
+                    restoreBtn.className = "mapping-table-inline-btn";
+                    restoreBtn.textContent = "Restore";
+                    restoreBtn.title = "Re-enable this built-in ignore pattern";
+                    restoreBtn.onclick = () => {
+                        const nextOverrides = new Map(rawOverrides);
+                        nextOverrides.delete(id);
+                        commit(nextOverrides);
+                        renderRows();
+                    };
+                    actionsDiv.appendChild(restoreBtn);
+                } else {
+                    if (isOverride) {
+                        // Reset button — restores built-in glob
+                        const resetBtn = document.createElement("button");
+                        resetBtn.type = "button";
+                        resetBtn.className = "mapping-table-row-reset";
+                        resetBtn.textContent = "↺";
+                        resetBtn.title = "Reset glob to built-in default";
+                        resetBtn.onclick = () => {
+                            const nextOverrides = new Map(rawOverrides);
+                            nextOverrides.delete(id);
+                            commit(nextOverrides);
+                            renderRows();
+                        };
+                        actionsDiv.appendChild(resetBtn);
+                    }
+
+                    // Remove/Disable button
+                    const removeBtn = document.createElement("button");
+                    removeBtn.className = "remove-btn";
+                    removeBtn.type = "button";
+                    removeBtn.textContent = "×";
+                    if (builtin) {
+                        removeBtn.setAttribute("aria-label", `Disable built-in: ${id}`);
+                        removeBtn.title = "Disable this built-in ignore pattern for this workspace";
+                        removeBtn.onclick = () => {
+                            const nextOverrides = new Map(rawOverrides);
+                            // Preserve label from builtin (or existing override) when disabling
+                            const existingOverride = rawOverrides.get(id);
+                            const preservedLabel = existingOverride?.label ?? builtin.label ?? null;
+                            nextOverrides.set(id, { id, glob: builtin.glob, label: preservedLabel, disabled: true, wasObject: false });
+                            commit(nextOverrides);
+                            renderRows();
+                        };
+                    } else {
+                        removeBtn.setAttribute("aria-label", `Remove custom entry: ${id}`);
+                        removeBtn.title = "Remove this custom ignore entry";
+                        removeBtn.onclick = () => {
+                            showConfirmDialog({
+                                title: "Remove Ignore Entry",
+                                message: `Are you sure you want to remove the custom ignore entry "${id}"?`,
+                                confirmLabel: "Remove",
+                                onConfirm: () => {
+                                    const nextOverrides = new Map(rawOverrides);
+                                    nextOverrides.delete(id);
+                                    commit(nextOverrides);
+                                    renderRows();
+                                },
+                            });
+                        };
+                    }
+                    actionsDiv.appendChild(removeBtn);
+                }
+
+                const actionsCell = document.createElement("div");
+                actionsCell.className = "mapping-table-cell is-actions";
+                actionsCell.appendChild(actionsDiv);
+                row.appendChild(actionsCell);
+
+                body.appendChild(row);
+            });
+        }
+    };
+
+    const addItem = () => {
+        const glob = addGlobInput.value.trim();
+        if (!glob) return;
+        // In delta mode also reject if the glob matches a built-in id (user should use disable/override instead).
+        if (!legacyMode && builtinById.has(glob)) return;
+        // Reject if the glob already exists as a map key OR as the effective glob value of any
+        // existing override. This catches renamed string-backed entries (where the old id is stale
+        // but the new glob value matches what the user is trying to add) and wasObject entries
+        // whose glob was edited to the same value.
+        if (rawOverrides.has(glob)) return;
+        for (const override of rawOverrides.values()) {
+            if (override.glob === glob) return;
+        }
+        const id = glob;
+        const nextOverrides = new Map(rawOverrides);
+        nextOverrides.set(id, { id, glob, label: null, disabled: false, wasObject: false });
+        commit(nextOverrides);
+        renderRows();
+        addGlobInput.value = "";
+        addGlobInput.focus();
+    };
+
+    addBtn.onclick = addItem;
+    addGlobInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addItem();
+        }
+    });
+
+    renderRows();
+    return container;
+}

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
-import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri } from './gluarcConfig';
+import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
@@ -19,6 +19,45 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     private _hasUnsavedChanges = false;
     private _isSelfWrite = false;
     private readonly _disposables: vscode.Disposable[] = [];
+
+    /**
+     * Ensures .gluarc.json exists in the resolved workspace folder (creating a
+     * minimal `{}` skeleton if missing), then opens the settings panel.
+     * Used by the `gluals.gmod.createSettings` command.
+     */
+    static async createAndShow(context: vscode.ExtensionContext, targetUri?: vscode.Uri): Promise<void> {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            vscode.window.showErrorMessage('Open a workspace folder to create GLua settings');
+            return;
+        }
+
+        let workspaceFolder = targetUri
+            ? GluarcSettingsPanel.resolveWorkspaceFolderFromUri(targetUri)
+            : undefined;
+
+        if (!workspaceFolder) {
+            if (folders.length === 1) {
+                workspaceFolder = folders[0];
+            } else {
+                const pickedFolder = await vscode.window.showWorkspaceFolderPick();
+                if (!pickedFolder) {
+                    return;
+                }
+                workspaceFolder = pickedFolder;
+            }
+        }
+
+        const created = await ensureGluarcExists(workspaceFolder);
+        if (!created) {
+            // ensureGluarcExists already showed an error message
+            return;
+        }
+
+        // Pass the already-resolved workspaceFolder directly to avoid a
+        // second showWorkspaceFolderPick call in multi-root workspaces.
+        await GluarcSettingsPanel.createOrShow(context, workspaceFolder.uri);
+    }
 
     static async createOrShow(context: vscode.ExtensionContext, targetUri?: vscode.Uri): Promise<void> {
         const folders = vscode.workspace.workspaceFolders;

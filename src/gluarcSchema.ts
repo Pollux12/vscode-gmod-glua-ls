@@ -1,6 +1,6 @@
 export type FieldType = 'boolean' | 'string' | 'number' | 'integer' | 'array' | 'object' | 'enum' | 'any';
 
-export type FieldEditorKind = 'mappingTable' | 'scriptedClassTable';
+export type FieldEditorKind = 'mappingTable' | 'scriptedClassTable' | 'ignoreDirDefaults';
 
 export interface FieldEditorDescriptor {
     kind: FieldEditorKind;
@@ -317,6 +317,10 @@ function buildFieldDescriptorInternal(
     } else if (editorKind === 'scriptedClassTable') {
         descriptor.editor = {
             kind: 'scriptedClassTable',
+        };
+    } else if (editorKind === 'ignoreDirDefaults') {
+        descriptor.editor = {
+            kind: 'ignoreDirDefaults',
         };
     }
 

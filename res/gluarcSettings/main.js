@@ -16,6 +16,7 @@ import {
     renderObjectArrayEditor,
     renderScriptedClassTableEditor,
     renderScalarListEditor,
+    renderIgnoreDirDefaultsEditor,
 } from "./components/collectionEditors.js";
 import {
     isDiagnosticsStateField,
@@ -728,6 +729,16 @@ function generateInput(field, value, onChange) {
 
     if (type === "object" && Array.isArray(field.properties) && field.properties.length > 0) {
         return renderObjectGroup(field, value, onChange);
+    }
+
+    if (
+        field.editor?.kind === "ignoreDirDefaults" &&
+        type === "array"
+    ) {
+        const useDefaultIgnores = getValue(["workspace", "useDefaultIgnores"]);
+        // useDefaultIgnores defaults to true when unset; only explicit false disables built-ins
+        const defaultsActive = useDefaultIgnores !== false;
+        return renderIgnoreDirDefaultsEditor(field, value, onChange, { defaultsActive });
     }
 
     if (

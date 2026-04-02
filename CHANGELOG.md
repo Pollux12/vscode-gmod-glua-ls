@@ -1,18 +1,24 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to the GLuaLS project (VS Code extension and language server) are documented in this file.
 
-## [Unreleased]
+## [1.0.7] - Unreleased
 
 ### VS Code Extension
-- Add annotation file path override setting for testing annotations
-- Add default 1hr interval for annotation update checking
 - Add 32/64-bit debugger binary auto-detection on Windows
 - Add undefined-global "quickfix" option to add global to config
+- Add annotation file path override setting for testing annotations
+- Add default 1hr interval for annotation update checking
+- Add interactive UI editor for `workspace.ignoreDirDefaults` — view, disable, override, or add to built-in ignore glob defaults per workspace
+- Fix various issues with `ignoreDirDefaults` not loading correctly
 
 ### Language Server
-- Add module support and various fixes
-- Refactor expression handling for realm, global and validation
+- Add module support
+- Fix many incorrect realm issues
+- Fix validation not correctly narrowing type
+
+### Debugger
+- Fix x64 windows crash
 
 ## [1.0.6] - 2026-03-29
 
