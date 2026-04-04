@@ -1315,7 +1315,15 @@ async function loadMoreGmodEntityExplorer(): Promise<void> {
 }
 
 async function configureGmodDebugger(): Promise<void> {
-    await runGmodDebugSetupWizard(extensionContext.vscodeContext);
+    await runGmodDebugSetupWizard(extensionContext.vscodeContext, {
+        installClientDebugger: async (garrysmodPath: string) => {
+            if (!gmodClientRdbUpdater) {
+                throw new Error('rdb_client updater is not initialized');
+            }
+
+            await gmodClientRdbUpdater.downloadAndInstall(extensionContext.vscodeContext, garrysmodPath);
+        },
+    });
     await refreshGmodDebugConfigContext();
 }
 

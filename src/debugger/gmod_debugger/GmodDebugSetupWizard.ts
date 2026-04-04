@@ -6,7 +6,9 @@ import { fetchJson, downloadFile } from '../../netHelpers';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
 const LEGACY_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.garrysmodPath';
+const CLIENT_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.clientGarrysmodPath';
 const GMOD_DEBUGGER_TYPE = 'gluals_gmod';
+const GMOD_CLIENT_DEBUGGER_TYPE = 'gluals_gmod_client';
 const GM_RDB_REPO = 'Pollux12/gm_rdb';
 const EXTENSION_ID = 'Pollux.gmod-glua-ls';
 const GITHUB_RELEASE_HEADERS = {
@@ -28,10 +30,10 @@ const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
 const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS);
 
 const GM_RDB_CLIENT_PLATFORM_DLLS: Record<string, string> = {
-    'Windows 64-bit': 'gmcl_rdb_client_win64.dll',
-    'Windows 32-bit': 'gmcl_rdb_client_win32.dll',
-    'Linux 64-bit': 'gmcl_rdb_client_linux64.dll',
-    'Linux 32-bit': 'gmcl_rdb_client_linux.dll',
+    'Windows 64-bit': 'gmcl_rdb_win64.dll',
+    'Windows 32-bit': 'gmcl_rdb_win32.dll',
+    'Linux 64-bit': 'gmcl_rdb_linux64.dll',
+    'Linux 32-bit': 'gmcl_rdb_linux.dll',
 };
 
 export const ALL_RDB_CLIENT_DLLS = Object.values(GM_RDB_CLIENT_PLATFORM_DLLS);
@@ -46,7 +48,7 @@ interface DebugConfig {
     sourceFileMap: Record<string, string>;
     stopOnEntry: boolean;
     stopOnError: boolean;
-    realm: string;
+    realm?: string;
     program?: string;
     cwd?: string;
     args?: string[];
@@ -77,6 +79,15 @@ interface WorkspaceAutoDetection {
 interface ResolvedSrcdsPath {
     srcdsRoot: string;
     garrysmodPath: string;
+}
+
+interface ResolvedClientInstallPath {
+    gameRoot: string;
+    garrysmodPath: string;
+}
+
+export interface ClientInstallPathValidation {
+    warnings: string[];
 }
 
 export type AutorunSyncStatus = 'created' | 'updated' | 'unchanged';
@@ -198,20 +209,36 @@ export function detectGmRdb(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
-export function getDllForSrcdsExecutable(srcdsRoot: string): 'gmsv_rdb_win64.dll' | 'gmsv_rdb_win32.dll' | undefined {
-    if (process.platform !== 'win32') {
+export function detectGarrysmodBranchName(garrysmodPath: string): string | undefined {
+    const versionFilePath = path.join(garrysmodPath, 'garrysmod.ver');
+    if (!fs.existsSync(versionFilePath)) {
         return undefined;
     }
 
-    if (fs.existsSync(path.join(srcdsRoot, 'srcds_win64.exe'))) {
-        return 'gmsv_rdb_win64.dll';
+    try {
+        const content = fs.readFileSync(versionFilePath, 'utf8');
+        const lines = content.split(/\r?\n/);
+        return lines[2]?.trim();
+    } catch {
+        return undefined;
+    }
+}
+
+export function isGarrysmodX64(garrysmodPath: string): boolean {
+    return detectGarrysmodBranchName(garrysmodPath) === 'x86-64';
+}
+
+export function hasSrcdsExecutable(srcdsRoot: string): boolean {
+    if (process.platform === 'win32') {
+        return fs.existsSync(path.join(srcdsRoot, 'srcds_win64.exe'))
+            || fs.existsSync(path.join(srcdsRoot, 'srcds.exe'));
     }
 
-    if (fs.existsSync(path.join(srcdsRoot, 'srcds.exe'))) {
-        return 'gmsv_rdb_win32.dll';
+    if (process.platform === 'linux') {
+        return fs.existsSync(path.join(srcdsRoot, 'srcds_run'));
     }
 
-    return undefined;
+    return false;
 }
 
 export function detectGmRdbClient(garrysmodPath: string): string | undefined {
@@ -243,6 +270,144 @@ function isPreReleaseExtension(): boolean {
     }
 
     return patch > 0;
+}
+
+function normalizeClientInstallInput(rawPath: string): ResolvedClientInstallPath {
+    const resolved = path.resolve(rawPath.trim());
+    const baseName = path.basename(resolved).toLowerCase();
+    const hasVersionInSelf = fs.existsSync(path.join(resolved, 'garrysmod.ver'));
+    const hasVersionInChild = fs.existsSync(path.join(resolved, 'garrysmod', 'garrysmod.ver'));
+
+    if (hasVersionInChild) {
+        return {
+            gameRoot: resolved,
+            garrysmodPath: path.join(resolved, 'garrysmod'),
+        };
+    }
+
+    if (baseName === 'garrysmod' && hasVersionInSelf) {
+        return {
+            gameRoot: path.dirname(resolved),
+            garrysmodPath: resolved,
+        };
+    }
+
+    return {
+        gameRoot: resolved,
+        garrysmodPath: path.join(resolved, 'garrysmod'),
+    };
+}
+
+function collectSteamRootsForPlatform(): string[] {
+    const roots: string[] = [];
+    const home = os.homedir();
+
+    if (process.platform === 'win32') {
+        const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
+        const programFiles = process.env['ProgramFiles'] ?? 'C:\\Program Files';
+        roots.push(
+            path.join(programFilesX86, 'Steam'),
+            path.join(programFiles, 'Steam')
+        );
+    } else if (process.platform === 'linux') {
+        roots.push(
+            path.join(home, '.steam', 'steam'),
+            path.join(home, '.steam', 'root'),
+            path.join(home, '.steam', 'debian-installation'),
+            path.join(home, '.local', 'share', 'Steam'),
+            path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.steam', 'steam'),
+            path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
+            path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),
+            path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam')
+        );
+    }
+
+    const seen = new Set<string>();
+    return roots.filter((entry) => {
+        const key = path.resolve(entry);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
+function collectSteamLibraryPaths(): string[] {
+    const roots = collectSteamRootsForPlatform();
+    const libraries = new Set<string>();
+
+    for (const root of roots) {
+        libraries.add(path.resolve(root));
+
+        const libraryVdfPath = path.join(root, 'steamapps', 'libraryfolders.vdf');
+        if (!fs.existsSync(libraryVdfPath)) {
+            continue;
+        }
+
+        try {
+            const content = fs.readFileSync(libraryVdfPath, 'utf8');
+            const pattern = /"path"\s+"([^"]+)"/g;
+            let match: RegExpExecArray | null;
+            while ((match = pattern.exec(content)) !== null) {
+                const raw = match[1].replace(/\\\\/g, '\\');
+                if (raw.trim().length > 0) {
+                    libraries.add(path.resolve(raw));
+                }
+            }
+        } catch {
+            // Ignore malformed or unreadable library manifest files.
+        }
+    }
+
+    return [...libraries];
+}
+
+function detectClientGarrysmodInstallPath(): string | undefined {
+    const libraries = collectSteamLibraryPaths();
+    for (const library of libraries) {
+        const gameRoot = path.join(library, 'steamapps', 'common', 'GarrysMod');
+        const garrysmodPath = path.join(gameRoot, 'garrysmod');
+        const versionPath = path.join(garrysmodPath, 'garrysmod.ver');
+        if (!fs.existsSync(versionPath)) {
+            continue;
+        }
+
+        if (process.platform === 'win32' && !fs.existsSync(path.join(gameRoot, 'gmod.exe'))) {
+            continue;
+        }
+
+        return gameRoot;
+    }
+
+    return undefined;
+}
+
+export function validateClientInstallPath(inputPath: string): ClientInstallPathValidation {
+    const warnings: string[] = [];
+    const normalized = normalizeClientInstallInput(inputPath);
+    const gameRoot = normalized.gameRoot;
+    const garrysmodPath = normalized.garrysmodPath;
+    const hasSrcdsExe = hasSrcdsExecutable(gameRoot);
+    const hasGmodExe = process.platform === 'win32' && fs.existsSync(path.join(gameRoot, 'gmod.exe'));
+
+    if (!fs.existsSync(garrysmodPath)) {
+        warnings.push(`The garrysmod folder does not exist at ${garrysmodPath}.`);
+    }
+
+    if (!fs.existsSync(path.join(garrysmodPath, 'garrysmod.ver'))) {
+        warnings.push(`Could not find garrysmod.ver in ${garrysmodPath}.`);
+    }
+
+    if (hasSrcdsExe && !hasGmodExe) {
+        warnings.push(`Found SRCDS executable in ${gameRoot}, which suggests this is a server install.`);
+    }
+
+    if (process.platform === 'win32' && !hasGmodExe) {
+        warnings.push(`Could not find gmod.exe in ${gameRoot}, so this may not be a client install.`);
+    }
+
+    return { warnings };
 }
 
 export async function fetchLatestRelease(): Promise<GmRdbRelease | null> {
@@ -462,8 +627,15 @@ function buildSharedAutorunLua(port: number, clientPort?: number): string {
         '        ErrorNoHalt("[GLuaLS] Unknown exec kind: " .. tostring(kind) .. "\\n")',
         '    end)',
         ...(clientPort !== undefined ? [
-            '    if pcall(require, "rdb_client") then',
-            `        rdb_client.activate(${clientPort})`,
+            '    if util and util.IsBinaryModuleInstalled and util.IsBinaryModuleInstalled("rdb") then',
+            '        local ok, requiredModule = pcall(require, "rdb")',
+            '        if ok and istable(requiredModule) and isfunction(requiredModule.activate) then',
+            `            requiredModule.activate(${clientPort})`,
+            '        elseif istable(rdb_client) and isfunction(rdb_client.activate) then',
+            `            rdb_client.activate(${clientPort})`,
+            '        else',
+            '            ErrorNoHalt("[GLuaLS] Failed to load client debugger module via require(\\"rdb\\").\\n")',
+            '        end',
             '    end',
         ] : []),
         'end',
@@ -531,18 +703,29 @@ export function cleanupLegacyInitInjection(garrysmodPath: string): void {
 }
 
 async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<void> {
+    const srcdsRoot = path.dirname(garrysmodPath);
+    if (!hasSrcdsExecutable(srcdsRoot)) {
+        vscode.window.showErrorMessage(
+            `Could not find SRCDS executable in ${srcdsRoot}. This path looks like a client install; refusing to install gm_rdb server binary.`
+        );
+        return;
+    }
+
     const platformItems = Object.entries(GM_RDB_PLATFORM_DLLS).map(([label, dll]) => ({
         label,
         description: dll,
     }));
 
-    const srcdsRoot = path.dirname(garrysmodPath);
-    const detectedDll = getDllForSrcdsExecutable(srcdsRoot);
-    if (detectedDll) {
-        const detectedIndex = platformItems.findIndex((item) => item.description === detectedDll);
+    if (process.platform === 'win32' || process.platform === 'linux') {
+        const detectedIsX64 = isGarrysmodX64(garrysmodPath);
+        const detectedIndex = platformItems.findIndex((item) =>
+            process.platform === 'win32'
+                ? item.description === (detectedIsX64 ? 'gmsv_rdb_win64.dll' : 'gmsv_rdb_win32.dll')
+                : item.description === (detectedIsX64 ? 'gmsv_rdb_linux64.dll' : 'gmsv_rdb_linux.dll')
+        );
         if (detectedIndex >= 0) {
             const [detectedItem] = platformItems.splice(detectedIndex, 1);
-            detectedItem.label = `${detectedItem.label} (detected)`;
+            detectedItem.label = `${detectedItem.label} (detected from garrysmod.ver)`;
             platformItems.unshift(detectedItem);
         }
     }
@@ -709,82 +892,111 @@ async function promptForSrcdsPath(
     const savedSrcdsPath = context.workspaceState.get<string>(SRCDS_ROOT_STATE_KEY) ?? legacySrcdsPath;
     const detectedSrcdsPath = workspaceDetection?.srcdsRoot;
 
-    const options: Array<{ label: string; description: string; value: 'detected' | 'saved' | 'browse' | 'manual' }> = [];
-    if (detectedSrcdsPath) {
-        options.push({
-            label: `$(check) ${detectedSrcdsPath}`,
-            description: 'Detected from workspace location',
-            value: 'detected',
-        });
-    }
-    if (savedSrcdsPath && (!detectedSrcdsPath || !samePath(savedSrcdsPath, detectedSrcdsPath))) {
-        options.push({
-            label: `$(history) ${savedSrcdsPath}`,
-            description: 'Previously used SRCDS path',
-            value: 'saved',
-        });
-    }
-    options.push(
-        {
-            label: '$(folder-opened) Browse…',
-            description: 'Pick your SRCDS root folder',
-            value: 'browse',
-        },
-        {
-            label: '$(edit) Enter path manually…',
-            description: 'Type the SRCDS root path (folder containing garrysmod/)',
-            value: 'manual',
-        }
-    );
+    while (true) {
+        const detectedSrcdsPathValid = !!detectedSrcdsPath && hasSrcdsExecutable(detectedSrcdsPath);
+        const savedSrcdsPathValid = !!savedSrcdsPath && hasSrcdsExecutable(savedSrcdsPath);
 
-    const picked = await vscode.window.showQuickPick(options, {
-        title: 'GMod Debugger Setup (1/4) — SRCDS Root Path',
-        placeHolder: 'Workspace auto-detection is attempted first; choose or enter SRCDS root if needed',
-        ignoreFocusOut: true,
-    });
-    if (!picked) {
-        return undefined;
-    }
-
-    let rawPath: string;
-    if (picked.value === 'browse') {
-        const selected = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: 'Select SRCDS Root (folder containing garrysmod)',
-        });
-        if (!selected?.length) {
-            return undefined;
+        const options: Array<{ label: string; description: string; value: 'detected' | 'saved' | 'browse' | 'manual' }> = [];
+        if (detectedSrcdsPath && detectedSrcdsPathValid) {
+            options.push({
+                label: `$(check) ${detectedSrcdsPath}`,
+                description: 'Detected from workspace location',
+                value: 'detected',
+            });
         }
-        rawPath = selected[0].fsPath;
-    } else if (picked.value === 'manual') {
-        const defaultPath = savedSrcdsPath ?? detectedSrcdsPath ?? (os.platform() === 'win32' ? 'C:\\srcds' : '/home/steam/srcds');
-        const typed = await vscode.window.showInputBox({
-            title: 'SRCDS Root Path',
-            prompt: 'Enter the SRCDS root path (the folder that contains garrysmod/)',
-            value: defaultPath,
+        if (savedSrcdsPath && savedSrcdsPathValid && (!detectedSrcdsPath || !samePath(savedSrcdsPath, detectedSrcdsPath))) {
+            options.push({
+                label: `$(history) ${savedSrcdsPath}`,
+                description: 'Previously used SRCDS path',
+                value: 'saved',
+            });
+        }
+        options.push(
+            {
+                label: '$(folder-opened) Browse…',
+                description: 'Pick your SRCDS root folder',
+                value: 'browse',
+            },
+            {
+                label: '$(edit) Enter path manually…',
+                description: 'Type the SRCDS root path (folder containing garrysmod/)',
+                value: 'manual',
+            }
+        );
+
+        const picked = await vscode.window.showQuickPick(options, {
+            title: 'GMod Debugger Setup (1/4) — SRCDS Root Path',
+            placeHolder: detectedSrcdsPath && !detectedSrcdsPathValid
+                ? 'Detected workspace path is not a valid SRCDS root; choose or enter your actual SRCDS path'
+                : 'Workspace auto-detection is attempted first; choose or enter SRCDS root if needed',
             ignoreFocusOut: true,
         });
-        if (!typed?.trim()) {
+        if (!picked) {
             return undefined;
         }
-        rawPath = typed.trim();
-    } else {
-        const stripped = picked.label.replace(/^\$\(\S+\)\s+/, '');
-        rawPath = stripped;
+
+        let rawPath: string;
+        if (picked.value === 'browse') {
+            const selected = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                title: 'Select SRCDS Root (folder containing garrysmod)',
+            });
+            if (!selected?.length) {
+                continue;
+            }
+            rawPath = selected[0].fsPath;
+        } else if (picked.value === 'manual') {
+            const defaultPath = (savedSrcdsPathValid ? savedSrcdsPath : undefined)
+                ?? (detectedSrcdsPathValid ? detectedSrcdsPath : undefined)
+                ?? savedSrcdsPath
+                ?? detectedSrcdsPath
+                ?? (os.platform() === 'win32' ? 'C:\\srcds' : '/home/steam/srcds');
+            const typed = await vscode.window.showInputBox({
+                title: 'SRCDS Root Path',
+                prompt: 'Enter the SRCDS root path (the folder that contains garrysmod/)',
+                value: defaultPath,
+                ignoreFocusOut: true,
+            });
+            if (typed === undefined) {
+                continue;
+            }
+            if (!typed.trim()) {
+                vscode.window.showWarningMessage('Path cannot be empty.');
+                continue;
+            }
+            rawPath = typed.trim();
+        } else {
+            rawPath = picked.label.replace(/^\$\(\S+\)\s+/, '');
+        }
+
+        const resolved = normalizeSrcdsRootInput(rawPath);
+        if (!hasSrcdsExecutable(resolved.srcdsRoot)) {
+            const action = await vscode.window.showWarningMessage(
+                `No SRCDS executable was found in ${resolved.srcdsRoot}. Choose a different path, or continue anyway for custom/symlink setups.`,
+                'Choose Different Path',
+                'Use Anyway',
+                'Cancel Setup'
+            );
+            if (action === 'Choose Different Path') {
+                continue;
+            }
+            if (action !== 'Use Anyway') {
+                return undefined;
+            }
+        }
+
+        await context.workspaceState.update(SRCDS_ROOT_STATE_KEY, resolved.srcdsRoot);
+
+        if (!fs.existsSync(resolved.garrysmodPath)) {
+            vscode.window.showWarningMessage(
+                `Could not find a garrysmod folder in ${resolved.srcdsRoot}. The generated config will still use this path.`
+            );
+        }
+
+        return resolved;
     }
-
-    const resolved = normalizeSrcdsRootInput(rawPath);
-    await context.workspaceState.update(SRCDS_ROOT_STATE_KEY, resolved.srcdsRoot);
-
-    if (!fs.existsSync(resolved.garrysmodPath)) {
-        vscode.window.showWarningMessage(
-            `Could not find a garrysmod folder in ${resolved.srcdsRoot}. The generated config will still use this path.`
-        );
-    }
-
-    return resolved;
 }
 
 function getPreferredWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -804,6 +1016,133 @@ export async function promptForGarrysmodPath(context: vscode.ExtensionContext): 
     const workspaceDetection = workspaceFolder ? detectWorkspaceSrcdsLayout(workspaceFolder) : undefined;
     const selection = await promptForSrcdsPath(context, workspaceDetection);
     return selection?.garrysmodPath;
+}
+
+export async function promptForClientGarrysmodPath(context: vscode.ExtensionContext): Promise<string | undefined> {
+    const savedClientPath = context.globalState.get<string>(CLIENT_GARRYSMOD_PATH_STATE_KEY);
+    const detectedClientPath = detectClientGarrysmodInstallPath();
+    const normalizedSavedPath = savedClientPath ? normalizeClientInstallInput(savedClientPath) : undefined;
+    const normalizedDetectedPath = detectedClientPath ? normalizeClientInstallInput(detectedClientPath) : undefined;
+    const manualDefaultPath = normalizedSavedPath?.gameRoot
+        ?? normalizedDetectedPath?.gameRoot
+        ?? (os.platform() === 'win32'
+            ? 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\GarrysMod'
+            : '/home/steam/.steam/steam/steamapps/common/GarrysMod');
+
+    while (true) {
+        const detectedValidation = normalizedDetectedPath ? validateClientInstallPath(normalizedDetectedPath.gameRoot) : undefined;
+        const savedValidation = normalizedSavedPath ? validateClientInstallPath(normalizedSavedPath.gameRoot) : undefined;
+        const options: Array<{ label: string; description: string; value: 'detected' | 'saved' | 'browse' | 'manual' }> = [];
+        if (normalizedDetectedPath && detectedValidation && detectedValidation.warnings.length === 0) {
+            options.push({
+                label: `$(search) ${normalizedDetectedPath.gameRoot}`,
+                description: 'Auto-detected from Steam libraries',
+                value: 'detected',
+            });
+        }
+        if (
+            normalizedSavedPath
+            && savedValidation
+            && savedValidation.warnings.length === 0
+            && (!normalizedDetectedPath || !samePath(normalizedSavedPath.gameRoot, normalizedDetectedPath.gameRoot))
+        ) {
+            options.push({
+                label: `$(history) ${normalizedSavedPath.gameRoot}`,
+                description: 'Previously used Garry\'s Mod client path',
+                value: 'saved',
+            });
+        }
+
+        options.push(
+            {
+                label: '$(folder-opened) Browse…',
+                description: 'Pick your Garry\'s Mod game install folder',
+                value: 'browse',
+            },
+            {
+                label: '$(edit) Enter path manually…',
+                description: 'Type Garry\'s Mod install path (folder containing garrysmod/ and bin/)',
+                value: 'manual',
+            }
+        );
+
+        const picked = await vscode.window.showQuickPick(options, {
+            title: 'GMod Client Debugger — Garry\'s Mod Install Path',
+            placeHolder: (detectedValidation && detectedValidation.warnings.length > 0)
+                ? 'Auto-detected client path did not pass validation; choose or enter the correct client install path'
+                : 'Choose the game install root (or garrysmod folder) for client debugger installation',
+            ignoreFocusOut: true,
+        });
+        if (!picked) {
+            const cancelAction = await vscode.window.showWarningMessage(
+                'Client install path selection was cancelled.',
+                'Back to Path Selection',
+                'Skip Client Debugger Step'
+            );
+            if (cancelAction === 'Back to Path Selection') {
+                continue;
+            }
+            return undefined;
+        }
+
+        let rawPath: string | undefined;
+        if (picked.value === 'browse') {
+            const selected = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                title: 'Select Garry\'s Mod Install Folder',
+            });
+            if (!selected?.length) {
+                continue;
+            }
+            rawPath = selected[0].fsPath;
+        } else if (picked.value === 'manual') {
+            const typed = await vscode.window.showInputBox({
+                title: 'Garry\'s Mod Install Path',
+                prompt: 'Enter Garry\'s Mod install path (folder containing garrysmod/ and bin/)',
+                value: manualDefaultPath,
+                ignoreFocusOut: true,
+            });
+            if (typed === undefined) {
+                continue;
+            }
+            if (!typed.trim()) {
+                vscode.window.showWarningMessage('Path cannot be empty.');
+                continue;
+            }
+            rawPath = typed.trim();
+        } else {
+            rawPath = picked.label.replace(/^\$\(\S+\)\s+/, '');
+        }
+
+        const resolved = normalizeClientInstallInput(rawPath);
+        const validation = validateClientInstallPath(resolved.gameRoot);
+        if (validation.warnings.length > 0) {
+            const action = await vscode.window.showWarningMessage(
+                `This path may not be a valid Garry's Mod client install:\n- ${validation.warnings.join('\n- ')}`,
+                'Choose Different Path',
+                'Use Anyway',
+                'Cancel Setup'
+            );
+            if (action === 'Choose Different Path') {
+                continue;
+            }
+            if (action !== 'Use Anyway') {
+                return undefined;
+            }
+        }
+
+        await context.globalState.update(CLIENT_GARRYSMOD_PATH_STATE_KEY, resolved.gameRoot);
+
+        if (!fs.existsSync(resolved.garrysmodPath)) {
+            vscode.window.showWarningMessage(
+                `Could not find a garrysmod folder in ${resolved.gameRoot}. Installation will still use ${resolved.garrysmodPath}.`
+            );
+        }
+
+        return resolved.garrysmodPath;
+    }
 }
 
 function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
@@ -833,7 +1172,53 @@ function pickLaunchCwd(srcdsRoot: string, srcdsRootExpression?: string): string 
     return srcdsRootExpression ?? srcdsRoot;
 }
 
-export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext): Promise<void> {
+interface DebugWizardOptions {
+    installClientDebugger?: (garrysmodPath: string) => Promise<void>;
+}
+
+async function runOptionalClientDebuggerStep(
+    context: vscode.ExtensionContext,
+    installClientDebugger?: (garrysmodPath: string) => Promise<void>
+): Promise<boolean> {
+    const choice = await vscode.window.showQuickPick(
+        [
+            {
+                label: '$(remove) Skip',
+                description: 'Default. Do this later using "Check for rdb_client Updates"',
+                value: 'skip' as const,
+            },
+            {
+                label: '$(check) Yes',
+                description: 'Install or update rdb_client for client-side debugging',
+                value: 'yes' as const,
+            },
+        ],
+        {
+            title: 'GMod Debugger Setup — Optional Client Debugger Step',
+            placeHolder: 'Install client debugger (rdb_client) in your Garry\'s Mod game folder?',
+            ignoreFocusOut: true,
+        }
+    );
+
+    if (!choice || choice.value === 'skip') {
+        return false;
+    }
+
+    if (!installClientDebugger) {
+        vscode.window.showWarningMessage('Client debugger installer is unavailable right now.');
+        return false;
+    }
+
+    const garrysmodPath = await promptForClientGarrysmodPath(context);
+    if (!garrysmodPath) {
+        return false;
+    }
+
+    await installClientDebugger(garrysmodPath);
+    return true;
+}
+
+export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, options?: DebugWizardOptions): Promise<void> {
     const workspaceFolder = await pickWorkspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showWarningMessage('Open a workspace folder first.');
@@ -870,6 +1255,12 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
                 vscode.window.showErrorMessage(`gm_rdb install failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
+    }
+
+    const serverDebuggerInstalled = !!detectGmRdb(srcdsSelection.garrysmodPath);
+    let includeClientAttachConfig = false;
+    if (serverDebuggerInstalled) {
+        includeClientAttachConfig = await runOptionalClientDebuggerStep(context, options?.installClientDebugger);
     }
 
     const requestPick = await vscode.window.showQuickPick(
@@ -972,6 +1363,21 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext):
 
     await writeLaunchConfig(workspaceFolder, config);
 
+    if (includeClientAttachConfig) {
+        const clientConfig: DebugConfig = {
+            type: GMOD_CLIENT_DEBUGGER_TYPE,
+            request: 'attach',
+            name: 'Attach to GMod Client (rdb_client)',
+            host: '127.0.0.1',
+            port: DEFAULT_RDB_CLIENT_PORT,
+            sourceRoot,
+            sourceFileMap,
+            stopOnEntry: true,
+            stopOnError: false,
+        };
+        await writeLaunchConfig(workspaceFolder, clientConfig);
+    }
+
     const openLaunch = await vscode.window.showInformationMessage(
         'GMod debug configuration written to .vscode/launch.json.',
         'Open launch.json'
@@ -995,4 +1401,13 @@ export function getStoredGarrysmodPath(context: vscode.ExtensionContext): string
     }
 
     return normalizeSrcdsRootInput(savedSrcdsPath).garrysmodPath;
+}
+
+export function getStoredClientGarrysmodPath(context: vscode.ExtensionContext): string | undefined {
+    const savedPath = context.globalState.get<string>(CLIENT_GARRYSMOD_PATH_STATE_KEY);
+    if (!savedPath || savedPath.trim().length === 0) {
+        return undefined;
+    }
+
+    return normalizeClientInstallInput(savedPath).garrysmodPath;
 }

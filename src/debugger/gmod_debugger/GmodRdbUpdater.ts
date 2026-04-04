@@ -6,9 +6,9 @@ import { downloadFile } from '../../netHelpers';
 import {
     cleanupLegacyInitInjection,
     DEFAULT_RDB_PORT,
-    getDllForSrcdsExecutable,
     fetchReleaseForCurrentExtensionChannel,
     getStoredGarrysmodPath,
+    isGarrysmodX64,
     GmRdbRelease,
     promptForGarrysmodPath,
     ReleaseAsset,
@@ -203,25 +203,19 @@ export class GmodRdbUpdater {
     }
 
     private findAssetForUpdate(release: GmRdbRelease, garrysmodPath: string): ReleaseAsset | undefined {
-        if (process.platform === 'win32') {
-            const binDir = path.join(garrysmodPath, 'lua', 'bin');
-            const hasWin64 = fs.existsSync(path.join(binDir, 'gmsv_rdb_win64.dll'));
-            const hasWin32 = fs.existsSync(path.join(binDir, 'gmsv_rdb_win32.dll'));
+        const isX64 = isGarrysmodX64(garrysmodPath);
+        const preferredCandidates: string[] = process.platform === 'win32'
+            ? [isX64 ? 'gmsv_rdb_win64.dll' : 'gmsv_rdb_win32.dll']
+            : process.platform === 'linux'
+                ? (isX64
+                    ? ['gmsv_rdb_linux64.so', 'gmsv_rdb_linux64.dll']
+                    : ['gmsv_rdb_linux.so', 'gmsv_rdb_linux.dll'])
+                : [];
 
-            let installed: string | undefined;
-            if (hasWin64 && hasWin32) {
-                installed = getDllForSrcdsExecutable(path.dirname(garrysmodPath));
-            } else if (hasWin64) {
-                installed = 'gmsv_rdb_win64.dll';
-            } else if (hasWin32) {
-                installed = 'gmsv_rdb_win32.dll';
-            }
-
-            if (installed === 'gmsv_rdb_win64.dll' || installed === 'gmsv_rdb_win32.dll') {
-                const asset = release.assets.find((entry) => entry.name === installed);
-                if (asset) {
-                    return asset;
-                }
+        for (const preferred of preferredCandidates) {
+            const asset = release.assets.find((entry) => entry.name === preferred);
+            if (asset) {
+                return asset;
             }
         }
 

@@ -5,15 +5,12 @@ import * as vscode from 'vscode';
 import { downloadFile } from '../../netHelpers';
 import {
     ALL_RDB_CLIENT_DLLS,
-    cleanupLegacyInitInjection,
-    DEFAULT_RDB_PORT,
-    DEFAULT_RDB_CLIENT_PORT,
     fetchReleaseForCurrentExtensionChannel,
-    getStoredGarrysmodPath,
+    isGarrysmodX64,
     GmRdbRelease,
-    promptForGarrysmodPath,
+    promptForClientGarrysmodPath,
     ReleaseAsset,
-    syncAutorunFile,
+    validateClientInstallPath,
 } from './GmodDebugSetupWizard';
 import { EXPECTED_GM_RDB_VERSION } from './GmodRdbUpdater';
 
@@ -57,24 +54,8 @@ export class GmodClientRdbUpdater {
     }
 
     public async ensureRuntimeFilesUpToDate(session?: vscode.DebugSession): Promise<void> {
-        const garrysmodPath = this.resolveKnownGarrysmodPath(session);
-        if (!garrysmodPath) {
-            return;
-        }
-
-        try {
-            const serverPort = this.resolveServerDebugPort(session?.workspaceFolder);
-            const clientPort = this.resolveClientDebugPort(session?.workspaceFolder);
-            const autorunStatus = syncAutorunFile(garrysmodPath, serverPort, clientPort);
-            cleanupLegacyInitInjection(garrysmodPath);
-
-            if (autorunStatus !== 'unchanged') {
-                console.log(`[GLuaLS] Updated runtime file: lua/autorun/debug.lua (${autorunStatus}).`);
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.warn(`[GLuaLS] Failed to sync runtime files: ${message}`);
-        }
+        // Client installs must not write server runtime files.
+        void session;
     }
 
     public async promptForUpdate(moduleVersion: string): Promise<void> {
@@ -111,7 +92,7 @@ export class GmodClientRdbUpdater {
     }
 
     private async runUpdateFlow(): Promise<void> {
-        const garrysmodPath = await promptForGarrysmodPath(this.context);
+        const garrysmodPath = await promptForClientGarrysmodPath(this.context);
         if (!garrysmodPath) {
             return;
         }
@@ -120,7 +101,37 @@ export class GmodClientRdbUpdater {
     }
 
     private async downloadAndInstallInternal(_context: vscode.ExtensionContext, garrysmodPath: string): Promise<void> {
-        const binDir = path.join(garrysmodPath, 'lua', 'bin');
+        let installGarrysmodPath = garrysmodPath;
+        while (true) {
+            const validation = validateClientInstallPath(installGarrysmodPath);
+            if (validation.warnings.length === 0) {
+                break;
+            }
+
+            const action = await vscode.window.showWarningMessage(
+                `This path may not be a valid Garry's Mod client install:\n- ${validation.warnings.join('\n- ')}`,
+                'Choose Different Path',
+                'Use Anyway',
+                'Cancel Install'
+            );
+
+            if (action === 'Choose Different Path') {
+                const replacement = await promptForClientGarrysmodPath(this.context);
+                if (!replacement) {
+                    return;
+                }
+                installGarrysmodPath = replacement;
+                continue;
+            }
+
+            if (action !== 'Use Anyway') {
+                return;
+            }
+
+            break;
+        }
+
+        const binDir = path.join(installGarrysmodPath, 'lua', 'bin');
 
         try {
             await vscode.window.withProgress(
@@ -136,7 +147,7 @@ export class GmodClientRdbUpdater {
                         throw new Error('Failed to fetch rdb_client release metadata.');
                     }
 
-                    const asset = this.findAssetForCurrentPlatform(release);
+                    const asset = this.findAssetForUpdate(release, installGarrysmodPath);
                     if (!asset) {
                         const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
                         throw new Error(`No compatible rdb_client binary found for ${os.platform()} (${os.arch()}). Available assets: ${available}`);
@@ -161,12 +172,6 @@ export class GmodClientRdbUpdater {
 
                     progress.report({ message: `Installed ${asset.name} to garrysmod/lua/bin.` });
 
-                    const serverPort = this.resolveServerDebugPort();
-                    const clientPort = this.resolveClientDebugPort();
-
-                    progress.report({ message: 'Writing shared debugger autorun file...' });
-                    syncAutorunFile(garrysmodPath, serverPort, clientPort);
-                    cleanupLegacyInitInjection(garrysmodPath);
                 }
             );
 
@@ -186,6 +191,26 @@ export class GmodClientRdbUpdater {
             }
         }
         return undefined;
+    }
+
+    private findAssetForUpdate(release: GmRdbRelease, garrysmodPath: string): ReleaseAsset | undefined {
+        const isX64 = isGarrysmodX64(garrysmodPath);
+        const preferredCandidates: string[] = process.platform === 'win32'
+            ? [isX64 ? 'gmcl_rdb_win64.dll' : 'gmcl_rdb_win32.dll']
+            : process.platform === 'linux'
+                ? (isX64
+                    ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux64.dll']
+                    : ['gmcl_rdb_linux.so', 'gmcl_rdb_linux.dll'])
+                : [];
+
+        for (const preferred of preferredCandidates) {
+            const asset = release.assets.find((entry) => entry.name === preferred);
+            if (asset) {
+                return asset;
+            }
+        }
+
+        return this.findAssetForCurrentPlatform(release);
     }
 
     private getAssetCandidatesForCurrentPlatform(): string[] {
@@ -211,67 +236,4 @@ export class GmodClientRdbUpdater {
         return skippedVersion === EXPECTED_GM_RDB_VERSION;
     }
 
-    private resolveKnownGarrysmodPath(session?: vscode.DebugSession): string | undefined {
-        const sourceRoot = this.resolveSessionSourceRoot(session);
-        if (sourceRoot) {
-            return sourceRoot;
-        }
-
-        return getStoredGarrysmodPath(this.context);
-    }
-
-    private resolveSessionSourceRoot(session?: vscode.DebugSession): string | undefined {
-        if (!session || session.type !== 'gluals_gmod_client') {
-            return undefined;
-        }
-
-        const sourceRoot = this.coerceSessionSourceRoot(session);
-        if (!sourceRoot || sourceRoot.includes('${')) {
-            return undefined;
-        }
-
-        const resolved = path.resolve(sourceRoot);
-        if (path.basename(resolved).toLowerCase() === 'garrysmod') {
-            return resolved;
-        }
-
-        const garrysmodCandidate = path.join(resolved, 'garrysmod');
-        if (fs.existsSync(garrysmodCandidate)) {
-            return garrysmodCandidate;
-        }
-
-        return undefined;
-    }
-
-    private coerceSessionSourceRoot(session: vscode.DebugSession): string | undefined {
-        if (!session.configuration || typeof session.configuration !== 'object') {
-            return undefined;
-        }
-
-        const sourceRoot = (session.configuration as Record<string, unknown>)['sourceRoot'];
-        if (typeof sourceRoot !== 'string') {
-            return undefined;
-        }
-
-        const trimmed = sourceRoot.trim();
-        return trimmed.length > 0 ? trimmed : undefined;
-    }
-
-    private resolveServerDebugPort(scope?: vscode.ConfigurationScope): number {
-        const configuredPort = vscode.workspace
-            .getConfiguration('gluals.gmod', scope)
-            .get<number>('debugPort');
-        return typeof configuredPort === 'number' && Number.isFinite(configuredPort)
-            ? Math.max(1, Math.floor(configuredPort))
-            : DEFAULT_RDB_PORT;
-    }
-
-    private resolveClientDebugPort(scope?: vscode.ConfigurationScope): number {
-        const configuredPort = vscode.workspace
-            .getConfiguration('gluals.gmod', scope)
-            .get<number>('debugClientPort');
-        return typeof configuredPort === 'number' && Number.isFinite(configuredPort)
-            ? Math.max(1, Math.floor(configuredPort))
-            : DEFAULT_RDB_CLIENT_PORT;
-    }
 }
