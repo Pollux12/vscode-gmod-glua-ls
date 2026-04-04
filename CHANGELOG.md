@@ -1,5 +1,21 @@
 ﻿# Changelog
 
+## [1.0.8] - 2026-04-04
+
+### VS Code Extension
+- Add and improve various tests
+- Update documentation
+- Update readme
+
+### Language Server
+- Fix remaining known realm related issues
+- Add and improve various tests
+- Update documentation
+
+### Debugger
+- Fix x64 win debugger crash with entity explorer
+- Add better CI workflow
+
 ## [1.0.7] - 2026-04-02
 
 ### VS Code Extension
