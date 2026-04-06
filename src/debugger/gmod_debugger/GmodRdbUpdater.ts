@@ -1,12 +1,12 @@
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { downloadFile } from '../../netHelpers';
 import {
     cleanupLegacyInitInjection,
+    DEFAULT_RDB_CLIENT_PORT,
     DEFAULT_RDB_PORT,
-    fetchReleaseForCurrentExtensionChannel,
+    detectGarrysmodBranchName,
+    detectGmRdb,
     getStoredGarrysmodPath,
     isGarrysmodX64,
     GmRdbRelease,
@@ -14,6 +14,18 @@ import {
     ReleaseAsset,
     syncAutorunFile,
 } from './GmodDebugSetupWizard';
+import {
+    ActiveUpdateState,
+    downloadAndInstallRelease,
+    ExpectedVersionCacheState,
+    findAssetByNameCandidates,
+    normalizeComparableVersion,
+    recordInstalledModuleState,
+    resolveExpectedVersionWithCache,
+    resolveInstalledModuleVersion,
+    SHARED_EXPECTED_VERSION_STATE,
+    runExclusiveUpdate,
+} from './GmodRdbUpdaterShared';
 
 export const EXPECTED_GM_RDB_VERSION = '1.2.0';
 
@@ -24,25 +36,53 @@ interface VersionCheckResult {
 }
 
 export class GmodRdbUpdater {
+    private static readonly EXPECTED_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
     private readonly SKIP_EXPECTED_VERSION_KEY = 'gmodRdbUpdater.skipExpectedVersion';
+    private readonly INSTALLED_STATE_KEY = 'gmodRdbUpdater.server.installedState';
 
-    private activeUpdate: Promise<void> | undefined;
+    private readonly updateState: ActiveUpdateState = {
+        activeUpdate: undefined,
+    };
+
+    private readonly expectedVersionState: ExpectedVersionCacheState = SHARED_EXPECTED_VERSION_STATE;
 
     constructor(private readonly context: vscode.ExtensionContext) {
     }
 
-    public checkVersion(moduleVersion: string): VersionCheckResult {
-        const normalized = moduleVersion.trim();
+    private checkVersion(moduleVersion: string, expectedVersion: string): VersionCheckResult {
+        const normalized = this.normalizeVersion(moduleVersion);
         return {
             moduleVersion: normalized,
-            expectedVersion: EXPECTED_GM_RDB_VERSION,
-            isMatch: normalized === EXPECTED_GM_RDB_VERSION,
+            expectedVersion,
+            isMatch: normalized === expectedVersion,
         };
     }
 
     public async handleVersionMismatch(moduleVersion: string): Promise<void> {
-        const check = this.checkVersion(moduleVersion);
+        if (!this.shouldAutoPrompt()) {
+            return;
+        }
+
+        const expectedVersion = await this.resolveExpectedVersion();
+        const check = this.checkVersion(moduleVersion, expectedVersion);
         if (check.isMatch) {
+            return;
+        }
+
+        if (this.isSkippedExpectedVersion(check.expectedVersion)) {
+            return;
+        }
+
+        await this.promptForUpdate(check.moduleVersion, check.expectedVersion);
+    }
+
+    /**
+     * Boot/periodic update check: detects binary presence, compares version against release API.
+     * Called by GmodUpdateScheduler. Does not prompt or update if the binary is absent.
+     */
+    public async runBootTimeCheck(garrysmodPath: string): Promise<void> {
+        const detected = detectGmRdb(garrysmodPath);
+        if (!detected) {
             return;
         }
 
@@ -50,16 +90,27 @@ export class GmodRdbUpdater {
             return;
         }
 
-        if (this.isSkippedExpectedVersion()) {
+        const expectedVersion = await this.resolveExpectedVersion();
+        if (this.isSkippedExpectedVersion(expectedVersion)) {
             return;
         }
 
-        await this.promptForUpdate(check.moduleVersion);
+        const installedVersion = await this.resolveInstalledVersion(garrysmodPath, detected);
+        if (!installedVersion) {
+            return;
+        }
+
+        if (this.normalizeVersion(installedVersion) === expectedVersion) {
+            return;
+        }
+
+        await this.promptForUpdate(installedVersion, expectedVersion);
     }
 
     public async runManualUpdateCommand(): Promise<void> {
+        const expectedVersion = await this.resolveExpectedVersion();
         const action = await vscode.window.showInformationMessage(
-            `Check and install gm_rdb ${EXPECTED_GM_RDB_VERSION} and refresh GLuaLS runtime files?`,
+            `Check and install gm_rdb ${expectedVersion} and refresh GLuaLS runtime files?`,
             'Update Now',
             'Cancel'
         );
@@ -68,6 +119,7 @@ export class GmodRdbUpdater {
             return;
         }
 
+        await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
         await this.runUpdateFlow();
     }
 
@@ -79,7 +131,7 @@ export class GmodRdbUpdater {
 
         try {
             const debugPort = this.resolveDebugPort(session?.workspaceFolder);
-            const autorunStatus = syncAutorunFile(garrysmodPath, debugPort);
+            const autorunStatus = syncAutorunFile(garrysmodPath, debugPort, DEFAULT_RDB_CLIENT_PORT);
             cleanupLegacyInitInjection(garrysmodPath);
 
             if (autorunStatus !== 'unchanged') {
@@ -91,9 +143,9 @@ export class GmodRdbUpdater {
         }
     }
 
-    public async promptForUpdate(moduleVersion: string): Promise<void> {
+    public async promptForUpdate(moduleVersion: string, expectedVersion: string): Promise<void> {
         const action = await vscode.window.showInformationMessage(
-            `gm_rdb module version mismatch detected (connected: ${moduleVersion}, expected: ${EXPECTED_GM_RDB_VERSION}).`,
+            `gm_rdb module version mismatch detected (connected: ${moduleVersion}, expected: ${expectedVersion}).`,
             'Update Now',
             'Later',
             'Skip This Version'
@@ -106,22 +158,15 @@ export class GmodRdbUpdater {
         }
 
         if (action === 'Skip This Version') {
-            await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, EXPECTED_GM_RDB_VERSION);
+            await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, expectedVersion);
         }
     }
 
     public async downloadAndInstall(context: vscode.ExtensionContext, garrysmodPath: string): Promise<void> {
-        if (this.activeUpdate) {
-            await this.activeUpdate;
-            return;
-        }
-
-        this.activeUpdate = this.downloadAndInstallInternal(context, garrysmodPath);
-        try {
-            await this.activeUpdate;
-        } finally {
-            this.activeUpdate = undefined;
-        }
+        void context;
+        await runExclusiveUpdate(this.updateState, async () => {
+            await this.downloadAndInstallInternal(garrysmodPath);
+        });
     }
 
     private async runUpdateFlow(): Promise<void> {
@@ -133,73 +178,35 @@ export class GmodRdbUpdater {
         await this.downloadAndInstall(this.context, garrysmodPath);
     }
 
-    private async downloadAndInstallInternal(_context: vscode.ExtensionContext, garrysmodPath: string): Promise<void> {
-        const binDir = path.join(garrysmodPath, 'lua', 'bin');
+    private async downloadAndInstallInternal(garrysmodPath: string): Promise<void> {
+        const installedRelease = await downloadAndInstallRelease({
+            garrysmodPath,
+            progressTitle: 'Updating gm_rdb...',
+            fetchProgressMessage: 'Fetching gm_rdb release for current extension channel...',
+            missingReleaseMessage: 'Failed to fetch gm_rdb release metadata.',
+            incompatibleBinaryLabel: 'gm_rdb server',
+            tempDirPrefix: 'gluals-gmrdb-',
+            successMessage: 'gm_rdb updated successfully. Restart SRCDS to load the new module.',
+            failurePrefix: 'Failed to update gm_rdb',
+            selectAsset: (release) => this.findAssetForUpdate(release, garrysmodPath),
+            afterInstall: async ({ progress }) => {
+                const debugPort = this.resolveDebugPort();
+                progress.report({ message: 'Writing shared debugger autorun file...' });
+                syncAutorunFile(garrysmodPath, debugPort, DEFAULT_RDB_CLIENT_PORT);
+                cleanupLegacyInitInjection(garrysmodPath);
+            },
+        });
 
-        try {
-            await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: 'Updating gm_rdb...',
-                    cancellable: false,
-                },
-                async (progress) => {
-                    progress.report({ message: 'Fetching gm_rdb release for current extension channel...' });
-                    const release = await fetchReleaseForCurrentExtensionChannel();
-                    if (!release) {
-                        throw new Error('Failed to fetch gm_rdb release metadata.');
-                    }
-
-                    const asset = this.findAssetForUpdate(release, garrysmodPath);
-                    if (!asset) {
-                        const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
-                        throw new Error(`No compatible gm_rdb server binary found for ${os.platform()} (${os.arch()}). Available assets: ${available}`);
-                    }
-
-                    progress.report({ message: `Downloading ${asset.name} (${release.tag_name})...` });
-                    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-gmrdb-'));
-                    const tempFilePath = path.join(tempDir, asset.name);
-                    const destinationPath = path.join(binDir, asset.name);
-
-                    try {
-                        await downloadFile(asset.browser_download_url, tempFilePath, progress);
-
-                        progress.report({ message: `Installing ${asset.name}...` });
-                        await fs.promises.mkdir(binDir, { recursive: true });
-                        await fs.promises.copyFile(tempFilePath, destinationPath);
-
-                        progress.report({ message: 'Update complete!' });
-                    } finally {
-                        fs.rmSync(tempDir, { recursive: true, force: true });
-                    }
-
-                    progress.report({ message: `Installed ${asset.name} to garrysmod/lua/bin.` });
-
-                    const debugPort = this.resolveDebugPort();
-
-                    progress.report({ message: 'Writing shared debugger autorun file...' });
-                    syncAutorunFile(garrysmodPath, debugPort);
-                    cleanupLegacyInitInjection(garrysmodPath);
-                }
-            );
-
-            vscode.window.showInformationMessage('gm_rdb updated successfully. Restart SRCDS to load the new module.');
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to update gm_rdb: ${message}`);
+        if (!installedRelease) {
+            return;
         }
+
+        await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
+        await this.recordInstall(garrysmodPath, installedRelease);
     }
 
     private findAssetForCurrentPlatform(release: GmRdbRelease): ReleaseAsset | undefined {
-        const candidates = this.getAssetCandidatesForCurrentPlatform();
-        for (const name of candidates) {
-            const asset = release.assets.find((entry) => entry.name === name);
-            if (asset) {
-                return asset;
-            }
-        }
-
-        return undefined;
+        return findAssetByNameCandidates(release, this.getAssetCandidatesForCurrentPlatform());
     }
 
     private findAssetForUpdate(release: GmRdbRelease, garrysmodPath: string): ReleaseAsset | undefined {
@@ -212,11 +219,14 @@ export class GmodRdbUpdater {
                     : ['gmsv_rdb_linux.so', 'gmsv_rdb_linux.dll'])
                 : [];
 
-        for (const preferred of preferredCandidates) {
-            const asset = release.assets.find((entry) => entry.name === preferred);
-            if (asset) {
-                return asset;
-            }
+        const preferredAsset = findAssetByNameCandidates(release, preferredCandidates);
+        if (preferredAsset) {
+            return preferredAsset;
+        }
+
+        // If branch architecture is known, avoid silently falling back to a mismatched binary.
+        if (detectGarrysmodBranchName(garrysmodPath)) {
+            return undefined;
         }
 
         return this.findAssetForCurrentPlatform(release);
@@ -245,9 +255,21 @@ export class GmodRdbUpdater {
             .get<boolean>('autoUpdateRdb', true);
     }
 
-    private isSkippedExpectedVersion(): boolean {
+    private isSkippedExpectedVersion(expectedVersion: string): boolean {
         const skippedVersion = this.context.globalState.get<string>(this.SKIP_EXPECTED_VERSION_KEY);
-        return skippedVersion === EXPECTED_GM_RDB_VERSION;
+        return skippedVersion === expectedVersion;
+    }
+
+    private normalizeVersion(version: string): string {
+        return normalizeComparableVersion(version);
+    }
+
+    private async resolveExpectedVersion(): Promise<string> {
+        return resolveExpectedVersionWithCache(
+            this.expectedVersionState,
+            EXPECTED_GM_RDB_VERSION,
+            GmodRdbUpdater.EXPECTED_VERSION_CACHE_TTL_MS,
+        );
     }
 
     private resolveKnownGarrysmodPath(session?: vscode.DebugSession): string | undefined {
@@ -301,7 +323,25 @@ export class GmodRdbUpdater {
             .getConfiguration('gluals.gmod', scope)
             .get<number>('debugPort');
         return typeof configuredPort === 'number' && Number.isFinite(configuredPort)
-            ? Math.max(1, Math.floor(configuredPort))
+            ? Math.min(65535, Math.max(1, Math.floor(configuredPort)))
             : DEFAULT_RDB_PORT;
+    }
+
+    private async resolveInstalledVersion(garrysmodPath: string, binaryName: string): Promise<string | undefined> {
+        return resolveInstalledModuleVersion(
+            this.context,
+            this.INSTALLED_STATE_KEY,
+            garrysmodPath,
+            binaryName,
+        );
+    }
+
+    private async recordInstall(garrysmodPath: string, release: GmRdbRelease): Promise<void> {
+        await recordInstalledModuleState(
+            this.context,
+            this.INSTALLED_STATE_KEY,
+            garrysmodPath,
+            release.tag_name,
+        );
     }
 }

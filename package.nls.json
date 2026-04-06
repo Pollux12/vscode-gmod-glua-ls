@@ -74,7 +74,7 @@
     "config.gluals.strict.inferredTypeMismatch.description": "Keep inferred types lenient in mismatch diagnostics.",
     "config.gluals.workspace.enableReindex.description": "Enable full project reindex after changing a file.",
     "config.gluals.workspace.reindexDuration.description": "Delay between changing a file and full project reindex, in milliseconds.",
-    "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update gm_rdb when the connected module version does not match the extension's expected debugger module version.",
+    "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update `gm_rdb` and `rdb_client` (the GMod debugger modules) when an outdated version is detected during the background update check.",
     "config.lua.trace.server.description": "Traces the communication between VSCode and the EmmyLua language server in the Output view. Default is `off`",
     "debug.gmod.args": "Arguments passed to launched program",
     "debug.gmod.attach.desc": "Attach to a running Garry's Mod remote debugger",

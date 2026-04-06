@@ -42,6 +42,7 @@ import { GmodRunFileTool } from './tools/gmodRunFileTool';
 import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
+import { GmodUpdateScheduler } from './debugger/gmod_debugger/GmodUpdateScheduler';
 import {
     hasAnyGmodDebugConfiguration,
     runGmodDebugSetupWizard,
@@ -344,6 +345,14 @@ async function initializeExtension(): Promise<void> {
 
     // Initialize annotations before starting server
     await gmodAnnotationManager.initializeAnnotations();
+
+    // Boot-time + periodic update scheduler (annotations + debugger modules)
+    new GmodUpdateScheduler(
+        extensionContext.vscodeContext,
+        gmodAnnotationManager,
+        gmodRdbUpdater,
+        gmodClientRdbUpdater,
+    ).start();
 
     // Initialize syntax tree manager
     syntaxTreeManager = new SyntaxTreeManager();
@@ -1551,7 +1560,7 @@ function coerceGmodToolTimestamp(value: unknown): string {
     return new Date().toISOString();
 }
 
-interface GmodRdbVersionMismatchBody {
+interface GmodConnectedBody {
     moduleVersion?: unknown;
 }
 
@@ -1561,22 +1570,14 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.rdb.versionMismatch' && event.session.type === 'gluals_gmod') {
-        if (event.body && typeof event.body === 'object') {
-            const body = event.body as GmodRdbVersionMismatchBody;
-            if (typeof body.moduleVersion === 'string' && gmodRdbUpdater) {
-                void gmodRdbUpdater.handleVersionMismatch(body.moduleVersion);
-            }
-        }
+        // Keep legacy event for compatibility, but avoid double prompts.
+        // Active version checks are handled on `gmod.connected`.
         return;
     }
 
     if (event.event === 'gmod.rdb.client.versionMismatch' && event.session.type === 'gluals_gmod_client') {
-        if (event.body && typeof event.body === 'object') {
-            const body = event.body as GmodRdbVersionMismatchBody;
-            if (typeof body.moduleVersion === 'string' && gmodClientRdbUpdater) {
-                void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);
-            }
-        }
+        // Keep legacy event for compatibility, but avoid double prompts.
+        // Active version checks are handled on `gmod.client.connected`.
         return;
     }
 
@@ -1588,7 +1589,23 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.connected') {
+        if (event.body && typeof event.body === 'object' && gmodRdbUpdater) {
+            const body = event.body as GmodConnectedBody;
+            if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
+                void gmodRdbUpdater.handleVersionMismatch(body.moduleVersion);
+            }
+        }
         void gmodEntityExplorerProvider?.loadEntities();
+        return;
+    }
+
+    if (event.event === 'gmod.client.connected') {
+        if (event.body && typeof event.body === 'object' && gmodClientRdbUpdater) {
+            const body = event.body as GmodConnectedBody;
+            if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
+                void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);
+            }
+        }
         return;
     }
 

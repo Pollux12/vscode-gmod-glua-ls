@@ -200,9 +200,13 @@ export function detectGmRdb(garrysmodPath: string): string | undefined {
         return undefined;
     }
 
-    for (const dllName of ALL_RDB_DLLS) {
-        if (fs.existsSync(path.join(binDir, dllName))) {
-            return dllName;
+    const candidates = process.platform === 'linux'
+        ? ['gmsv_rdb_linux64.so', 'gmsv_rdb_linux.so', 'gmsv_rdb_linux64.dll', 'gmsv_rdb_linux.dll']
+        : ALL_RDB_DLLS;
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(path.join(binDir, candidate))) {
+            return candidate;
         }
     }
 
@@ -247,9 +251,13 @@ export function detectGmRdbClient(garrysmodPath: string): string | undefined {
         return undefined;
     }
 
-    for (const dllName of ALL_RDB_CLIENT_DLLS) {
-        if (fs.existsSync(path.join(binDir, dllName))) {
-            return dllName;
+    const candidates = process.platform === 'linux'
+        ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux.so', 'gmcl_rdb_linux64.dll', 'gmcl_rdb_linux.dll']
+        : ALL_RDB_CLIENT_DLLS;
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(path.join(binDir, candidate))) {
+            return candidate;
         }
     }
 
@@ -433,7 +441,7 @@ async function fetchLatestPreRelease(): Promise<GmRdbRelease | null> {
 
             return release.assets.some((asset) => {
                 return typeof asset?.name === 'string'
-                    && ALL_RDB_DLLS.includes(asset.name)
+                    && (ALL_RDB_DLLS.includes(asset.name) || ALL_RDB_CLIENT_DLLS.includes(asset.name))
                     && typeof asset?.browser_download_url === 'string';
             });
         }) ?? null;
@@ -486,12 +494,15 @@ export async function fetchReleaseForCurrentExtensionChannel(): Promise<GmRdbRel
     return fetchLatestRelease();
 }
 
-function buildSharedAutorunLua(port: number, clientPort?: number): string {
+function buildSharedAutorunLua(port: number, clientPort: number = DEFAULT_RDB_CLIENT_PORT): string {
     return [
         '-- [GLuaLS] Auto-managed by GLuaLS extension. Do not edit.',
         '_GLUALS = _GLUALS or {}',
         '',
         'if SERVER then',
+        '    if not (util and util.IsBinaryModuleInstalled and util.IsBinaryModuleInstalled("rdb")) then',
+        '        return',
+        '    end',
         '    require("rdb")',
         `    rdb.activate(${port})`,
         '    util.AddNetworkString("gm_rdb_exec")',
@@ -626,28 +637,26 @@ function buildSharedAutorunLua(port: number, clientPort?: number): string {
         '',
         '        ErrorNoHalt("[GLuaLS] Unknown exec kind: " .. tostring(kind) .. "\\n")',
         '    end)',
-        ...(clientPort !== undefined ? [
-            '    if util and util.IsBinaryModuleInstalled and util.IsBinaryModuleInstalled("rdb") then',
-            '        local ok, requiredModule = pcall(require, "rdb")',
-            '        if ok and istable(requiredModule) and isfunction(requiredModule.activate) then',
-            `            requiredModule.activate(${clientPort})`,
-            '        elseif istable(rdb_client) and isfunction(rdb_client.activate) then',
-            `            rdb_client.activate(${clientPort})`,
-            '        else',
-            '            ErrorNoHalt("[GLuaLS] Failed to load client debugger module via require(\\"rdb\\").\\n")',
-            '        end',
-            '    end',
-        ] : []),
+        '    if util and util.IsBinaryModuleInstalled and util.IsBinaryModuleInstalled("rdb") then',
+        '        local ok, requiredModule = pcall(require, "rdb")',
+        '        if ok and istable(requiredModule) and isfunction(requiredModule.activate) then',
+        `            requiredModule.activate(${clientPort})`,
+        '        elseif ok and istable(rdb_client) and isfunction(rdb_client.activate) then',
+        `            rdb_client.activate(${clientPort})`,
+        '        else',
+        '            ErrorNoHalt("[GLuaLS] Failed to load client debugger module via require(\\"rdb\\").\\n")',
+        '        end',
+        '    end',
         'end',
         '',
     ].join('\n');
 }
 
-export function writeAutorunFile(garrysmodPath: string, port: number, clientPort?: number): void {
+export function writeAutorunFile(garrysmodPath: string, port: number, clientPort: number = DEFAULT_RDB_CLIENT_PORT): void {
     syncAutorunFile(garrysmodPath, port, clientPort);
 }
 
-export function syncAutorunFile(garrysmodPath: string, port: number, clientPort?: number): AutorunSyncStatus {
+export function syncAutorunFile(garrysmodPath: string, port: number, clientPort: number = DEFAULT_RDB_CLIENT_PORT): AutorunSyncStatus {
     const autorunDir = path.join(garrysmodPath, 'lua', 'autorun');
     // the debugger runtime script used to live at sh_luals.lua; we now create debug.lua
     const autorunPath = path.join(autorunDir, 'debug.lua');
@@ -769,7 +778,7 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
             await downloadFile(asset.browser_download_url, destinationPath, progress);
 
             progress.report({ message: 'Writing shared debugger autorun file…' });
-            writeAutorunFile(garrysmodPath, port);
+            writeAutorunFile(garrysmodPath, port, DEFAULT_RDB_CLIENT_PORT);
 
             progress.report({ message: 'Cleaning up legacy initializations…' });
             cleanupLegacyInitInjection(garrysmodPath);
@@ -839,7 +848,7 @@ async function writeLaunchConfig(workspaceFolder: vscode.WorkspaceFolder, config
         : [];
 
     const index = existingConfigurations.findIndex(
-        (entry) => entry['type'] === GMOD_DEBUGGER_TYPE && entry['name'] === config.name
+        (entry) => entry['type'] === config.type && entry['name'] === config.name
     );
     const configRecord: Record<string, unknown> = { ...config };
 
@@ -1009,6 +1018,19 @@ function getPreferredWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
     }
 
     return vscode.workspace.workspaceFolders?.[0];
+}
+
+export function getAutoDetectedWorkspaceGarrysmodPath(workspaceFolder: vscode.WorkspaceFolder): string | undefined {
+    return detectWorkspaceSrcdsLayout(workspaceFolder)?.garrysmodPath;
+}
+
+export function getAutoDetectedClientGarrysmodPath(): string | undefined {
+    const detectedClientPath = detectClientGarrysmodInstallPath();
+    if (!detectedClientPath) {
+        return undefined;
+    }
+
+    return normalizeClientInstallInput(detectedClientPath).garrysmodPath;
 }
 
 export async function promptForGarrysmodPath(context: vscode.ExtensionContext): Promise<string | undefined> {
@@ -1367,7 +1389,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         const clientConfig: DebugConfig = {
             type: GMOD_CLIENT_DEBUGGER_TYPE,
             request: 'attach',
-            name: 'Attach to GMod Client (rdb_client)',
+            name: 'GMod Attach (Client)',
             host: '127.0.0.1',
             port: DEFAULT_RDB_CLIENT_PORT,
             sourceRoot,

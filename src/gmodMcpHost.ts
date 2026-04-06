@@ -150,7 +150,7 @@ export class GmodMcpHost implements vscode.Disposable {
     private startedAt?: Date;
     private port = 0;
     private rateLimitPerMinute = 60;
-    private readonly host = '127.0.0.1';
+    private host = '127.0.0.1';
     private readonly outputEntries: GmodMcpOutputEntry[] = [];
     private readonly errorEntries: GmodMcpOutputEntry[] = [];
     private readonly auditEntries: GmodMcpAuditEntry[] = [];
@@ -201,8 +201,10 @@ export class GmodMcpHost implements vscode.Disposable {
         this.startedAt = new Date();
         const address = server.address();
         if (address && typeof address !== 'string') {
+            this.host = address.address;
             this.port = address.port;
         } else {
+            this.host = '127.0.0.1';
             this.port = config.port;
         }
 
@@ -225,6 +227,9 @@ export class GmodMcpHost implements vscode.Disposable {
                 resolve();
             });
         });
+        this.startedAt = undefined;
+        this.port = 0;
+        this.host = '127.0.0.1';
         this.outputChannel.appendLine('[MCP] host stopped.');
     }
 

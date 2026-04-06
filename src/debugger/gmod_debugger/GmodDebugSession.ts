@@ -423,7 +423,9 @@ export class GmodDebugSession extends DebugSession {
       this.getControlService(args.realm, args.sourceRoot)
 
       const port = args.port ? args.port : 21111
-      const host = args.host ? args.host : 'localhost'
+      const host = args.host === 'localhost'
+        ? '127.0.0.1'
+        : (args.host ? args.host : '127.0.0.1')
 
       this.sendEvent(new OutputEvent(`Debugger connecting to ${host}:${port} ...\n`))
       this._debug_client = new LRDBClient.Client(
@@ -1277,8 +1279,8 @@ export class GmodDebugSession extends DebugSession {
           break
 
         case 'connected':
-          this._debuggee_protocol_version = event.params.protocol_version
-          this._debuggee_module_version = event.params.module_version
+          this._debuggee_protocol_version = event.params?.protocol_version
+          this._debuggee_module_version = event.params?.module_version
           this.sendEvent(new DebugEvent('gmod.connected', {
             protocolVersion: this._debuggee_protocol_version,
             moduleVersion: this._debuggee_module_version,
@@ -1289,9 +1291,9 @@ export class GmodDebugSession extends DebugSession {
             )
           )
 
-          if (this._debuggee_module_version && this._debuggee_module_version !== GmodDebugSession.EXPECTED_GM_RDB_MODULE_VERSION) {
+          if (!this._debuggee_module_version || this._debuggee_module_version !== GmodDebugSession.EXPECTED_GM_RDB_MODULE_VERSION) {
             this.sendEvent(new DebugEvent('gmod.rdb.versionMismatch', {
-              moduleVersion: this._debuggee_module_version,
+              moduleVersion: this._debuggee_module_version ?? 'unknown',
               expectedVersion: GmodDebugSession.EXPECTED_GM_RDB_MODULE_VERSION,
               protocolVersion: this._debuggee_protocol_version,
             }))

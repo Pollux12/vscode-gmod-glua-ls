@@ -744,7 +744,7 @@
                     {
                         "type": "gluals_gmod_client",
                         "request": "attach",
-                        "name": "Attach to GMod Client (rdb_client)",
+                        "name": "GMod Attach (Client)",
                         "host": "127.0.0.1",
                         "port": 21112,
                         "sourceRoot": "${workspaceFolder}",
@@ -762,7 +762,7 @@
                         "body": {
                             "type": "gluals_gmod_client",
                             "request": "attach",
-                            "name": "Attach to GMod Client (rdb_client)",
+                            "name": "GMod Attach (Client)",
                             "host": "127.0.0.1",
                             "port": 21112,
                             "sourceRoot": "${workspaceFolder}",
@@ -1754,14 +1754,14 @@
                     "gluals.gmod.autoCheckAnnotationUpdates": {
                         "type": "boolean",
                         "default": true,
-                        "markdownDescription": "Automatically check for annotation updates in the background. When enabled, the extension will periodically check if new annotations are available and notify you."
+                        "markdownDescription": "Enable background update checks for annotations and debugger modules (`gm_rdb` / `rdb_client`). Checks run once at startup and then repeatedly on the configured interval. Disabling this turns off all automatic update checks."
                     },
                     "gluals.gmod.annotationUpdateCheckIntervalMinutes": {
                         "type": "number",
                         "default": 60,
                         "minimum": 5,
                         "maximum": 1440,
-                        "markdownDescription": "How often to check for annotation updates (in minutes). Minimum 5 minutes, maximum 24 hours (1440 minutes). Default is 60 minutes (1 hour)."
+                        "markdownDescription": "How often to run background update checks for annotations and debugger modules (in minutes). Minimum 5 minutes, maximum 24 hours (1440 minutes). Default is 60 minutes."
                     },
                     "gluals.gmod.templatePath": {
                         "type": [
@@ -1804,16 +1804,11 @@
                         "default": true,
                         "markdownDescription": "%config.gmod.debugger.autoUpdateRdb.description%"
                     },
-                    "gluals.gmod.debugger.autoUpdateClientRdb": {
-                        "type": "boolean",
-                        "default": true,
-                        "markdownDescription": "Automatically prompt to update `rdb_client` (the GMod client-side debug module) when a version mismatch is detected."
-                    },
                     "gluals.gmod.mcp.enabled": {
                         "type": "boolean",
                         "default": true,
                         "scope": "machine",
-                        "markdownDescription": "Enable the local authenticated MCP host for GMod debug tool execution."
+                        "markdownDescription": "Enable the authenticated MCP host for GMod debug tool execution."
                     },
                     "gluals.gmod.mcp.port": {
                         "type": "integer",
@@ -1821,13 +1816,13 @@
                         "minimum": 0,
                         "maximum": 65535,
                         "scope": "machine",
-                        "markdownDescription": "Port for the local MCP host (`0` chooses a random ephemeral port)."
+                        "markdownDescription": "Port for the MCP host (`0` chooses a random ephemeral port)."
                     },
                     "gluals.gmod.mcp.authToken": {
                         "type": "string",
                         "default": "",
                         "scope": "machine",
-                        "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure local token automatically."
+                        "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure token automatically."
                     },
                     "gluals.gmod.mcp.rateLimitPerMinute": {
                         "type": "integer",
