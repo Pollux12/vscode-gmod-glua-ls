@@ -1,12 +1,13 @@
 ﻿# Changelog
 
-## Unreleased  - 2026-04-xx
+## [1.0.9]  - 2026-04-07
 
 ### VS Code Extension
 - Fix errors and entity panel being shared for all debugger instances
 - Add clientside debugger support
 - Add optional clientside debugger setup step to debug wizard
 - Add client gmod install autodetection
+- Update auto-update system for debugger and annotations
 - Update srcds install autodetection
 - Update documentation
 
@@ -23,8 +24,6 @@
   - `-rdb_pause_on_activate [seconds]` (off by default, time default = 60s, 0 = inf)
 - Update CI workflow for better build speed
 - Various fixes and improvements
-
-
 
 ## [1.0.8] - 2026-04-04
 
