@@ -744,7 +744,7 @@
                     {
                         "type": "gluals_gmod_client",
                         "request": "attach",
-                        "name": "GMod Attach (Client)",
+                        "name": "[CLIENT] Attach to Gmod",
                         "host": "127.0.0.1",
                         "port": 21112,
                         "sourceRoot": "${workspaceFolder}",
@@ -762,7 +762,7 @@
                         "body": {
                             "type": "gluals_gmod_client",
                             "request": "attach",
-                            "name": "GMod Attach (Client)",
+"name": "[CLIENT] Attach to Gmod",
                             "host": "127.0.0.1",
                             "port": 21112,
                             "sourceRoot": "${workspaceFolder}",
