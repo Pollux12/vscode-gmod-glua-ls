@@ -157,10 +157,29 @@ export class GmodErrorFrameItem extends vscode.TreeItem {
 export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorTreeItem | GmodErrorFrameItem>, vscode.Disposable {
     private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodErrorTreeItem | GmodErrorFrameItem | undefined | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
-    private readonly storeSubscription: vscode.Disposable;
+    private storeSubscription: vscode.Disposable;
+    private currentStore: GmodErrorStore | undefined;
 
-    constructor(private readonly store: GmodErrorStore) {
-        this.storeSubscription = this.store.onDidChange(() => this.refresh());
+    constructor(initialStore?: GmodErrorStore) {
+        this.currentStore = initialStore;
+        this.storeSubscription = initialStore
+            ? initialStore.onDidChange(() => this.refresh())
+            : { dispose: () => {} };
+    }
+
+    /**
+     * Swap the backing store shown in this view.
+     * Pass `undefined` to show an empty view (e.g. no active debug session).
+     */
+    switchStore(store: GmodErrorStore | undefined): void {
+        this.storeSubscription.dispose();
+        this.currentStore = store;
+        if (store) {
+            this.storeSubscription = store.onDidChange(() => this.refresh());
+        } else {
+            this.storeSubscription = { dispose: () => {} };
+        }
+        this.refresh();
     }
 
     getTreeItem(element: GmodErrorTreeItem | GmodErrorFrameItem): vscode.TreeItem {
@@ -169,7 +188,7 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
 
     getChildren(element?: GmodErrorTreeItem | GmodErrorFrameItem): Array<GmodErrorTreeItem | GmodErrorFrameItem> {
         if (!element) {
-            return this.store.getAll().map((error) => new GmodErrorTreeItem(error));
+            return (this.currentStore?.getAll() ?? []).map((error) => new GmodErrorTreeItem(error));
         }
 
         if (element instanceof GmodErrorTreeItem) {
@@ -187,7 +206,7 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
     }
 
     clear(): void {
-        this.store.clear();
+        this.currentStore?.clear();
     }
 
     dispose(): void {
@@ -197,17 +216,15 @@ export class GmodErrorViewProvider implements vscode.TreeDataProvider<GmodErrorT
 }
 
 export function registerGmodErrorView(context: vscode.ExtensionContext): {
-    store: GmodErrorStore;
     provider: GmodErrorViewProvider;
     treeView: vscode.TreeView<GmodErrorTreeItem | GmodErrorFrameItem>;
 } {
-    const store = new GmodErrorStore();
-    const provider = new GmodErrorViewProvider(store);
+    const provider = new GmodErrorViewProvider();
     const treeView = vscode.window.createTreeView('gmodErrors', {
         treeDataProvider: provider,
         showCollapseAll: false,
     });
 
-    context.subscriptions.push(store, provider, treeView);
-    return { store, provider, treeView };
+    context.subscriptions.push(provider, treeView);
+    return { provider, treeView };
 }

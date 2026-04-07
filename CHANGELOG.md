@@ -1,5 +1,31 @@
 ﻿# Changelog
 
+## Unreleased  - 2026-04-xx
+
+### VS Code Extension
+- Fix errors and entity panel being shared for all debugger instances
+- Add clientside debugger support
+- Add optional clientside debugger setup step to debug wizard
+- Add client gmod install autodetection
+- Update srcds install autodetection
+- Update documentation
+
+### Language Server
+- Fix net read/write mismatch with if statements
+- Fix param mismatch not skipping for union checks
+- Add entity type narrowing for more accurate entity types
+- Update documentation
+
+### Debugger
+- Add full clientside debugger support
+- Add CLI flags / launch options for pause on activate and allow remote connection (SRCDS + Client)
+  - `-rdb_allow_remote` (off by default)
+  - `-rdb_pause_on_activate [seconds]` (off by default, time default = 60s, 0 = inf)
+- Update CI workflow for better build speed
+- Various fixes and improvements
+
+
+
 ## [1.0.8] - 2026-04-04
 
 ### VS Code Extension

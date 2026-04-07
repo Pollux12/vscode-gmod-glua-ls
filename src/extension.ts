@@ -71,7 +71,7 @@ let gmodClientRdbUpdater: GmodClientRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
-let gmodErrorStore: GmodErrorStore | undefined;
+const gmodErrorStores = new Map<string, GmodErrorStore>();
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
 let languageConfigurationDisposable: vscode.Disposable | undefined;
@@ -280,6 +280,7 @@ function registerEventListeners(context: vscode.ExtensionContext): void {
         vscode.workspace.onDidChangeWorkspaceFolders(onWorkspaceFoldersChanged),
         vscode.debug.onDidStartDebugSession(onDidStartDebugSession),
         vscode.debug.onDidTerminateDebugSession(onDidTerminateDebugSession),
+        vscode.debug.onDidChangeActiveDebugSession(onDidChangeActiveDebugSession),
         vscode.debug.onDidReceiveDebugSessionCustomEvent(onDidReceiveDebugSessionCustomEvent),
     ];
 
@@ -1009,17 +1010,28 @@ async function setGmodRealm(realm?: string): Promise<void> {
 function onDidStartDebugSession(session: vscode.DebugSession): void {
     if (session.type === 'gluals_gmod') {
         void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
-        gmodErrorStore?.clear();
+        gmodErrorStores.set(session.id, new GmodErrorStore());
         gmodEntityExplorerProvider?.clear();
         gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
         gmodRealmProvider?.refresh();
     } else if (session.type === 'gluals_gmod_client') {
         void gmodClientRdbUpdater?.ensureRuntimeFilesUpToDate(session);
-        gmodErrorStore?.clear();
+        gmodErrorStores.set(session.id, new GmodErrorStore());
+    }
+
+    // If this new session is already the active one, reflect it in the views.
+    if (vscode.debug.activeDebugSession?.id === session.id) {
+        updateActiveSessionViews();
     }
 }
 
 function onDidTerminateDebugSession(session: vscode.DebugSession): void {
+    const store = gmodErrorStores.get(session.id);
+    if (store) {
+        store.dispose();
+        gmodErrorStores.delete(session.id);
+    }
+
     if (session.type === 'gluals_gmod') {
         gmodEntityExplorerProvider?.clear();
         gmodSessionRealms.delete(session.id);
@@ -1027,6 +1039,25 @@ function onDidTerminateDebugSession(session: vscode.DebugSession): void {
     } else if (session.type === 'gluals_gmod_client') {
         gmodSessionRealms.delete(session.id);
     }
+
+    // Update views in case the terminated session was the active one.
+    updateActiveSessionViews();
+}
+
+function onDidChangeActiveDebugSession(_session: vscode.DebugSession | undefined): void {
+    updateActiveSessionViews();
+}
+
+/**
+ * Called whenever the active debug session changes (start, terminate, or user switching).
+ * Swaps the error view to show errors for the newly active session, and immediately
+ * clears/reloads the entity explorer so it reflects the correct session's state.
+ */
+function updateActiveSessionViews(): void {
+    const session = vscode.debug.activeDebugSession;
+    const store = session ? gmodErrorStores.get(session.id) : undefined;
+    gmodErrorViewProvider?.switchStore(store);
+    gmodEntityExplorerProvider?.clear();
 }
 
 function initializeGmodExplorer(context: vscode.ExtensionContext): void {
@@ -1045,12 +1076,11 @@ function initializeGmodRealmView(context: vscode.ExtensionContext): void {
 }
 
 function initializeGmodErrorView(context: vscode.ExtensionContext): void {
-    if (gmodErrorStore && gmodErrorViewProvider) {
+    if (gmodErrorViewProvider) {
         return;
     }
 
     const registered = registerGmodErrorView(context);
-    gmodErrorStore = registered.store;
     gmodErrorViewProvider = registered.provider;
 }
 
@@ -1610,14 +1640,14 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.errors.clear') {
-        gmodErrorStore?.clear();
+        gmodErrorStores.get(event.session.id)?.clear();
         return;
     }
 
     if (event.event === 'gmod.error') {
         const params = coerceGmodErrorNotificationParams(event.body);
         if (params) {
-            gmodErrorStore?.addError(params);
+            gmodErrorStores.get(event.session.id)?.addError(params);
             pushGmodToolEntry(gmodToolErrorEntries, {
                 timestamp: new Date().toISOString(),
                 source: params.source,
