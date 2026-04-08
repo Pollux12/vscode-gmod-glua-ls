@@ -27,7 +27,7 @@ import {
     runExclusiveUpdate,
 } from './GmodRdbUpdaterShared';
 
-export const EXPECTED_GM_RDB_VERSION = '1.2.0';
+export const EXPECTED_GM_RDB_VERSION = '0.0.9';
 
 interface VersionCheckResult {
     readonly moduleVersion: string;

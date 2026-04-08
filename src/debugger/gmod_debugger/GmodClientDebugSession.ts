@@ -121,7 +121,6 @@ export class GmodClientDebugSession extends DebugSession {
   private static THREAD_ID = 1
 
   private static DEBUGGER_PROTOCOL_VERSION = 'gmod-2'
-  private static EXPECTED_GM_RDB_MODULE_VERSION = '1.2.0'
 
   private _debug_client?: LRDBClient.Client
 
@@ -929,17 +928,6 @@ export class GmodClientDebugSession extends DebugSession {
               `[Client] Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
             )
           )
-
-          if (
-            !this._debuggee_module_version ||
-            this._debuggee_module_version !== GmodClientDebugSession.EXPECTED_GM_RDB_MODULE_VERSION
-          ) {
-            this.sendEvent(new DebugEvent('gmod.rdb.client.versionMismatch', {
-              moduleVersion: this._debuggee_module_version ?? 'unknown',
-              expectedVersion: GmodClientDebugSession.EXPECTED_GM_RDB_MODULE_VERSION,
-              protocolVersion: this._debuggee_protocol_version,
-            }))
-          }
           break
 
         case 'output': {
