@@ -197,12 +197,6 @@
                 "icon": "$(cloud-download)"
             },
             {
-                "command": "gmodRdbClient.checkForUpdates",
-                "title": "Check for rdb_client Updates",
-                "category": "GLuaLS",
-                "icon": "$(cloud-download)"
-            },
-            {
                 "command": "gmodErrors.clear",
                 "title": "%command.gmodErrors.clear.title%",
                 "category": "GLuaLS",

@@ -156,7 +156,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.updateAnnotations', handler: updateGmodAnnotations },
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
-        { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodClientRdbUpdates },
+        { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
         { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
@@ -810,21 +810,10 @@ async function removeGmodAnnotations(): Promise<void> {
 }
 
 async function checkForGmodRdbUpdates(): Promise<void> {
-    if (!gmodRdbUpdater) {
-        vscode.window.showErrorMessage('gm_rdb updater is not initialized');
-        return;
-    }
-
-    await gmodRdbUpdater.runManualUpdateCommand();
-}
-
-async function checkForGmodClientRdbUpdates(): Promise<void> {
-    if (!gmodClientRdbUpdater) {
-        vscode.window.showErrorMessage('rdb_client updater is not initialized');
-        return;
-    }
-
-    await gmodClientRdbUpdater.runManualUpdateCommand();
+    await Promise.all([
+        gmodRdbUpdater?.runManualUpdateCommand() ?? Promise.resolve(),
+        gmodClientRdbUpdater?.runManualUpdateCommand() ?? Promise.resolve(),
+    ]);
 }
 
 type GmodControlCommand =

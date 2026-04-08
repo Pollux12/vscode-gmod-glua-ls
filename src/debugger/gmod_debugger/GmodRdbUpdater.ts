@@ -108,19 +108,51 @@ export class GmodRdbUpdater {
     }
 
     public async runManualUpdateCommand(): Promise<void> {
-        const expectedVersion = await this.resolveExpectedVersion();
-        const action = await vscode.window.showInformationMessage(
-            `Check and install gm_rdb ${expectedVersion} and refresh GLuaLS runtime files?`,
-            'Update Now',
-            'Cancel'
-        );
-
-        if (action !== 'Update Now') {
+        const garrysmodPath = this.resolveKnownGarrysmodPath();
+        if (!garrysmodPath) {
+            const action = await vscode.window.showInformationMessage(
+                'gm_rdb: path not configured.',
+                'Setup'
+            );
+            if (action === 'Setup') {
+                void vscode.commands.executeCommand('gluals.gmod.configureDebugger');
+            }
             return;
         }
 
-        await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
-        await this.runUpdateFlow();
+        const detected = detectGmRdb(garrysmodPath);
+        if (!detected) {
+            const action = await vscode.window.showInformationMessage(
+                'gm_rdb not found in the configured path.',
+                'Setup'
+            );
+            if (action === 'Setup') {
+                void vscode.commands.executeCommand('gluals.gmod.configureDebugger');
+            }
+            return;
+        }
+
+        const [expectedVersion, installedVersion] = await Promise.all([
+            this.resolveExpectedVersion(),
+            this.resolveInstalledVersion(garrysmodPath, detected),
+        ]);
+
+        if (installedVersion && this.normalizeVersion(installedVersion) === expectedVersion) {
+            vscode.window.showInformationMessage(`gm_rdb is up to date (${expectedVersion}).`);
+            return;
+        }
+
+        const versionInfo = installedVersion
+            ? `(installed: ${installedVersion}, latest: ${expectedVersion})`
+            : `(latest: ${expectedVersion})`;
+        const action = await vscode.window.showInformationMessage(
+            `gm_rdb update available ${versionInfo}.`,
+            'Update'
+        );
+        if (action === 'Update') {
+            await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
+            await this.runUpdateFlow();
+        }
     }
 
     public async ensureRuntimeFilesUpToDate(session?: vscode.DebugSession): Promise<void> {

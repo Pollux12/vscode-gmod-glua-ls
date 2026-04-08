@@ -1277,6 +1277,23 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
                 vscode.window.showErrorMessage(`gm_rdb install failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
+    } else {
+        const latestRelease = await fetchReleaseForCurrentExtensionChannel().catch(() => null);
+        const versionInfo = latestRelease ? ` Latest release: ${latestRelease.tag_name}.` : '';
+        const updateChoice = await vscode.window.showInformationMessage(
+            `gm_rdb (${existingDll}) is already installed.${versionInfo} Update to the latest release?`,
+            { modal: false },
+            'Update',
+            'Skip'
+        );
+
+        if (updateChoice === 'Update') {
+            try {
+                await runGmRdbInstaller(srcdsSelection.garrysmodPath, DEFAULT_RDB_PORT);
+            } catch (error) {
+                vscode.window.showErrorMessage(`gm_rdb update failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
     }
 
     const serverDebuggerInstalled = !!detectGmRdb(srcdsSelection.garrysmodPath);

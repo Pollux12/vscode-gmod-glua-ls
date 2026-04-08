@@ -3,6 +3,7 @@ import {
     ALL_RDB_CLIENT_DLLS,
     detectGarrysmodBranchName,
     detectGmRdbClient,
+    getStoredClientGarrysmodPath,
     isGarrysmodX64,
     GmRdbRelease,
     promptForClientGarrysmodPath,
@@ -87,19 +88,51 @@ export class GmodClientRdbUpdater {
     }
 
     public async runManualUpdateCommand(): Promise<void> {
-        const expectedVersion = await this.resolveExpectedVersion();
-        const action = await vscode.window.showInformationMessage(
-            `Check and install rdb_client ${expectedVersion} and refresh GLuaLS runtime files?`,
-            'Update Now',
-            'Cancel'
-        );
-
-        if (action !== 'Update Now') {
+        const garrysmodPath = getStoredClientGarrysmodPath(this.context);
+        if (!garrysmodPath) {
+            const action = await vscode.window.showInformationMessage(
+                'rdb_client: path not configured.',
+                'Setup'
+            );
+            if (action === 'Setup') {
+                void vscode.commands.executeCommand('gluals.gmod.configureDebugger');
+            }
             return;
         }
 
-        await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
-        await this.runUpdateFlow();
+        const detected = detectGmRdbClient(garrysmodPath);
+        if (!detected) {
+            const action = await vscode.window.showInformationMessage(
+                'rdb_client not found in the configured path.',
+                'Setup'
+            );
+            if (action === 'Setup') {
+                void vscode.commands.executeCommand('gluals.gmod.configureDebugger');
+            }
+            return;
+        }
+
+        const [expectedVersion, installedVersion] = await Promise.all([
+            this.resolveExpectedVersion(),
+            this.resolveInstalledVersion(garrysmodPath, detected),
+        ]);
+
+        if (installedVersion && this.normalizeVersion(installedVersion) === expectedVersion) {
+            vscode.window.showInformationMessage(`rdb_client is up to date (${expectedVersion}).`);
+            return;
+        }
+
+        const versionInfo = installedVersion
+            ? `(installed: ${installedVersion}, latest: ${expectedVersion})`
+            : `(latest: ${expectedVersion})`;
+        const action = await vscode.window.showInformationMessage(
+            `rdb_client update available ${versionInfo}.`,
+            'Update'
+        );
+        if (action === 'Update') {
+            await this.context.globalState.update(this.SKIP_EXPECTED_VERSION_KEY, undefined);
+            await this.runUpdateFlow();
+        }
     }
 
     public async ensureRuntimeFilesUpToDate(session?: vscode.DebugSession): Promise<void> {

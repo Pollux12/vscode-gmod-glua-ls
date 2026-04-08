@@ -4,7 +4,7 @@
     "command.gmodEntityExplorer.refresh.title": "Refresh",
     "command.gmodEntityExplorer.search.title": "Search",
     "command.gmodErrors.clear.title": "Clear",
-    "command.gmodRdb.checkForUpdates.title": "GMod RDB: Check for Updates",
+    "command.gmodRdb.checkForUpdates.title": "GMod Debugger: Check for Updates",
     "config.common.deprecated": "This option is deprecated",
     "config.common.enum.default.description": "Use value from `.emmyrc.json` or fall back to default",
     "config.common.enum.off.description": "Override `.emmyrc.json` and disable this option",
