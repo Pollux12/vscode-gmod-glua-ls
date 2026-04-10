@@ -289,82 +289,82 @@ function assertManifest(packageJson) {
     for (const key of [
         "class",
         "class.declaration",
-        "event",
+        "event.static",
         "parameter",
-        "parameter.callable",
         "parameter.declaration",
-        "parameter.declaration.callable",
-        "parameter.modification",
         "variable",
-        "variable.declaration",
-        "variable.modification",
         "variable.local",
-        "variable.local.declaration",
-        "variable.local.modification",
-        "variable.object",
-        "variable.local.object",
-        "variable.local.declaration.object",
-        "variable.local.modification.object",
-        "variable.global",
-        "variable.global.modification",
-        "variable.global.object",
-        "variable.callable",
-        "variable.local.callable",
-        "variable.global.callable",
+        "variable.declaration.readonly",
+        "variable.readonly.local",
         "variable.readonly",
-        "parameter.object",
-        "parameter.declaration.object",
+        "variable.abstract",
+        "variable.defaultLibrary",
+        "variable.definition",
+        "variable.global",
+        "variable.declaration",
         "function",
-        "function.callable",
         "function.declaration",
         "function.defaultLibrary",
+        "function.static",
         "field",
-        "field.callable",
-        "field.global",
-        "field.global.callable",
-        "field.declaration",
-        "field.modification",
         "method",
-        "method.callable",
         "method.declaration",
         "namespace",
-        "namespace.defaultLibrary",
+        "namespace.global",
         "property",
         "property.declaration",
-        "property.modification"
+        "comment.documentation",
+        "keyword",
+        "keyword.async",
+        "keyword.declaration",
+        "keyword.documentation",
+        "keyword.readonly",
+        "macro",
+        "number",
+        "number.static",
+        "operator",
+        "string",
+        "string.deprecated",
+        "string.modification",
+        "struct",
+        "struct.declaration",
+        "type",
+        "type.modification",
+        "type.readonly",
+        "typeParameter"
     ]) {
         assert.ok(semanticScopes[key], `expected semanticTokenScopes.${key}`);
     }
 
     assert.deepEqual(
-        semanticScopes.parameter.slice(0, 2),
-        ["variable.parameter", "variable.parameter.lua"],
-        "expected parameter mapping to start from VS Code defaults"
+        semanticScopes.parameter.slice(0, 1),
+        ["variable.parameter.lua"],
+        "expected parameter mapping"
     );
     assert.deepEqual(
-        semanticScopes.variable.slice(0, 2),
-        ["variable.other.readwrite", "entity.name.variable"],
-        "expected variable mapping to start from VS Code defaults"
+        semanticScopes.variable.slice(0, 1),
+        ["variable.other.lua"],
+        "expected variable mapping"
     );
     assert.deepEqual(
         semanticScopes["variable.readonly"].slice(0, 1),
-        ["variable.other.constant"],
-        "expected readonly variables to use the default constant scope"
+        ["variable.other.lua"],
+        "expected readonly variable mapping"
     );
     assert.deepEqual(
         semanticScopes.property.slice(0, 1),
-        ["variable.other.property"],
-        "expected property mapping to start from the default property scope"
+        ["entity.other.attribute.lua"],
+        "expected property mapping"
     );
     assert.deepEqual(
-        semanticScopes.namespace.slice(0, 2),
-        ["entity.name.namespace", "entity.name.type.module"],
-        "expected namespace mapping to start from namespace/module scopes"
+        semanticScopes.namespace.slice(0, 1),
+        ["entity.name.namespace"],
+        "expected namespace mapping"
     );
     assert.deepEqual(
-        semanticScopes["function.defaultLibrary"].slice(0, 2),
-        ["support.function", "entity.name.function"],
-        "expected default library functions to keep the default support.function scope first"
+        semanticScopes["function.defaultLibrary"].slice(0, 1),
+        ["support.function.lua"],
+        "expected default library function mapping"
     );
 
     assert.equal(
