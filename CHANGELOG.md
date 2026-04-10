@@ -1,5 +1,23 @@
 ﻿# Changelog
 
+## [1.0.10]  - 2026-04-09
+
+### VS Code Extension
+- Improved syntax/semantic highlighting
+- Fix auto-update failing for debugger on old builds
+- Merge debugger update into one command rather than two, improve flow
+- Debugger setup overwrites existing binary files if detected
+
+### Language Server
+- Merge many commits from upstream
+  - Better performance
+  - Various bug fixes
+- Add better semantic highlighting features
+- Fix highlighting not updating if file was already open
+
+### Debugger
+- Add fallback version
+
 ## [1.0.9]  - 2026-04-07
 
 ### VS Code Extension
