@@ -43,6 +43,7 @@ import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import { GmodUpdateScheduler } from './debugger/gmod_debugger/GmodUpdateScheduler';
+import { detectGamemodeBaseLibraries } from './gmodGamemodeBaseDetector';
 import {
     hasAnyGmodDebugConfiguration,
     runGmodDebugSetupWizard,
@@ -544,6 +545,24 @@ async function doStartServer(): Promise<void> {
         if (annotationsPath) {
             initOptions.gmodAnnotationsPath = annotationsPath;
         }
+    }
+
+    // Detect gamemode base libraries for each workspace folder
+    const gamemodeBaseLibraries: string[] = [];
+    const config = vscode.workspace.getConfiguration('gluals');
+    const autoDetectEnabled = config.get<boolean>('gmod.autoDetectGamemodeBase', true);
+    if (autoDetectEnabled && vscode.workspace.workspaceFolders) {
+        for (const folder of vscode.workspace.workspaceFolders) {
+            try {
+                const detected = await detectGamemodeBaseLibraries(folder);
+                gamemodeBaseLibraries.push(...detected);
+            } catch {
+                // Silently skip detection failures
+            }
+        }
+    }
+    if (gamemodeBaseLibraries.length > 0) {
+        initOptions.gamemodeBaseLibraries = gamemodeBaseLibraries;
     }
 
     const clientOptions: LanguageClientOptions = {

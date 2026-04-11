@@ -1750,6 +1750,12 @@
                         "default": true,
                         "markdownDescription": "Enable background update checks for annotations and debugger modules (`gm_rdb` / `rdb_client`). Checks run once at startup and then repeatedly on the configured interval. Disabling this turns off all automatic update checks."
                     },
+                    "gluals.gmod.autoDetectGamemodeBase": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "resource",
+                        "markdownDescription": "Automatically detect when a gamemode derives from a base gamemode (via the `\"base\"` field in the gamemode `.txt` file) and add the base gamemode as a library. This enables autocompletion and goto-definition for code defined in the base gamemode. Disable this if you want to manage gamemode libraries manually via `workspace.library`."
+                    },
                     "gluals.gmod.annotationUpdateCheckIntervalMinutes": {
                         "type": "number",
                         "default": 60,
