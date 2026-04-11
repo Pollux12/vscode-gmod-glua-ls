@@ -1,6 +1,22 @@
 ﻿# Changelog
 
-## [1.0.10]  - 2026-04-09
+## [1.0.11] [Pre-Release (RC)] - 2026-04-11
+
+### VS Code Extension
+- Add gamemode base detection + automatic library load attempt for non sandbox/base gamemodes.
+- Fix color picker showing outside of brackets for `Color()`
+
+### Language Server
+- Add gamemode base detection + automatic library load attempt for non sandbox/base gamemodes.
+- Fix goto-def not respecting realms (was not fully realm aware)
+- Fix regression with race condition resulting in field assignments being unstable
+- Fix undefined `i` in `for i` loops
+- Fix color picker not being recognised for many valid Color objects
+- Fix narrowing sometimes leading to undefined issues with globals
+- Fix infer sometimes leading to incorrect assumptions when infering classes
+-
+
+## [1.0.10] [Pre-Release] - 2026-04-09
 
 ### VS Code Extension
 - Improved syntax/semantic highlighting
@@ -18,7 +34,8 @@
 ### Debugger
 - Add fallback version
 
-## [1.0.9]  - 2026-04-07
+
+## [1.0.9] [Pre-Release] - 2026-04-07
 
 ### VS Code Extension
 - Fix errors and entity panel being shared for all debugger instances
@@ -43,7 +60,8 @@
 - Update CI workflow for better build speed
 - Various fixes and improvements
 
-## [1.0.8] - 2026-04-04
+
+## [1.0.8] [Pre-Release] - 2026-04-04
 
 ### VS Code Extension
 - Add and improve various tests
@@ -59,7 +77,8 @@
 - Fix x64 win debugger crash with entity explorer
 - Add better CI workflow
 
-## [1.0.7] - 2026-04-02
+
+## [1.0.7] [Pre-Release] - 2026-04-02
 
 ### VS Code Extension
 - Add 32/64-bit debugger binary auto-detection on Windows
@@ -80,7 +99,8 @@
 ### Debugger
 - Fix x64 windows crash
 
-## [1.0.6] - 2026-03-29
+
+## [1.0.6] [Pre-Release] - 2026-03-29
 
 ### VS Code Extension
 - Add option to configure debugger from "GLuaLS Status Bar" menu
@@ -90,7 +110,8 @@
 ### Language Server
 - Fix linter issues
 
-## [1.0.5] - 2026-03-28
+
+## [1.0.5] [Pre-Release] - 2026-03-28
 
 ### VS Code Extension
 - Add VSIX files to releases
@@ -104,7 +125,8 @@
 - Fix narrowing not respecting alias types
 - Fix various issues with class fields and inference
 
-## [1.0.4] - 2026-03-28
+
+## [1.0.4] [Pre-Release] - 2026-03-28
 
 ### VS Code Extension
 - Fix permission issue with CI
@@ -113,7 +135,8 @@
 ### Language Server
 - Update badges and documentation
 
-## [1.0.3] - 2026-03-27
+
+## [1.0.3] [Pre-Release] - 2026-03-27
 
 ### Language Server
 - Fix syntax errors showing on wrong line
@@ -121,18 +144,21 @@
 - Fix style issues
 - Fix member inference only showing last definition
 
-## [1.0.2] - 2026-03-26
+
+## [1.0.2] [Pre-Release] - 2026-03-26
 
 ### Language Server
 - Fix failing tests
 - Update network configuration documentation
 
-## [1.0.1] - 2026-03-25
+
+## [1.0.1] [Pre-Release] - 2026-03-25
 
 ### Language Server
 - Documentation update
 
-## [1.0.0] - 2026-03-30
+
+## [1.0.0] [Stable] - 2026-03-30
 
 ### VS Code Extension
 - Garry's Mod GLua Language Server fork from EmmyLua Analyzer
