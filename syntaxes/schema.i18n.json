@@ -605,7 +605,10 @@
         "en": "Whether to add or remove a trailing separator after the last field in a table (`keep`, `never`, `always`, `smart`)."
     },
     "EmmyrcGmod.annotationsPath": {
-        "en": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely."
+        "en": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely."
+    },
+    "EmmyrcGmod.autoDetectGamemodeBase": {
+        "en": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\nSet to `false` to disable this detection."
     },
     "EmmyrcGmod.autoLoadAnnotations": {
         "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
@@ -777,6 +780,9 @@
         "en": "Whether to enable strict mode require path.",
         "zh-CN": "是否启用严格模式 require 路径。严格模式时 require 必须从指定的根目录开始。"
     },
+    "EmmyrcWorkspace.enableIsolation": {
+        "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, main workspaces can resolve symbols from other main workspaces,\nwhich allows index/diagnostic overlap while keeping per-workspace config loading."
+    },
     "EmmyrcWorkspace.enableReindex": {
         "en": "Enable full project reindex after changing a file.",
         "zh-CN": "启用重新索引。"
@@ -790,10 +796,7 @@
         "zh-CN": "忽略的目录。"
     },
     "EmmyrcWorkspace.ignoreDirDefaults": {
-        "en": "Default directories/globs to ignore. Accepts strings (legacy) or objects with id, optional glob, label, and disabled. Objects are delta-based: disabled:true removes a built-in by id; a new id adds a custom default; an existing id with a glob overrides the built-in pattern."
-    },
-    "EmmyrcWorkspace.useDefaultIgnores": {
-        "en": "Whether to apply default ignore directories. Set to false to disable default exclusions like E2 files and test directories."
+        "en": "Default directories/globs to ignore. Accepts strings (legacy, replaces built-ins) or\nobjects with `id`, optional `label`, `glob`, and `disabled`. Objects start from the\nbuilt-in list and apply overrides: `disabled: true` removes a built-in by id; a new id\nadds a custom default; an existing id with a `glob` changes the built-in's pattern.\nSet `useDefaultIgnores` to `false` to suppress all resolved defaults at runtime."
     },
     "EmmyrcWorkspace.ignoreGlobs": {
         "en": "Ignore globs. eg: [\"**/*.lua\"]",
@@ -814,8 +817,35 @@
         "en": "Delay between changing a file and full project reindex, in milliseconds.",
         "zh-CN": "当保存文件时，ls 将在指定毫秒后重新索引工作区。"
     },
+    "EmmyrcWorkspace.useDefaultIgnores": {
+        "en": "Whether to apply default ignore directories. Set to false to disable\ndefault exclusions like E2 files and test directories."
+    },
     "EmmyrcWorkspace.workspaceRoots": {
         "en": "Workspace roots. eg: [\"src\", \"test\"]",
         "zh-CN": "工作区根目录列表。例如：[\"src\", \"test\"]"
+    },
+    "IgnoreDirDefaultDefinition": {
+        "en": "Object form for `workspace.ignoreDirDefaults` entries."
+    },
+    "IgnoreDirDefaultDefinition.disabled": {
+        "en": "Set to `true` to remove this built-in default for the workspace."
+    },
+    "IgnoreDirDefaultDefinition.glob": {
+        "en": "The glob pattern to apply. Omit when only using `disabled`."
+    },
+    "IgnoreDirDefaultDefinition.id": {
+        "en": "Stable identifier. Built-in ids: `\"wire-expression2\"`, `\"wire-expression-files\"`,\n`\"tests\"`, `\"test\"`. Custom ids can be any non-empty string."
+    },
+    "IgnoreDirDefaultDefinition.label": {
+        "en": "Optional human-readable label (informational only)."
+    },
+    "IgnoreDirDefaultEntry": {
+        "en": "An entry in `workspace.ignoreDirDefaults`. Accepts either a legacy glob string (backward\ncompatible) or an object that can override, disable, or add to the built-in default list."
+    },
+    "IgnoreDirDefaultEntry.anyOf.0": {
+        "en": "Legacy string glob — when the whole list is pure strings, replaces built-ins entirely."
+    },
+    "IgnoreDirDefaultEntry.anyOf.1": {
+        "en": "Object entry for granular override of built-in defaults."
     }
 }

@@ -74,7 +74,6 @@
     "gmod": {
       "$ref": "#/$defs/EmmyrcGmod",
       "default": {
-        "autoLoadAnnotations": null,
         "defaultRealm": "shared",
         "dynamicFieldsGlobal": true,
         "enabled": true,
@@ -208,7 +207,8 @@
               "icon": "tools",
               "id": "stools",
               "include": [
-                "weapons/gmod_tool/stools/**"
+                "weapons/gmod_tool/stools/**",
+                "weapons/gmod_tool/*.lua"
               ],
               "label": "STools",
               "parentId": "weapons",
@@ -330,6 +330,7 @@
     "workspace": {
       "$ref": "#/$defs/EmmyrcWorkspace",
       "default": {
+        "enableIsolation": true,
         "enableReindex": false,
         "encoding": "utf-8",
         "ignoreDir": [],
@@ -1790,9 +1791,16 @@
       "type": "object",
       "properties": {
         "annotationsPath": {
-          "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .emmyrc to disable entirely.",
+          "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely.",
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "autoDetectGamemodeBase": {
+          "description": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\nSet to `false` to disable this detection.",
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -1801,8 +1809,7 @@
           "type": [
             "boolean",
             "null"
-          ],
-          "default": null
+          ]
         },
         "defaultRealm": {
           "$ref": "#/$defs/EmmyrcGmodRealm",
@@ -1982,7 +1989,8 @@
                 "icon": "tools",
                 "id": "stools",
                 "include": [
-                  "weapons/gmod_tool/stools/**"
+                  "weapons/gmod_tool/stools/**",
+                  "weapons/gmod_tool/*.lua"
                 ],
                 "label": "STools",
                 "parentId": "weapons",
@@ -2357,7 +2365,8 @@
               "icon": "tools",
               "id": "stools",
               "include": [
-                "weapons/gmod_tool/stools/**"
+                "weapons/gmod_tool/stools/**",
+                "weapons/gmod_tool/*.lua"
               ],
               "label": "STools",
               "parentId": "weapons",
@@ -2781,6 +2790,12 @@
     "EmmyrcWorkspace": {
       "type": "object",
       "properties": {
+        "enableIsolation": {
+          "description": "Whether multi-root workspaces should remain isolated.\n\nWhen false, main workspaces can resolve symbols from other main workspaces,\nwhich allows index/diagnostic overlap while keeping per-workspace config loading.",
+          "type": "boolean",
+          "default": true,
+          "x-vscode-setting": true
+        },
         "enableReindex": {
           "description": "Enable full project reindex after changing a file.",
           "type": "boolean",
@@ -2823,8 +2838,7 @@
           ],
           "items": {
             "$ref": "#/$defs/IgnoreDirDefaultEntry"
-          },
-          "x-gluals-editor": "ignoreDirDefaults"
+          }
         },
         "ignoreGlobs": {
           "description": "Ignore globs. eg: [\"**/*.lua\"]",
