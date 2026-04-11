@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
+const BUILTIN_GAMEMODE_BASES = new Set(['sandbox', 'base']);
+
 /**
  * Detects gamemode base dependencies by reading the gamemode `.txt` file
  * and following the `"base"` chain. Returns an array of relative library paths
@@ -17,14 +19,10 @@ export async function detectGamemodeBaseLibraries(
     const folderPath = workspaceFolder.uri.fsPath;
     const folderName = path.basename(folderPath);
 
-    // Look for <foldername>.txt in the workspace root
-    const txtFileName = `${folderName}.txt`;
-    const txtFilePath = path.join(folderPath, txtFileName);
-
     const libraries: string[] = [];
     const visited = new Set<string>([folderName.toLowerCase()]);
 
-    let currentBase = await readGamemodeBase(txtFilePath);
+    let currentBase = await readGamemodeBaseFromFolder(folderPath, folderName);
 
     while (currentBase) {
         const baseLower = currentBase.toLowerCase();
@@ -35,6 +33,13 @@ export async function detectGamemodeBaseLibraries(
         }
         visited.add(baseLower);
 
+        // Built-in gamemodes already have curated annotation metadata, so
+        // loading their source folders as libraries creates duplicate hook and
+        // member entries with noisier hover/completion output.
+        if (BUILTIN_GAMEMODE_BASES.has(baseLower)) {
+            break;
+        }
+
         // The base gamemode folder is a sibling of the current gamemode folder
         // Gamemodes are stored as: gamemodes/<gamemode_name>/
         // So the base would be at: ../<base_name>
@@ -42,11 +47,48 @@ export async function detectGamemodeBaseLibraries(
         libraries.push(relativePath);
 
         // Try to walk the chain further
-        const baseTxtPath = path.join(folderPath, '..', baseLower, `${baseLower}.txt`);
-        currentBase = await readGamemodeBase(baseTxtPath);
+        const baseFolderPath = path.join(folderPath, '..', baseLower);
+        currentBase = await readGamemodeBaseFromFolder(baseFolderPath, baseLower);
     }
 
     return libraries;
+}
+
+async function readGamemodeBaseFromFolder(
+    folderPath: string,
+    folderName: string
+): Promise<string | undefined> {
+    const txtFilePath = findGamemodeManifestPath(folderPath, folderName);
+    if (!txtFilePath) {
+        return undefined;
+    }
+
+    return readGamemodeBase(txtFilePath);
+}
+
+function findGamemodeManifestPath(folderPath: string, folderName: string): string | undefined {
+    const preferredPath = path.join(folderPath, `${folderName}.txt`);
+    if (fs.existsSync(preferredPath)) {
+        return preferredPath;
+    }
+
+    try {
+        const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+        const candidates = entries
+            .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.txt'))
+            .map((entry) => path.join(folderPath, entry.name))
+            .sort((left, right) => left.localeCompare(right));
+
+        for (const candidatePath of candidates) {
+            if (readGamemodeBaseSync(candidatePath) !== undefined) {
+                return candidatePath;
+            }
+        }
+    } catch {
+        return undefined;
+    }
+
+    return undefined;
 }
 
 /**
@@ -56,6 +98,10 @@ export async function detectGamemodeBaseLibraries(
  * Never throws — all errors are silently caught.
  */
 async function readGamemodeBase(txtFilePath: string): Promise<string | undefined> {
+    return readGamemodeBaseSync(txtFilePath);
+}
+
+function readGamemodeBaseSync(txtFilePath: string): string | undefined {
     try {
         const content = fs.readFileSync(txtFilePath, 'utf-8').trim();
         if (!content) {
@@ -105,7 +151,7 @@ function parseKeyValuesBase(content: string): string | undefined {
             return line;
         });
 
-        // Tokenize: extract all quoted strings
+        // Tokenize quoted strings plus top-level structure markers.
         const tokens: string[] = [];
         for (const line of lines) {
             const trimmed = line.trim();
@@ -142,6 +188,9 @@ function parseKeyValuesBase(content: string): string | undefined {
                         }
                         break;
                     }
+                } else if (trimmed[i] === '{' || trimmed[i] === '}') {
+                    tokens.push(trimmed[i]);
+                    i++;
                 } else {
                     i++;
                 }
