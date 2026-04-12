@@ -14,23 +14,10 @@ export class EmmyrcSchemaContentProvider implements vscode.TextDocumentContentPr
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         const schemaIdentifier = path.posix.basename(uri.path);
-        const locale = vscode.env.language;
         let schemaFileName: string;
 
         if (schemaIdentifier === 'emmyrc') {
-            switch (locale) {
-                case 'zh-cn':
-                case 'zh-CN':
-                case 'zh':
-                    schemaFileName = 'schema.zh-cn.json';
-                    break;
-                case 'en':
-                case 'en-US':
-                case 'en-GB':
-                default:
-                    schemaFileName = 'schema.json';
-                    break;
-            }
+            schemaFileName = 'schema.json';
         } else {
             return '';
         }

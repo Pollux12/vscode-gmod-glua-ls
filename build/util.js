@@ -33,15 +33,6 @@ export const schemaPath = join(__dirname, "..", "syntaxes", "schema.json");
 export const readSchema = () => readJson(schemaPath);
 export const writeSchema = (data) => writeJson(schemaPath, data);
 
-export const schemaPathZhCn = join(
-    __dirname,
-    "..",
-    "syntaxes",
-    "schema.zh-cn.json"
-);
-export const readSchemaZhCn = () => readJson(schemaPathZhCn);
-export const writeSchemaZhCn = (data) => writeJson(schemaPathZhCn, data);
-
 export const schemaPathI18n = join(
     __dirname,
     "..",

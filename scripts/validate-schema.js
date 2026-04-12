@@ -15,17 +15,23 @@ const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 
 const FILES_TO_VALIDATE = [
-    path.join(ROOT, "syntaxes", "schema.json"),
-    path.join(ROOT, "syntaxes", "schema.zh-cn.json"),
-    path.join(ROOT, "syntaxes", "schema.i18n.json"),
+    { path: path.join(ROOT, "syntaxes", "schema.json"), required: true },
+    { path: path.join(ROOT, "syntaxes", "schema.i18n.json"), required: true },
 ];
 
 let allPassed = true;
 
-for (const filePath of FILES_TO_VALIDATE) {
-    const relative = path.relative(ROOT, filePath);
+for (const item of FILES_TO_VALIDATE) {
+    const relative = path.relative(ROOT, item.path);
+
+    if (!fs.existsSync(item.path)) {
+        console.error(`  FAIL  ${relative}: file not found`);
+        allPassed = false;
+        continue;
+    }
+
     try {
-        const raw = fs.readFileSync(filePath, "utf8");
+        const raw = fs.readFileSync(item.path, "utf8");
         JSON.parse(raw);
         console.log(`  ok  ${relative}`);
     } catch (/** @type {any} */ err) {

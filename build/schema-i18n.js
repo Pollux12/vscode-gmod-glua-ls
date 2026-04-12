@@ -3,7 +3,6 @@ import {
     readSchemaI18n,
     schemaPathI18n,
     writeSchemaI18n,
-    writeSchemaZhCn,
 } from "./util.js";
 import { existsSync } from "fs";
 
@@ -78,39 +77,6 @@ function mergeWithExistingTranslations(newDescriptions, existingI18n) {
     return merged;
 }
 
-function translateDescriptions(obj, i18nData, currentPath = "") {
-    if (typeof obj !== "object" || obj === null) {
-        return obj;
-    }
-
-    const result = Array.isArray(obj) ? [] : {};
-
-    for (const [key, value] of Object.entries(obj)) {
-        if (key === "description" && typeof value === "string") {
-            // 生成简化的路径来查找翻译
-            const cleanPath = buildCleanPath(currentPath, obj);
-
-            // 查找中文翻译
-            if (
-                cleanPath &&
-                i18nData[cleanPath] &&
-                i18nData[cleanPath]["zh-CN"]
-            ) {
-                result[key] = i18nData[cleanPath]["zh-CN"];
-            } else {
-                result[key] = value; // 保持原文
-            }
-        } else if (typeof value === "object") {
-            const newPath = currentPath ? `${currentPath}.${key}` : key;
-            result[key] = translateDescriptions(value, i18nData, newPath);
-        } else {
-            result[key] = value;
-        }
-    }
-
-    return result;
-}
-
 export function main() {
     // 读取 schema.json 文件
     const schema = readSchema();
@@ -152,19 +118,6 @@ export function main() {
     // 更新 schema.i18n.json 文件
     writeSchemaI18n(finalDescriptions);
     console.log(`已更新 schema.i18n.json 文件`);
-
-    // 生成中文版的 schema.zh-cn.json（只处理 definitions 部分）
-    const translatedDefinitions = translateDescriptions(
-        schema.$defs,
-        finalDescriptions
-    );
-    const translatedSchema = {
-        ...schema,
-        $defs: translatedDefinitions,
-    };
-
-    writeSchemaZhCn(translatedSchema);
-    console.log(`已生成中文版 schema.zh-cn.json 文件`);
 }
 
 main()
