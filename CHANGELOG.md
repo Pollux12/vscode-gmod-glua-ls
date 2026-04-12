@@ -1,5 +1,11 @@
 ﻿# Changelog
 
+## [1.0.13] [Pre-Release (RC3)] - 2026-04-12
+
+### Language Server
+- Fixed a bug where module used with redefined `package.seeall` resulted in corruption of language server output.
+
+
 ## [1.0.12] [Pre-Release (RC2)] - 2026-04-12
 
 ### VS Code Extension
