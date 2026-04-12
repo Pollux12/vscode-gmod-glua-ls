@@ -1,5 +1,17 @@
 ﻿# Changelog
 
+## [1.0.12] [Pre-Release (RC2)] - 2026-04-12
+
+### VS Code Extension
+- Update docs and UI for multi-root isolation configuration
+
+### Language Server
+- Add workspace isolation toggle
+- Add config merge system for when workspace isolation is disabled
+- Disable workspace isolation by default
+- Fix regression causing inlay hint flicker on type
+- Fix regression causing edits to class definition not updating global index
+
 ## [1.0.11] [Pre-Release (RC)] - 2026-04-11
 
 ### VS Code Extension
@@ -14,7 +26,6 @@
 - Fix color picker not being recognised for many valid Color objects
 - Fix narrowing sometimes leading to undefined issues with globals
 - Fix infer sometimes leading to incorrect assumptions when infering classes
--
 
 ## [1.0.10] [Pre-Release] - 2026-04-09
 
