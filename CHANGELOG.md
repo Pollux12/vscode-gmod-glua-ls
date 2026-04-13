@@ -16,13 +16,14 @@
 
 ## [1.0.16] [Pre-Release] - 2026-04-13
 
-Version bump (same as 1.0.15)
+- Version bump (same as 1.0.15)
 
 ---
 
 ## [1.0.15] [Stable] - 2026-04-13
 
-All changes from 1.0.6 -> 1.0.14
+- All changes from 1.0.6 -> 1.0.14
+- Fix potential crash on startup
 
 ---
 
