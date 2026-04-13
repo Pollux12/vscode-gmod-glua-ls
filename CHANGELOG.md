@@ -1,15 +1,28 @@
 ﻿# Changelog
 
-## [1.1.1] [Pre-Release] - Unreleased
+## [1.1.x] [WIP] - Unreleased
 
 ### VS Code Extension
 - Add gamemode setup wizard
 - Add presets for common gamemodes
+  - If gamemode is detected, user is prompted via notification for preset/wizard
+  - This generates an initial `.gluarc.json` configuration to add basic support for opened gamemode
 
 ### Language Server
-- Add automatic gamemode scanning
-- Add global scripted class for better gamemode support (e.g. schema)
-- Refactor scriped class system
+- Add automatic gamemode scanning to apply presets
+- Refactor scriped class system for better gamemode support with globals (e.g. schema)
+
+---
+
+## [1.0.16] [Pre-Release] - 2026-04-13
+
+Version bump (same as 1.0.15)
+
+---
+
+## [1.0.15] [Stable] - 2026-04-13
+
+All changes from 1.0.6 -> 1.0.14
 
 ---
 

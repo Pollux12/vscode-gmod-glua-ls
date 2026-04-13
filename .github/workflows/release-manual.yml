@@ -111,6 +111,10 @@ jobs:
               repo: context.repo.repo,
               workflow_id: "build.yml",
               ref: "${{ steps.meta.outputs.tag }}",
+              inputs: {
+                channel: "${{ inputs.channel }}",
+                version: "${{ steps.meta.outputs.version }}",
+              },
             });
 
       - name: Summary
