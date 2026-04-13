@@ -1,10 +1,38 @@
 ﻿# Changelog
 
+## [1.1.1] [Pre-Release] - Unreleased
+
+### VS Code Extension
+- Add gamemode setup wizard
+- Add presets for common gamemodes
+
+### Language Server
+- Add automatic gamemode scanning
+- Add global scripted class for better gamemode support (e.g. schema)
+- Refactor scriped class system
+
+---
+
+## [1.0.14] [Pre-Release (RC4)] - 2026-04-13
+
+### Language Server
+- Fix various string issues
+- Fix various module issues
+
+### Annotations
+- Fix file class missing methods
+- Fix string.gsub missing parameters
+- Fix debug.getinfo incorrect parameters
+- Fix integer enums not allowing raw integer values
+
+---
+
 ## [1.0.13] [Pre-Release (RC3)] - 2026-04-12
 
 ### Language Server
 - Fixed a bug where module used with redefined `package.seeall` resulted in corruption of language server output.
 
+---
 
 ## [1.0.12] [Pre-Release (RC2)] - 2026-04-12
 
@@ -18,7 +46,9 @@
 - Fix regression causing inlay hint flicker on type
 - Fix regression causing edits to class definition not updating global index
 
-## [1.0.11] [Pre-Release (RC)] - 2026-04-11
+---
+
+## [1.0.11] [Pre-Release (RC1)] - 2026-04-11
 
 ### VS Code Extension
 - Add gamemode base detection + automatic library load attempt for non sandbox/base gamemodes.
@@ -32,6 +62,8 @@
 - Fix color picker not being recognised for many valid Color objects
 - Fix narrowing sometimes leading to undefined issues with globals
 - Fix infer sometimes leading to incorrect assumptions when infering classes
+
+---
 
 ## [1.0.10] [Pre-Release] - 2026-04-09
 
@@ -51,6 +83,7 @@
 ### Debugger
 - Add fallback version
 
+---
 
 ## [1.0.9] [Pre-Release] - 2026-04-07
 
@@ -77,6 +110,7 @@
 - Update CI workflow for better build speed
 - Various fixes and improvements
 
+---
 
 ## [1.0.8] [Pre-Release] - 2026-04-04
 
@@ -94,6 +128,7 @@
 - Fix x64 win debugger crash with entity explorer
 - Add better CI workflow
 
+---
 
 ## [1.0.7] [Pre-Release] - 2026-04-02
 
@@ -116,6 +151,7 @@
 ### Debugger
 - Fix x64 windows crash
 
+---
 
 ## [1.0.6] [Pre-Release] - 2026-03-29
 
@@ -127,6 +163,7 @@
 ### Language Server
 - Fix linter issues
 
+---
 
 ## [1.0.5] [Pre-Release] - 2026-03-28
 
@@ -142,6 +179,7 @@
 - Fix narrowing not respecting alias types
 - Fix various issues with class fields and inference
 
+---
 
 ## [1.0.4] [Pre-Release] - 2026-03-28
 
@@ -152,6 +190,7 @@
 ### Language Server
 - Update badges and documentation
 
+---
 
 ## [1.0.3] [Pre-Release] - 2026-03-27
 
@@ -161,6 +200,7 @@
 - Fix style issues
 - Fix member inference only showing last definition
 
+---
 
 ## [1.0.2] [Pre-Release] - 2026-03-26
 
@@ -168,12 +208,14 @@
 - Fix failing tests
 - Update network configuration documentation
 
+---
 
 ## [1.0.1] [Pre-Release] - 2026-03-25
 
 ### Language Server
 - Documentation update
 
+---
 
 ## [1.0.0] [Stable] - 2026-03-30
 
