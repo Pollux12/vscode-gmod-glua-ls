@@ -2766,7 +2766,7 @@
           "default": true
         },
         "inferredTypeMismatch": {
-          "description": "Keep inferred types lenient in mismatch diagnostics.",
+          "description": "Report type mismatch diagnostics for inferred values when strict mode is enabled.",
           "type": "boolean",
           "default": false
         },

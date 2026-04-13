@@ -767,7 +767,7 @@
         "zh-CN": "doc定义的基础常量类型可以匹配基础类型，使 int 可以匹配 `---@alias id 1|2|3`，string 同理。"
     },
     "EmmyrcStrict.inferredTypeMismatch": {
-        "en": "Keep inferred types lenient in mismatch diagnostics."
+        "en": "Report type mismatch diagnostics for inferred values when strict mode is enabled."
     },
     "EmmyrcStrict.metaOverrideFileDefine": {
         "en": "meta define overrides file define",

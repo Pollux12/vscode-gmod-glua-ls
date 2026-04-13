@@ -1636,9 +1636,7 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
     };
 
     const render = () => {
-        note.textContent = rawDefinitions.size === 0 && legacyGlobs.length === 0
-            ? "Built-in scripted classes stay active until you add overrides, removals, or custom definitions. Path must match the real folder structure; include globs only decide which files are in scope."
-            : "Workspace changes are stored as overrides and removals so built-in updates still flow through. Keep Path aligned with the actual folders you want the explorer and analyzer to classify.";
+        note.textContent = "Define special scripted classes such as entities and effects, alongside custom classes such as plugins, items, etc. This is a powerful feature which can automatically create a class for each file/folder within the given directory. See the defaults below for examples, you can also override as required.";
 
         body.innerHTML = "";
 

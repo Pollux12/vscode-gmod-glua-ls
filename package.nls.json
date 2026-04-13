@@ -71,7 +71,7 @@
     "config.gluals.references.shortStringSearch.description": "Also search for usages in strings.",
     "config.gluals.semanticTokens.enable.description": "Enable semantic tokens.",
     "config.gluals.semanticTokens.renderDocumentationMarkup.description": "Render Markdown/RST in documentation. Set `doc.syntax` for this option to have effect.",
-    "config.gluals.strict.inferredTypeMismatch.description": "Keep inferred types lenient in mismatch diagnostics.",
+    "config.gluals.strict.inferredTypeMismatch.description": "Report type mismatch diagnostics for inferred values when strict mode is enabled.",
     "config.gluals.workspace.enableReindex.description": "Enable full project reindex after changing a file.",
     "config.gluals.workspace.reindexDuration.description": "Delay between changing a file and full project reindex, in milliseconds.",
     "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update `gm_rdb` and `rdb_client` (the GMod debugger modules) when an outdated version is detected during the background update check.",
