@@ -186,15 +186,19 @@ export class EmmyContext implements vscode.Disposable {
      */
     async stopServer(): Promise<void> {
         if (!this._client) {
+            this.setServerStopped();
             return;
         }
 
+        const clientToStop = this._client;
+        this._client = undefined;
         this.setServerStopping();
         try {
-            await this._client.stop();
+            await clientToStop.stop();
             this.setServerStopped();
         } catch (error) {
             this.setServerError('Failed to stop server', String(error));
+            throw error;
         }
     }
 

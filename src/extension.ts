@@ -5,9 +5,9 @@ import * as process from 'process';
 import * as os from 'os';
 import * as fs from 'fs';
 
-import { LanguageClient, LanguageClientOptions, ServerOptions, StreamInfo } from 'vscode-languageclient/node';
+import { LanguageClient, LanguageClientOptions, ServerOptions, State, StreamInfo } from 'vscode-languageclient/node';
 import { LuaLanguageConfiguration } from './languageConfiguration';
-import { EmmyContext } from './emmyContext';
+import { EmmyContext, ServerState } from './emmyContext';
 import { IServerLocation, IServerPosition } from './lspExtension';
 import { onDidChangeConfiguration } from './annotator';
 import { ConfigurationManager } from './configManager';
@@ -60,10 +60,32 @@ interface CommandEntry {
     readonly id: string;
     readonly handler: (...args: any[]) => any;
 }
-
 // Global state
 export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
+let serverStartPromise: Promise<void> | undefined;
+let suppressNextStartupError = false;
+let startupRunCounter = 0;
+let currentStartupRunId: number | undefined;
+const cancelledStartupRuns = new Set<number>();
+
+class StartupCancelledError extends Error {
+    constructor() {
+        super('GLuaLS startup cancelled');
+    }
+}
+
+function cancelPendingStartupRun(): void {
+    if (currentStartupRunId !== undefined) {
+        cancelledStartupRuns.add(currentStartupRunId);
+    }
+}
+
+function throwIfStartupCancelled(startupRunId: number): void {
+    if (cancelledStartupRuns.has(startupRunId)) {
+        throw new StartupCancelledError();
+    }
+}
 
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
@@ -136,6 +158,11 @@ export async function deactivate(): Promise<void> {
         await gmodMcpHost.stop();
         gmodMcpHost.dispose();
         gmodMcpHost = undefined;
+    }
+    try {
+        await extensionContext?.stopServer();
+    } catch {
+        // Ignore stop errors during shutdown; extension host is unloading.
     }
     extensionContext?.dispose();
     Annotator.dispose();
@@ -505,36 +532,115 @@ function delay(ms: number): Promise<void> {
 
 
 async function startServer(): Promise<void> {
-    try {
-        extensionContext.setServerStarting();
-        await doStartServer();
+    if (serverStartPromise) {
+        await serverStartPromise;
+        return;
+    }
+
+    if (extensionContext.client?.isRunning()) {
         extensionContext.setServerRunning();
-        void warmupOpenDocumentSymbols();
-        onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
-    } catch (reason) {
-        const errorMessage = reason instanceof Error ? reason.message : String(reason);
-        extensionContext.setServerError(
-            'Failed to start GLua Language Server',
-            errorMessage
-        );
-        vscode.window.showErrorMessage(
-            `Failed to start GLua Language Server: ${errorMessage}`,
-            'Retry',
-            'Show Logs'
-        ).then(action => {
-            if (action === 'Retry') {
-                restartServer();
-            } else if (action === 'Show Logs') {
-                extensionContext.client?.outputChannel?.show();
+        return;
+    }
+
+    const startupRunId = ++startupRunCounter;
+    currentStartupRunId = startupRunId;
+    serverStartPromise = (async () => {
+        try {
+            extensionContext.setServerStarting();
+            await doStartServer(startupRunId);
+            extensionContext.setServerRunning();
+            void warmupOpenDocumentSymbols();
+            onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
+        } catch (reason) {
+            const errorMessage = reason instanceof Error ? reason.message : String(reason);
+            const client = extensionContext.client;
+            extensionContext.client = undefined;
+            if (client) {
+                try {
+                    await client.stop();
+                } catch {
+                    // Ignore cleanup failures after startup errors.
+                }
             }
-        });
+
+            if (suppressNextStartupError || reason instanceof StartupCancelledError) {
+                extensionContext.setServerStopped();
+                return;
+            }
+
+            extensionContext.setServerError(
+                'Failed to start GLua Language Server',
+                errorMessage
+            );
+            vscode.window.showErrorMessage(
+                `Failed to start GLua Language Server: ${errorMessage}`,
+                'Retry',
+                'Show Logs'
+            ).then(action => {
+                if (action === 'Retry') {
+                    restartServer();
+                } else if (action === 'Show Logs') {
+                    extensionContext.client?.outputChannel?.show();
+                }
+            });
+        } finally {
+            cancelledStartupRuns.delete(startupRunId);
+            if (currentStartupRunId === startupRunId) {
+                currentStartupRunId = undefined;
+            }
+            suppressNextStartupError = false;
+            serverStartPromise = undefined;
+        }
+    })();
+
+    await serverStartPromise;
+}
+
+function registerLanguageClientStateHandlers(client: LanguageClient): void {
+    client.onDidChangeState((event) => {
+        if (extensionContext.client !== client) {
+            return;
+        }
+
+        switch (event.newState) {
+            case State.Starting:
+                extensionContext.setServerStarting();
+                break;
+            case State.Running:
+                extensionContext.setServerRunning();
+                break;
+            case State.Stopped:
+                extensionContext.client = undefined;
+                if (extensionContext.serverStatus.state !== ServerState.Error) {
+                    extensionContext.setServerStopped();
+                }
+                break;
+            default:
+                break;
+        }
+    });
+}
+
+async function cleanupExistingClient(): Promise<void> {
+    const existingClient = extensionContext.client;
+    if (!existingClient) {
+        return;
+    }
+
+    extensionContext.client = undefined;
+    try {
+        await existingClient.stop();
+    } catch {
+        // Ignore stale-client cleanup failures and continue with a fresh start.
     }
 }
 
 /**
  * Start the language server
  */
-async function doStartServer(): Promise<void> {
+async function doStartServer(startupRunId: number): Promise<void> {
+    await cleanupExistingClient();
+    throwIfStartupCancelled(startupRunId);
     const context = extensionContext.vscodeContext;
     const configManager = new ConfigurationManager(getConfigurationScope());
 
@@ -554,9 +660,14 @@ async function doStartServer(): Promise<void> {
     if (autoDetectEnabled && vscode.workspace.workspaceFolders) {
         for (const folder of vscode.workspace.workspaceFolders) {
             try {
+                throwIfStartupCancelled(startupRunId);
                 const detected = await detectGamemodeBaseLibraries(folder);
+                throwIfStartupCancelled(startupRunId);
                 gamemodeBaseLibraries.push(...detected);
-            } catch {
+            } catch (error) {
+                if (error instanceof StartupCancelledError) {
+                    throw error;
+                }
                 // Silently skip detection failures
             }
         }
@@ -581,14 +692,21 @@ async function doStartServer(): Promise<void> {
         serverOptions = createProcessServerOptions(context, configManager);
     }
 
-    extensionContext.client = new LanguageClient(
+    throwIfStartupCancelled(startupRunId);
+
+    const client = new LanguageClient(
         extensionContext.LANGUAGE_ID,
         'GLua Language Server',
         serverOptions,
         clientOptions
     );
+    registerLanguageClientStateHandlers(client);
+    extensionContext.client = client;
 
-    await extensionContext.client.start();
+    throwIfStartupCancelled(startupRunId);
+
+    await client.start();
+    throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
 }
 
@@ -723,21 +841,26 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
 }
 
 async function restartServer(): Promise<void> {
-    const client = extensionContext.client;
-    if (!client) {
-        await startServer();
-    } else {
-        extensionContext.setServerStopping('Restarting server...');
-        try {
-            if (client.isRunning()) {
-                await client.stop();
-            }
-            await startServer();
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            extensionContext.setServerError('Failed to restart server', errorMessage);
-            vscode.window.showErrorMessage(`Failed to restart server: ${errorMessage}`);
+    extensionContext.setServerStopping('Restarting server...');
+    const pendingStart = serverStartPromise;
+    if (pendingStart) {
+        // Restart during startup should cancel the in-flight start without surfacing a failure toast.
+        suppressNextStartupError = true;
+        cancelPendingStartupRun();
+    }
+
+    try {
+        await cleanupExistingClient();
+        if (pendingStart) {
+            await pendingStart.catch(() => {
+                // Intentional cancellation during restart.
+            });
         }
+        await startServer();
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        extensionContext.setServerError('Failed to restart server', errorMessage);
+        vscode.window.showErrorMessage(`Failed to restart server: ${errorMessage}`);
     }
 }
 
@@ -763,8 +886,19 @@ async function startServerCommand(): Promise<void> {
 }
 
 async function stopServer(): Promise<void> {
+    const pendingStart = serverStartPromise;
     try {
+        if (pendingStart) {
+            // Stopping while startup is in-flight is intentional, so suppress startup-failed toast.
+            suppressNextStartupError = true;
+            cancelPendingStartupRun();
+        }
         await extensionContext.stopServer();
+        if (pendingStart) {
+            await pendingStart.catch(() => {
+                // Intentional cancellation during stop.
+            });
+        }
         vscode.window.showInformationMessage('GLua Language Server stopped');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
