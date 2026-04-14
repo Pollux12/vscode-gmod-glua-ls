@@ -52,6 +52,12 @@ import {
     isExpectedLifecycleRequestError,
     sendRequestWithStartupRetry,
 } from './languageServerRequests';
+import {
+    runFrameworkPresetCheck,
+    manualRerunFrameworkPresetCheck,
+    showApplyPresetPicker,
+    runCustomSetupWizard,
+} from './gmodPresetManager';
 
 /**
  * Command registration entry
@@ -221,6 +227,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
         { id: 'gluals.gmod.explorer.copyClassName', handler: copyGmodExplorerClassName },
         { id: 'gluals.gmod.explorer.revealInExplorer', handler: revealGmodExplorerItemInExplorer },
+        // Framework preset / wizard commands
+        { id: 'gluals.gmod.applyFrameworkPreset', handler: () => showApplyPresetPicker(context) },
+        { id: 'gluals.gmod.runFrameworkSetupWizard', handler: () => runCustomSetupWizard(context) },
+        { id: 'gluals.gmod.rerunFrameworkDetection', handler: () => manualRerunFrameworkPresetCheck(context) },
     ];
 
     // Register all commands
@@ -442,6 +452,8 @@ async function initializeExtension(): Promise<void> {
     await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
+    // Run framework preset detection after server is ready (non-blocking)
+    void runFrameworkPresetCheck(extensionContext.vscodeContext);
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -459,6 +471,9 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
 function onWorkspaceFoldersChanged(): void {
     onDidChangeConfiguration();
     void refreshGmodDebugConfigContext();
+    // Re-run framework preset detection for any newly added folders.
+    // Suppression logic prevents prompt spam for folders already processed.
+    void runFrameworkPresetCheck(extensionContext.vscodeContext);
 }
 
 function onDidOpenTextDocument(document: vscode.TextDocument): void {

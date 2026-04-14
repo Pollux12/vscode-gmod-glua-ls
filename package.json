@@ -271,6 +271,24 @@
                 "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
+            },
+            {
+                "command": "gluals.gmod.applyFrameworkPreset",
+                "title": "Apply Framework Preset",
+                "category": "GLuaLS",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "gluals.gmod.runFrameworkSetupWizard",
+                "title": "Framework Setup Wizard",
+                "category": "GLuaLS",
+                "icon": "$(wand)"
+            },
+            {
+                "command": "gluals.gmod.rerunFrameworkDetection",
+                "title": "Re-run Framework Detection",
+                "category": "GLuaLS",
+                "icon": "$(refresh)"
             }
         ],
         "languageModelTools": [

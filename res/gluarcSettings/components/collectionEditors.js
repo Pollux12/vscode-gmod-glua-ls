@@ -1003,6 +1003,7 @@ function normalizeScriptedClassDefinition(value) {
     const definition = { id };
     const label = typeof value.label === "string" ? value.label.trim() : "";
     const classGlobal = typeof value.classGlobal === "string" ? value.classGlobal.trim() : "";
+    const fixedClassName = typeof value.fixedClassName === "string" ? value.fixedClassName.trim() : "";
     const parentId = typeof value.parentId === "string" ? value.parentId.trim() : "";
     const icon = typeof value.icon === "string" ? value.icon.trim() : "";
     const rootDir = typeof value.rootDir === "string" ? value.rootDir.trim() : "";
@@ -1016,6 +1017,10 @@ function normalizeScriptedClassDefinition(value) {
     if (include.length > 0) definition.include = include;
     if (exclude.length > 0) definition.exclude = exclude;
     if (classGlobal) definition.classGlobal = classGlobal;
+    if (fixedClassName) definition.fixedClassName = fixedClassName;
+    if (typeof value.isGlobalSingleton === "boolean") definition.isGlobalSingleton = value.isGlobalSingleton;
+    if (typeof value.stripFilePrefix === "boolean") definition.stripFilePrefix = value.stripFilePrefix;
+    if (typeof value.hideFromOutline === "boolean") definition.hideFromOutline = value.hideFromOutline;
     if (parentId) definition.parentId = parentId;
     if (icon) definition.icon = icon;
     if (rootDir) definition.rootDir = rootDir;
@@ -1053,6 +1058,7 @@ function mergeScriptedClassDefinition(baseDefinition, overrideDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1062,6 +1068,21 @@ function mergeScriptedClassDefinition(baseDefinition, overrideDefinition) {
             merged[key] = cloneDefinition(overrideDefinition[key]);
         }
     });
+    if (overrideDefinition.isGlobalSingleton === true) {
+        merged.isGlobalSingleton = true;
+    } else if (overrideDefinition.isGlobalSingleton === false) {
+        delete merged.isGlobalSingleton;
+    }
+    if (overrideDefinition.stripFilePrefix === true) {
+        merged.stripFilePrefix = true;
+    } else if (overrideDefinition.stripFilePrefix === false) {
+        delete merged.stripFilePrefix;
+    }
+    if (overrideDefinition.hideFromOutline === true) {
+        merged.hideFromOutline = true;
+    } else if (overrideDefinition.hideFromOutline === false) {
+        delete merged.hideFromOutline;
+    }
     if (overrideDefinition.disabled === true) {
         merged.disabled = true;
     } else {
@@ -1163,6 +1184,7 @@ function buildScriptedClassOverride(defaultDefinition, effectiveDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1174,6 +1196,13 @@ function buildScriptedClassOverride(defaultDefinition, effectiveDefinition) {
             override[key] = cloneDefinition(effectiveValue);
         }
     });
+    for (const boolKey of ["isGlobalSingleton", "stripFilePrefix", "hideFromOutline"]) {
+        if (effectiveDefinition[boolKey] === true && defaultDefinition[boolKey] !== true) {
+            override[boolKey] = true;
+        } else if (effectiveDefinition[boolKey] !== true && defaultDefinition[boolKey] === true) {
+            override[boolKey] = false;
+        }
+    }
 
     return Object.keys(override).length > 1 ? override : null;
 }
@@ -1186,6 +1215,7 @@ function buildCustomScriptedClassPayload(effectiveDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1195,6 +1225,11 @@ function buildCustomScriptedClassPayload(effectiveDefinition) {
             payload[key] = cloneDefinition(effectiveDefinition[key]);
         }
     });
+    for (const boolKey of ["isGlobalSingleton", "stripFilePrefix", "hideFromOutline"]) {
+        if (effectiveDefinition[boolKey] === true) {
+            payload[boolKey] = true;
+        }
+    }
     return payload;
 }
 
@@ -1452,6 +1487,48 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
                 nextDefinition.classGlobal = nextValue || row.defaultDefinition?.classGlobal || row.id.toUpperCase();
             });
         });
+
+        const fixedClassNameInput = createField("Fixed Class Name", createScriptedClassTextInput(definition.fixedClassName || ""));
+        fixedClassNameInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = fixedClassNameInput.value.trim();
+                if (nextValue) {
+                    nextDefinition.fixedClassName = nextValue;
+                } else {
+                    nextDefinition.fixedClassName = "";
+                }
+            });
+        });
+
+        const isGlobalSingletonCheckbox = document.createElement("input");
+        isGlobalSingletonCheckbox.type = "checkbox";
+        isGlobalSingletonCheckbox.checked = !!definition.isGlobalSingleton;
+        isGlobalSingletonCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.isGlobalSingleton = isGlobalSingletonCheckbox.checked;
+            });
+        });
+        createField("Global Singleton", isGlobalSingletonCheckbox);
+
+        const stripFilePrefixCheckbox = document.createElement("input");
+        stripFilePrefixCheckbox.type = "checkbox";
+        stripFilePrefixCheckbox.checked = !!definition.stripFilePrefix;
+        stripFilePrefixCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.stripFilePrefix = stripFilePrefixCheckbox.checked;
+            });
+        });
+        createField("Strip File Prefix", stripFilePrefixCheckbox);
+
+        const hideFromOutlineCheckbox = document.createElement("input");
+        hideFromOutlineCheckbox.type = "checkbox";
+        hideFromOutlineCheckbox.checked = !!definition.hideFromOutline;
+        hideFromOutlineCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.hideFromOutline = hideFromOutlineCheckbox.checked;
+            });
+        });
+        createField("Hide From Outline", hideFromOutlineCheckbox);
 
         const rootDirInput = createField("Root Directory", createScriptedClassTextInput(definition.rootDir || ""));
         rootDirInput.addEventListener("change", () => {

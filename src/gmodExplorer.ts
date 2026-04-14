@@ -66,6 +66,10 @@ export interface LsScriptedClassDefinition {
     include: string[];
     exclude: string[];
     classGlobal: string;
+    fixedClassName?: string;
+    isGlobalSingleton?: boolean;
+    stripFilePrefix?: boolean;
+    hideFromOutline?: boolean;
     parentId?: string;
     icon?: string;
     rootDir: string;
@@ -142,16 +146,6 @@ const LEGACY_SCRIPTED_CLASS_DEFINITIONS: LsScriptedClassDefinition[] = [
         scaffold: {
             files: [{ path: '{{name}}.lua', template: 'tool.lua' }],
         },
-    },
-    {
-        id: 'plugins',
-        label: 'Plugins',
-        path: ['plugins'],
-        include: ['plugins/**'],
-        exclude: [],
-        classGlobal: 'PLUGIN',
-        icon: 'extensions',
-        rootDir: 'plugins',
     },
 ];
 

@@ -27,7 +27,7 @@ export async function detectGamemodeBaseLibraries(
     while (currentBase) {
         const baseLower = currentBase.toLowerCase();
 
-        // Prevent cycles
+        // Prevent cycles (lowercase comparison so "Sandbox" and "sandbox" are the same)
         if (visited.has(baseLower)) {
             break;
         }
@@ -40,18 +40,22 @@ export async function detectGamemodeBaseLibraries(
             break;
         }
 
-        // The base gamemode folder is a sibling of the current gamemode folder
-        // Gamemodes are stored as: gamemodes/<gamemode_name>/
-        // So the base would be at: ../<base_name>
-        const relativePath = `../${baseLower}`;
+        // The base gamemode folder is a sibling of the current gamemode folder.
+        // Resolve the sibling directory case-insensitively for traversal so manifest
+        // casing differences do not break on case-sensitive filesystems, while using
+        // the resolved directory name for returned relative paths when available.
+        const resolvedBase = resolveSiblingFolder(path.join(folderPath, '..'), currentBase);
+        const relativePath = `../${resolvedBase.name}`;
         libraries.push(relativePath);
 
-        // Try to walk the chain further
-        const baseFolderPath = path.join(folderPath, '..', baseLower);
-        currentBase = await readGamemodeBaseFromFolder(baseFolderPath, baseLower);
+        currentBase = await readGamemodeBaseFromFolder(resolvedBase.path, resolvedBase.name);
     }
 
     return libraries;
+}
+
+export function hasGamemodeManifest(folderPath: string): boolean {
+    return findGamemodeManifestPath(folderPath, path.basename(folderPath)) !== undefined;
 }
 
 async function readGamemodeBaseFromFolder(
@@ -89,6 +93,32 @@ function findGamemodeManifestPath(folderPath: string, folderName: string): strin
     }
 
     return undefined;
+}
+
+function resolveSiblingFolder(parentFolderPath: string, folderName: string): { name: string; path: string } {
+    try {
+        const entries = fs.readdirSync(parentFolderPath, { withFileTypes: true });
+        const exactMatch = entries.find((entry) => entry.isDirectory() && entry.name === folderName);
+        if (exactMatch) {
+            return {
+                name: exactMatch.name,
+                path: path.join(parentFolderPath, exactMatch.name),
+            };
+        }
+
+        const match = entries.find((entry) => entry.isDirectory() && entry.name.toLowerCase() === folderName.toLowerCase());
+        if (match) {
+            return {
+                name: match.name,
+                path: path.join(parentFolderPath, match.name),
+            };
+        }
+    } catch {
+        // Preserve previous outward behavior if the parent cannot be read.
+    }
+
+    const directPath = path.join(parentFolderPath, folderName);
+    return { name: folderName, path: directPath };
 }
 
 /**
