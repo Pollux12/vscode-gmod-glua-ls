@@ -1885,6 +1885,15 @@
           "type": "boolean",
           "default": true
         },
+        "plugins": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of enabled GMod plugins. Later entries win when multiple plugins define the same setting.",
+          "x-gluals-editor": "pluginList"
+        },
         "network": {
           "$ref": "#/$defs/EmmyrcGmodNetwork",
           "default": {

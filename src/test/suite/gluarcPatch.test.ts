@@ -11,7 +11,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-import { applyGluarcPatch, buildPresetPatchEntries, BUILTIN_ARRAY_IDENTITY_RULES } from '../../gluarcPatch';
+import { applyGluarcPatch, buildPluginPatchEntries, buildPresetPatchEntries, BUILTIN_ARRAY_IDENTITY_RULES } from '../../gluarcPatch';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -122,6 +122,31 @@ suite('GluarcPatch — additive patch engine', () => {
         assert.strictEqual(include.length, 2);
     });
 
+    test('gmod.plugins merges as ordered primitive identity array', async () => {
+        writeGluarc(tmpDir, { gmod: { plugins: ['helix'] } });
+        const folder = makeWorkspaceFolder(tmpDir);
+        await applyGluarcPatch(folder, [
+            { path: ['gmod', 'plugins'], value: ['helix', 'darkrp'] },
+        ]);
+
+        const result = readGluarc(tmpDir) as any;
+        assert.deepStrictEqual(result.gmod.plugins, ['helix', 'darkrp']);
+    });
+
+    test('gmod.plugins reapply is idempotent', async () => {
+        writeGluarc(tmpDir, {});
+        const folder = makeWorkspaceFolder(tmpDir);
+        await applyGluarcPatch(folder, [
+            { path: ['gmod', 'plugins'], value: ['darkrp'] },
+        ]);
+        await applyGluarcPatch(folder, [
+            { path: ['gmod', 'plugins'], value: ['darkrp'] },
+        ]);
+
+        const result = readGluarc(tmpDir) as any;
+        assert.deepStrictEqual(result.gmod.plugins, ['darkrp']);
+    });
+
     // ── Conflict behavior ─────────────────────────────────────────────────────
 
     test('skips conflict when intermediate path is occupied by a scalar', async () => {
@@ -189,11 +214,22 @@ suite('GluarcPatch — additive patch engine', () => {
         assert.strictEqual(entries.length, 0);
     });
 
+    test('buildPluginPatchEntries appends plugin id and flattens fragment leaves', () => {
+        const entries = buildPluginPatchEntries('darkrp', {
+            gmod: { defaultRealm: 'server' },
+            diagnostics: { globals: ['DarkRP'] },
+        });
+        assert.ok(entries.some((entry) => entry.path.join('.') === 'gmod.plugins'));
+        assert.ok(entries.some((entry) => entry.path.join('.') === 'gmod.defaultRealm'));
+        assert.ok(entries.some((entry) => entry.path.join('.') === 'diagnostics.globals'));
+    });
+
     // ── BUILTIN_ARRAY_IDENTITY_RULES exported ─────────────────────────────────
 
     test('BUILTIN_ARRAY_IDENTITY_RULES covers scriptedClassScopes and diagnostics.globals', () => {
         const paths = BUILTIN_ARRAY_IDENTITY_RULES.map((r) => r.path.join('.'));
         assert.ok(paths.includes('gmod.scriptedClassScopes.include'), 'scriptedClassScopes.include rule missing');
+        assert.ok(paths.includes('gmod.plugins'), 'gmod.plugins rule missing');
         assert.ok(paths.includes('diagnostics.globals'), 'diagnostics.globals rule missing');
 
         // diagnostics.globals must be a primitive-value rule (no idKey)

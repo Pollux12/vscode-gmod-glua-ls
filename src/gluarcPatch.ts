@@ -79,6 +79,7 @@ export interface PatchSummary {
  */
 export const BUILTIN_ARRAY_IDENTITY_RULES: readonly ArrayIdentityRule[] = [
     { path: ['gmod', 'scriptedClassScopes', 'include'], idKey: 'id' },
+    { path: ['gmod', 'plugins'] },
     { path: ['diagnostics', 'globals'] }, // primitive string array — idKey omitted, identity is the value itself
 ];
 
@@ -371,5 +372,40 @@ export function buildPresetPatchEntries(opts: {
         });
     }
 
+    return entries;
+}
+
+function flattenObjectToPatchEntries(
+    value: unknown,
+    currentPath: string[],
+    entries: PatchEntry[],
+): void {
+    if (isObjectRecord(value)) {
+        const keys = Object.keys(value);
+        if (keys.length === 0) {
+            return;
+        }
+        for (const key of keys) {
+            flattenObjectToPatchEntries(value[key], [...currentPath, key], entries);
+        }
+        return;
+    }
+
+    if (currentPath.length > 0) {
+        entries.push({
+            path: currentPath,
+            value,
+        });
+    }
+}
+
+export function buildPluginPatchEntries(
+    pluginId: string,
+    pluginGluarcFragment: Record<string, unknown>,
+): PatchEntry[] {
+    const entries: PatchEntry[] = [
+        { path: ['gmod', 'plugins'], value: [pluginId] },
+    ];
+    flattenObjectToPatchEntries(pluginGluarcFragment, [], entries);
     return entries;
 }

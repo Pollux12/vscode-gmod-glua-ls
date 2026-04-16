@@ -1,6 +1,6 @@
 export type FieldType = 'boolean' | 'string' | 'number' | 'integer' | 'array' | 'object' | 'enum' | 'any';
 
-export type FieldEditorKind = 'mappingTable' | 'scriptedClassTable' | 'ignoreDirDefaults';
+export type FieldEditorKind = 'mappingTable' | 'scriptedClassTable' | 'ignoreDirDefaults' | 'pluginList';
 
 export interface FieldEditorDescriptor {
     kind: FieldEditorKind;
@@ -322,6 +322,10 @@ function buildFieldDescriptorInternal(
         descriptor.editor = {
             kind: 'ignoreDirDefaults',
         };
+    } else if (editorKind === 'pluginList') {
+        descriptor.editor = {
+            kind: 'pluginList',
+        };
     }
 
     if (enumInfo.values) {
@@ -498,6 +502,7 @@ const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
     inferDynamicFields: 'completion',
     fileParamDefaults: 'completion',
     scriptedClassScopes: 'workspace',
+    plugins: 'workspace',
 };
 
 /**

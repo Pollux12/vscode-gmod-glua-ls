@@ -18,6 +18,7 @@ import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions';
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
+import { GmodPluginDescriptor, loadGmodPluginCatalog } from './gmodPluginCatalog';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
@@ -32,6 +33,7 @@ import {
 } from './gmodErrorView';
 import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import { readGluarcConfig } from './gluarcConfig';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
 import { GmodGetDebugStateTool } from './tools/gmodGetDebugStateTool';
@@ -123,6 +125,13 @@ interface GmodToolLogEntry {
 
 const gmodToolOutputEntries: GmodToolLogEntry[] = [];
 const gmodToolErrorEntries: GmodToolLogEntry[] = [];
+
+async function resolvePluginBundlePath(plugin: GmodPluginDescriptor): Promise<string | undefined> {
+    if (!gmodAnnotationManager) {
+        return undefined;
+    }
+    return gmodAnnotationManager.ensurePluginBundle(plugin);
+}
 
 /**
  * Extension activation entry point
@@ -227,10 +236,22 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
         { id: 'gluals.gmod.explorer.copyClassName', handler: copyGmodExplorerClassName },
         { id: 'gluals.gmod.explorer.revealInExplorer', handler: revealGmodExplorerItemInExplorer },
-        // Framework preset / wizard commands
-        { id: 'gluals.gmod.applyFrameworkPreset', handler: () => showApplyPresetPicker(context) },
+        // Plugin preset / wizard commands
+        {
+            id: 'gluals.gmod.applyFrameworkPreset',
+            handler: () => showApplyPresetPicker(context, undefined, {
+                annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+                resolvePluginBundlePath,
+            }),
+        },
         { id: 'gluals.gmod.runFrameworkSetupWizard', handler: () => runCustomSetupWizard(context) },
-        { id: 'gluals.gmod.rerunFrameworkDetection', handler: () => manualRerunFrameworkPresetCheck(context) },
+        {
+            id: 'gluals.gmod.rerunFrameworkDetection',
+            handler: () => manualRerunFrameworkPresetCheck(context, {
+                annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+                resolvePluginBundlePath,
+            }),
+        },
     ];
 
     // Register all commands
@@ -452,8 +473,11 @@ async function initializeExtension(): Promise<void> {
     await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
-    // Run framework preset detection after server is ready (non-blocking)
-    void runFrameworkPresetCheck(extensionContext.vscodeContext);
+    // Run plugin preset detection after server is ready (non-blocking)
+    void runFrameworkPresetCheck(extensionContext.vscodeContext, {
+        annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+        resolvePluginBundlePath,
+    });
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -471,9 +495,12 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
 function onWorkspaceFoldersChanged(): void {
     onDidChangeConfiguration();
     void refreshGmodDebugConfigContext();
-    // Re-run framework preset detection for any newly added folders.
+    // Re-run plugin preset detection for any newly added folders.
     // Suppression logic prevents prompt spam for folders already processed.
-    void runFrameworkPresetCheck(extensionContext.vscodeContext);
+    void runFrameworkPresetCheck(extensionContext.vscodeContext, {
+        annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+        resolvePluginBundlePath,
+    });
 }
 
 function onDidOpenTextDocument(document: vscode.TextDocument): void {
@@ -650,6 +677,30 @@ async function cleanupExistingClient(): Promise<void> {
     }
 }
 
+async function collectEnabledPluginIds(): Promise<string[]> {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const ids: string[] = [];
+    const seen = new Set<string>();
+
+    for (const folder of folders) {
+        try {
+            const config = await readGluarcConfig(folder);
+            const pluginsRaw = (config as any)?.gmod?.plugins;
+            if (!Array.isArray(pluginsRaw)) continue;
+            for (const pluginId of pluginsRaw) {
+                if (typeof pluginId !== 'string' || pluginId.trim().length === 0) continue;
+                if (seen.has(pluginId)) continue;
+                seen.add(pluginId);
+                ids.push(pluginId);
+            }
+        } catch {
+            // ignore malformed/missing workspace configs during startup
+        }
+    }
+
+    return ids;
+}
+
 /**
  * Start the language server
  */
@@ -665,6 +716,16 @@ async function doStartServer(startupRunId: number): Promise<void> {
         const annotationsPath = gmodAnnotationManager.getAnnotationsPath();
         if (annotationsPath) {
             initOptions.gmodAnnotationsPath = annotationsPath;
+
+            const pluginCatalog = loadGmodPluginCatalog({ annotationsPath });
+            const enabledPluginIds = await collectEnabledPluginIds();
+            const pluginLibraryPaths = await gmodAnnotationManager.resolvePluginAnnotationLibraryPaths(
+                enabledPluginIds,
+                pluginCatalog,
+            );
+            if (pluginLibraryPaths.length > 0) {
+                initOptions.gmodPluginLibraryPaths = pluginLibraryPaths;
+            }
         }
     }
 

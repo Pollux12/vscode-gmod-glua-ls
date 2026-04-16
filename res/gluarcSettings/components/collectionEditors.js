@@ -413,6 +413,119 @@ export function renderScalarListEditor(field, value, onChange) {
     return container;
 }
 
+export function renderPluginListEditor(field, value, onChange, options = {}) {
+    const catalog = Array.isArray(options.catalog) ? options.catalog : [];
+    let enabledIds = Array.isArray(value)
+        ? value.filter((entry) => typeof entry === "string")
+        : Array.isArray(field.default)
+            ? field.default.filter((entry) => typeof entry === "string")
+            : [];
+
+    const normalize = (id) => String(id).trim();
+    enabledIds = enabledIds.map(normalize).filter((id) => id.length > 0);
+
+    const commit = () => onChange([...enabledIds]);
+
+    const container = document.createElement("div");
+    container.className = "path-list-container";
+
+    const table = document.createElement("div");
+    table.className = "path-table";
+    container.appendChild(table);
+
+    const knownById = new Map();
+    catalog.forEach((entry) => {
+        if (entry && typeof entry.id === "string") {
+            knownById.set(entry.id, entry);
+        }
+    });
+
+    const render = () => {
+        table.innerHTML = "";
+        const disabledKnown = catalog
+            .map((entry) => entry.id)
+            .filter((id) => !enabledIds.includes(id));
+        const rows = [...enabledIds, ...disabledKnown];
+
+        rows.forEach((id) => {
+            const meta = knownById.get(id) ?? { id, label: id, description: "Unknown plugin id from .gluarc.json" };
+            const row = document.createElement("div");
+            row.className = "path-row";
+
+            const left = document.createElement("div");
+            left.className = "path-cell";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = enabledIds.includes(id);
+            checkbox.onchange = () => {
+                if (checkbox.checked) {
+                    if (!enabledIds.includes(id)) {
+                        enabledIds.push(id);
+                    }
+                } else {
+                    enabledIds = enabledIds.filter((entry) => entry !== id);
+                }
+                commit();
+                render();
+            };
+            left.appendChild(checkbox);
+
+            const label = document.createElement("span");
+            label.textContent = ` ${meta.label} (${id})`;
+            left.appendChild(label);
+            row.appendChild(left);
+
+            const desc = document.createElement("div");
+            desc.className = "path-cell";
+            desc.textContent = meta.description || "";
+            row.appendChild(desc);
+
+            const actions = document.createElement("div");
+            actions.className = "path-cell";
+            if (enabledIds.includes(id)) {
+                const upBtn = document.createElement("button");
+                upBtn.type = "button";
+                upBtn.textContent = "↑";
+                upBtn.disabled = enabledIds.indexOf(id) <= 0;
+                upBtn.onclick = () => {
+                    const index = enabledIds.indexOf(id);
+                    if (index <= 0) return;
+                    const next = [...enabledIds];
+                    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                    enabledIds = next;
+                    commit();
+                    render();
+                };
+                actions.appendChild(upBtn);
+
+                const downBtn = document.createElement("button");
+                downBtn.type = "button";
+                downBtn.textContent = "↓";
+                downBtn.disabled = (() => {
+                    const index = enabledIds.indexOf(id);
+                    return index === -1 || index >= enabledIds.length - 1;
+                })();
+                downBtn.onclick = () => {
+                    const index = enabledIds.indexOf(id);
+                    if (index < 0 || index >= enabledIds.length - 1) return;
+                    const next = [...enabledIds];
+                    [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                    enabledIds = next;
+                    commit();
+                    render();
+                };
+                actions.appendChild(downBtn);
+            }
+            row.appendChild(actions);
+            table.appendChild(row);
+        });
+    };
+
+    render();
+    return container;
+}
+
 export function renderMapEditor(field, value, onChange) {
     const descriptor = field.additionalProperties ?? { type: "string" };
     const editorDesc = field.editor ?? {};

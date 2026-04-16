@@ -2,16 +2,50 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fetchJson, downloadAndExtractZip } from './netHelpers';
+import { GmodPluginCatalog, GmodPluginDescriptor, loadPluginBundleDefinition } from './gmodPluginCatalog';
+
+export interface LocalPluginBundleCandidateOptions {
+    pluginId: string;
+    pluginBundlePathOverride?: string;
+    annotationPathOverride?: string;
+}
+
+export function getLocalPluginBundleCandidates(options: LocalPluginBundleCandidateOptions): string[] {
+    const candidates: string[] = [];
+    if (options.pluginBundlePathOverride?.trim()) {
+        candidates.push(path.join(options.pluginBundlePathOverride.trim(), options.pluginId));
+    }
+    if (options.annotationPathOverride?.trim()) {
+        const normalizedBase = path.resolve(options.annotationPathOverride.trim());
+        const siblingRoot = path.join(
+            path.dirname(normalizedBase),
+            `${path.basename(normalizedBase)}-plugins`,
+        );
+        candidates.push(path.join(siblingRoot, options.pluginId));
+    }
+
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const candidate of candidates) {
+        const normalized = path.resolve(candidate);
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        deduped.push(normalized);
+    }
+    return deduped;
+}
 
 /**
  * Manages Garry's Mod GLuaLS annotations
  * Handles downloading and updating from the gluals-annotations branch
  */
 export class GmodAnnotationManager implements vscode.Disposable {
-    private readonly ZIP_URL = 'https://github.com/Pollux12/gmod-luals-addon/archive/refs/heads/gluals-annotations.zip';
-    private readonly ZIP_INNER_FOLDER = 'gmod-luals-addon-gluals-annotations';
-    private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/gmod-luals-addon/gluals-annotations/__metadata.json';
+    private readonly REPO_SLUG = 'Pollux12/annotations-gmod-glua-ls';
+    private readonly ZIP_URL = 'https://github.com/Pollux12/annotations-gmod-glua-ls/archive/refs/heads/gluals-annotations.zip';
+    private readonly ZIP_INNER_FOLDER = 'annotations-gmod-glua-ls-gluals-annotations';
+    private readonly REMOTE_METADATA_URL = 'https://raw.githubusercontent.com/Pollux12/annotations-gmod-glua-ls/gluals-annotations/__metadata.json';
     private readonly annotationsPath: string;
+    private readonly pluginStoragePath: string;
 
     constructor(context: vscode.ExtensionContext) {
         // Store annotations in extension's global storage
@@ -19,10 +53,24 @@ export class GmodAnnotationManager implements vscode.Disposable {
             context.globalStorageUri.fsPath,
             'gmod-annotations'
         );
+        this.pluginStoragePath = path.join(
+            context.globalStorageUri.fsPath,
+            'gmod-plugin-annotations'
+        );
     }
 
     private getAnnotationPathOverride(): string | undefined {
         const configuredPath = vscode.workspace.getConfiguration('gluals').get<string>('ls.annotationPath');
+        if (!configuredPath) {
+            return undefined;
+        }
+
+        const normalizedPath = configuredPath.trim();
+        return normalizedPath.length > 0 ? normalizedPath : undefined;
+    }
+
+    private getPluginBundlePathOverride(): string | undefined {
+        const configuredPath = vscode.workspace.getConfiguration('gluals').get<string>('ls.pluginBundlePath');
         if (!configuredPath) {
             return undefined;
         }
@@ -116,6 +164,151 @@ export class GmodAnnotationManager implements vscode.Disposable {
      * Dispose of resources
      */
     public dispose(): void {
+    }
+
+    public getPluginStoragePath(): string {
+        return this.pluginStoragePath;
+    }
+
+    private getPluginInstallPath(pluginId: string): string {
+        return path.join(this.pluginStoragePath, pluginId);
+    }
+
+    private getPluginBranchZipUrl(branch: string): string {
+        return `https://github.com/${this.REPO_SLUG}/archive/refs/heads/${encodeURIComponent(branch)}.zip`;
+    }
+
+    private getPluginBranchInnerFolder(branch: string): string {
+        return `${this.REPO_SLUG.split('/')[1]}-${branch}`;
+    }
+
+    private getInstalledPluginVersion(pluginInstallPath: string): string | undefined {
+        try {
+            const metadataPath = path.join(pluginInstallPath, '__plugin_metadata.json');
+            if (!fs.existsSync(metadataPath)) return undefined;
+            const parsed = JSON.parse(fs.readFileSync(metadataPath, 'utf8')) as { version?: unknown };
+            return typeof parsed.version === 'string' && parsed.version.trim().length > 0
+                ? parsed.version.trim()
+                : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    private isPluginBundleCurrent(plugin: GmodPluginDescriptor, pluginInstallPath: string): boolean {
+        const manifestRelPath = plugin.artifact.manifest || 'plugin.json';
+        if (!fs.existsSync(path.join(pluginInstallPath, manifestRelPath))) {
+            return false;
+        }
+
+        const expectedVersion = plugin.artifact.version;
+        if (!expectedVersion) {
+            return true;
+        }
+
+        return this.getInstalledPluginVersion(pluginInstallPath) === expectedVersion;
+    }
+
+    private resolveLocalPluginBundle(plugin: GmodPluginDescriptor): string | undefined {
+        const manifestRelPath = plugin.artifact.manifest || 'plugin.json';
+        const candidates = getLocalPluginBundleCandidates({
+            pluginId: plugin.id,
+            pluginBundlePathOverride: this.getPluginBundlePathOverride(),
+            annotationPathOverride: this.getAnnotationPathOverride(),
+        });
+
+        for (const candidate of candidates) {
+            if (!this.isAccessibleDirectory(candidate)) continue;
+            const bundle = loadPluginBundleDefinition(candidate, manifestRelPath);
+            if (bundle) {
+                return candidate;
+            }
+        }
+
+        return undefined;
+    }
+
+    public async ensurePluginBundle(plugin: GmodPluginDescriptor): Promise<string | undefined> {
+        const localBundlePath = this.resolveLocalPluginBundle(plugin);
+        if (localBundlePath) {
+            return localBundlePath;
+        }
+
+        const localOverrideMode = !!this.getAnnotationPathOverride() || !!this.getPluginBundlePathOverride();
+        if (localOverrideMode) {
+            console.warn(`[GLuaLS] Local plugin bundle not found for ${plugin.id}. Skipping remote fallback in local override mode.`);
+            return undefined;
+        }
+
+        const pluginInstallPath = this.getPluginInstallPath(plugin.id);
+        if (this.isPluginBundleCurrent(plugin, pluginInstallPath)) {
+            return pluginInstallPath;
+        }
+
+        const zipUrl = this.getPluginBranchZipUrl(plugin.artifact.branch);
+        const innerFolder = this.getPluginBranchInnerFolder(plugin.artifact.branch);
+        try {
+            await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Downloading ${plugin.label} plugin annotations...`,
+                    cancellable: false,
+                },
+                async (progress) => {
+                    await downloadAndExtractZip(zipUrl, pluginInstallPath, innerFolder, progress);
+                },
+            );
+
+            const manifestRelPath = plugin.artifact.manifest || 'plugin.json';
+            if (!fs.existsSync(path.join(pluginInstallPath, manifestRelPath))) {
+                throw new Error(`Plugin manifest "${plugin.artifact.manifest}" missing after download`);
+            }
+
+            if (plugin.artifact.version) {
+                fs.writeFileSync(
+                    path.join(pluginInstallPath, '__plugin_metadata.json'),
+                    `${JSON.stringify({ version: plugin.artifact.version }, null, 2)}\n`,
+                    'utf8',
+                );
+            }
+
+            return pluginInstallPath;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showWarningMessage(
+                `GLuaLS: Failed to download ${plugin.label} plugin bundle (${plugin.artifact.branch}): ${errorMessage}`,
+            );
+            return undefined;
+        }
+    }
+
+    public async resolvePluginAnnotationLibraryPaths(
+        pluginIds: readonly string[],
+        catalog: GmodPluginCatalog,
+    ): Promise<string[]> {
+        const paths: string[] = [];
+        const seen = new Set<string>();
+
+        for (const pluginId of pluginIds) {
+            const plugin = catalog.byId.get(pluginId);
+            if (!plugin) continue;
+
+            const bundlePath = await this.ensurePluginBundle(plugin);
+            if (!bundlePath) continue;
+
+            const bundle = loadPluginBundleDefinition(bundlePath, plugin.artifact.manifest || 'plugin.json');
+            if (!bundle) continue;
+
+            if (!fs.existsSync(bundle.annotationsPath) || !fs.statSync(bundle.annotationsPath).isDirectory()) {
+                continue;
+            }
+
+            if (seen.has(bundle.annotationsPath)) continue;
+            seen.add(bundle.annotationsPath);
+            paths.push(bundle.annotationsPath);
+        }
+
+        return paths;
     }
 
     /**

@@ -392,7 +392,19 @@ function scanWorkspaceScopes(folderPath: string): ScannedScope[] {
         }
     }
 
-    const scopes = [...discoveredScopes.values()].map((scope) => {
+    const redundantFiltered = [...discoveredScopes.values()].filter((scope) => {
+        // Reduce noisy duplicates: if both loader root and plugin-container path are present,
+        // keep the more explicit plugin-container scope and drop generic parent duplicates.
+        if (scope.relativePath === 'plugins' && discoveredScopes.has('schema/plugins')) {
+            return false;
+        }
+        if (scope.relativePath === 'gamemode/plugins' && discoveredScopes.has('plugins')) {
+            return false;
+        }
+        return true;
+    });
+
+    const scopes = redundantFiltered.map((scope) => {
         const parts = scope.relativePath.split('/');
         const lastPart = parts[parts.length - 1] || scope.relativePath;
         return {
@@ -608,7 +620,7 @@ function inferClassScopeFields(dirPath: string, fallbackClassGlobal: string): In
         case 'schema/plugins':
             return {
                 classGlobal: 'PLUGIN',
-                include: ['plugins/**', 'schema/plugins/**'],
+                include: ['plugins/**', 'schema/plugins/**', 'gamemode/plugins/**'],
                 path: ['plugins'],
                 rootDir: 'plugins',
             };
@@ -713,7 +725,7 @@ export async function runFrameworkSetupWizard(
 
     const selectedScopePicks = await vscode.window.showQuickPick(scopePicks, {
         title: 'GLuaLS Setup (1/3) — Script Folders',
-        placeHolder: 'Choose folders that contain your entities, weapons, plugins, etc. Select none to skip.',
+        placeHolder: 'Choose script-loader folders. Auto-selected items are conservative, high-confidence matches.',
         canPickMany: true,
         ignoreFocusOut: true,
     });
@@ -723,7 +735,7 @@ export async function runFrameworkSetupWizard(
 
     const customScopesRaw = await vscode.window.showInputBox({
         title: 'GLuaLS Setup (1/3) — Extra Script Folders',
-        prompt: 'Any other folders to include? Enter relative paths separated by commas, or leave blank to skip.',
+        prompt: 'Add extra relative folder paths only when needed. They must exist and contain Lua files.',
         placeHolder: 'e.g. gamemode/custom,lua/mylib',
         ignoreFocusOut: true,
     });
@@ -774,7 +786,7 @@ export async function runFrameworkSetupWizard(
         title: 'GLuaLS Setup (2/3) — Suppress Unknown-Variable Warnings (Advanced, Optional)',
         prompt:
             'Getting "unknown global" warnings for variables that are definitely valid? ' +
-            'List them here (comma-separated). Leave blank to skip — most users do not need this.',
+            'List them here (comma-separated). Leave blank to skip — this should be used sparingly.',
         placeHolder: 'e.g. MyFramework,MyLib,GlobalTable',
         ignoreFocusOut: true,
     });

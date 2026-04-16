@@ -1,15 +1,19 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { hasGamemodeManifest } from './gmodGamemodeBaseDetector';
 import {
-    detectFramework,
-    buildDetectionFingerprint,
-    getFrameworkDescriptor,
-    FRAMEWORK_DESCRIPTORS,
-    FrameworkPreset,
-    DetectionResult,
-} from './gmodFrameworkDescriptors';
+    GmodPluginCatalog,
+    GmodPluginDescriptor,
+    getGmodPluginById,
+    loadGmodPluginCatalog,
+    loadPluginBundleDefinition,
+} from './gmodPluginCatalog';
+import {
+    buildPluginDetectionFingerprint,
+    detectGmodPlugin,
+    folderLooksLikeGmodProject,
+    PluginDetectionResult,
+} from './gmodPluginDetection';
 import {
     readPresetState,
     markPresetApplied,
@@ -18,46 +22,18 @@ import {
     resetPresetSuppression,
     isSuppressed,
 } from './gmodPresetState';
-import { applyGluarcPatch, buildPresetPatchEntries } from './gluarcPatch';
+import { applyGluarcPatch, buildPluginPatchEntries } from './gluarcPatch';
 import { ensureGluarcExists } from './gluarcConfig';
 import { runFrameworkSetupWizard } from './gmodFrameworkWizard';
 
 const GUIDED_WIZARD_PROMPT_ID = 'guided-framework-setup-wizard';
 
-function folderLooksLikeGmodProject(folder: vscode.WorkspaceFolder): boolean {
-    const folderPath = folder.uri.fsPath;
-    const commonDirs = [
-        ['gamemode'],
-        ['lua'],
-        ['schema'],
-        ['plugins'],
-        ['entities'],
-        ['weapons'],
-    ];
-
-    for (const segments of commonDirs) {
-        try {
-            if (fs.statSync(path.join(folderPath, ...segments)).isDirectory()) {
-                return true;
-            }
-        } catch {
-            // ignore missing paths
-        }
-    }
-
-    try {
-        return hasGamemodeManifest(folderPath);
-    } catch {
-        return false;
-    }
+interface CatalogOptions {
+    annotationsPath?: string;
+    catalog?: GmodPluginCatalog;
+    resolvePluginBundlePath?: (plugin: GmodPluginDescriptor) => Promise<string | undefined>;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Returns true if any open workspace folder already has a .gluarc.json config file,
- * indicating the project has already been set up and auto-prompts should be skipped.
- */
 function gluarcExistsInAnyFolder(): boolean {
     const folders = vscode.workspace.workspaceFolders ?? [];
     return folders.some((f) => {
@@ -69,102 +45,87 @@ function gluarcExistsInAnyFolder(): boolean {
     });
 }
 
-/**
- * Runs the framework detection + preset prompt flow for all workspace folders.
- * Detected frameworks offer direct preset apply; undetected GMod-like projects
- * offer the setup wizard. Safe to call multiple times — suppression logic
- * prevents repeated prompts.
- *
- * In multi-root workspaces, folders that detect the same framework are grouped
- * together and produce a single notification using the first matching folder,
- * preventing duplicate prompts for sibling roots.
- *
- * When `force` is true (manual re-run), the .gluarc.json existence check is skipped
- * so the notification is shown even if the workspace is already configured.
- */
+function resolveCatalog(options?: CatalogOptions): GmodPluginCatalog {
+    if (options?.catalog) {
+        return options.catalog;
+    }
+    return loadGmodPluginCatalog(options?.annotationsPath);
+}
+
+function extractRecommendedScopePaths(fragment: Record<string, unknown>): string[] {
+    const include = (fragment as any)?.gmod?.scriptedClassScopes?.include;
+    if (!Array.isArray(include)) return [];
+    return include
+        .map((entry) => entry?.rootDir)
+        .filter((rootDir): rootDir is string => typeof rootDir === 'string' && rootDir.length > 0);
+}
+
 export async function runFrameworkPresetCheck(
     context: vscode.ExtensionContext,
-    { force = false }: { force?: boolean } = {},
+    { force = false, annotationsPath, catalog, resolvePluginBundlePath }: {
+        force?: boolean;
+        annotationsPath?: string;
+        catalog?: GmodPluginCatalog;
+        resolvePluginBundlePath?: (plugin: GmodPluginDescriptor) => Promise<string | undefined>;
+    } = {},
 ): Promise<void> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return;
+    if (!force && gluarcExistsInAnyFolder()) return;
 
-    // Detect all folders in parallel
-    const folderResults: Array<{ folder: vscode.WorkspaceFolder; result: DetectionResult }> = (
+    const activeCatalog = resolveCatalog({ annotationsPath, catalog });
+
+    const folderResults: Array<{ folder: vscode.WorkspaceFolder; result: PluginDetectionResult }> = (
         await Promise.all(
             folders.map(async (folder) => {
                 try {
-                    const result = await detectFramework(folder);
+                    const result = await detectGmodPlugin(folder, activeCatalog);
                     return { folder, result } as const;
                 } catch {
                     return null;
                 }
             }),
         )
-    ).filter((x): x is { folder: vscode.WorkspaceFolder; result: DetectionResult } => x !== null);
+    ).filter((x): x is { folder: vscode.WorkspaceFolder; result: PluginDetectionResult } => x !== null);
 
-    // Update stored detection info for every folder before prompting
     for (const { folder, result } of folderResults) {
         await updateLastDetection(
             context,
             folder,
-            result.detected?.id,
+            result.detected[0]?.id,
             undefined,
-            buildDetectionFingerprint(result),
+            buildPluginDetectionFingerprint(result),
         );
     }
 
-    // Group folders by their detected framework
-    const frameworkGroups = new Map<
-        string,
-        Array<{ folder: vscode.WorkspaceFolder; result: DetectionResult }>
-    >();
-    for (const item of folderResults) {
-        const fwId = item.result.detected?.id;
-        if (!fwId) continue;
-        if (!frameworkGroups.has(fwId)) {
-            frameworkGroups.set(fwId, []);
-        }
-        frameworkGroups.get(fwId)!.push(item);
-    }
-
-    // For each framework group, fire ONE prompt using the first folder
-    const promptedFolders = new Set<vscode.WorkspaceFolder>();
-    for (const [, group] of frameworkGroups) {
-        const best = group[0];
-        promptedFolders.add(best.folder);
-        try {
-            await checkFolderForFrameworkPreset(context, best.folder, best.result, { force });
-        } catch {
-            // Silently skip detection failures to avoid disrupting the extension
-        }
-    }
-
-    // Handle folders with no framework detection that look like a GMod project
     for (const { folder, result } of folderResults) {
-        if (promptedFolders.has(folder)) continue;
-        if (result.detected) continue;
-        if (!folderLooksLikeGmodProject(folder)) continue;
+        if (result.detected.length > 0) {
+            try {
+                await checkFolderForPluginPreset(context, folder, activeCatalog, result, { force, resolvePluginBundlePath });
+            } catch {
+                // Keep auto-detection resilient if one folder has malformed config.
+            }
+            continue;
+        }
 
+        if (!folderLooksLikeGmodProject(folder)) continue;
         if (!force && gluarcExistsInAnyFolder()) continue;
 
-        const fingerprint = buildDetectionFingerprint(result);
+        const fingerprint = buildPluginDetectionFingerprint(result);
         const state = readPresetState(context, folder);
         if (isSuppressed(state, GUIDED_WIZARD_PROMPT_ID, fingerprint)) continue;
 
         try {
-            await promptForSetupWizard(context, folder, result);
+            await promptForSetupWizard(context, folder, undefined, { resolvePluginBundlePath });
         } catch {
-            // Silently skip
+            // Ignore per-folder setup prompt failures.
         }
     }
 }
 
-/**
- * Manual re-run command: clears suppression and re-runs detection for all folders.
- */
 export async function manualRerunFrameworkPresetCheck(
     context: vscode.ExtensionContext,
+    options?: CatalogOptions,
 ): Promise<void> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -176,57 +137,54 @@ export async function manualRerunFrameworkPresetCheck(
         await resetPresetSuppression(context, folder);
     }
 
-    await runFrameworkPresetCheck(context, { force: true });
+    await runFrameworkPresetCheck(context, { force: true, ...options });
 }
 
-/**
- * Applies a specific preset by framework id to the given workspace folder,
- * bypassing detection. Used by the command palette.
- */
 export async function applyFrameworkPresetById(
     context: vscode.ExtensionContext,
     frameworkId: string,
     folder: vscode.WorkspaceFolder,
+    options?: CatalogOptions,
 ): Promise<void> {
-    const descriptor = getFrameworkDescriptor(frameworkId);
-    if (!descriptor) {
-        vscode.window.showErrorMessage(`GLuaLS: Unknown framework preset id: "${frameworkId}".`);
+    const activeCatalog = resolveCatalog(options);
+    const plugin = getGmodPluginById(activeCatalog, frameworkId);
+    if (!plugin) {
+        vscode.window.showErrorMessage(`GLuaLS: Unknown plugin preset id: "${frameworkId}".`);
         return;
     }
-
-    await applyPreset(context, folder, descriptor.getPreset());
+    await applyPluginPreset(context, folder, plugin, options);
 }
 
-/**
- * Opens a quick-pick to let the user choose which framework preset to apply.
- */
 export async function showApplyPresetPicker(
     context: vscode.ExtensionContext,
     folder?: vscode.WorkspaceFolder,
+    options?: CatalogOptions,
 ): Promise<void> {
     const targetFolder = folder ?? await pickWorkspaceFolder();
     if (!targetFolder) return;
 
-    const picks = FRAMEWORK_DESCRIPTORS.map((desc) => ({
-        label: desc.label,
-        description: desc.description,
-        id: desc.id,
+    const activeCatalog = resolveCatalog(options);
+    const picks = activeCatalog.plugins.map((plugin) => ({
+        label: plugin.label,
+        description: plugin.description,
+        id: plugin.id,
     }));
 
+    if (picks.length === 0) {
+        vscode.window.showInformationMessage('GLuaLS: No plugins found in annotation bundle metadata.');
+        return;
+    }
+
     const picked = await vscode.window.showQuickPick(picks, {
-        title: 'Apply Framework Preset',
-        placeHolder: 'Select a framework to apply its scripted class scope preset',
+        title: 'Apply Plugin Preset',
+        placeHolder: 'Select a plugin to apply its additive .gluarc.json fragment',
         ignoreFocusOut: true,
     });
 
     if (!picked) return;
-
-    await applyFrameworkPresetById(context, picked.id, targetFolder);
+    await applyFrameworkPresetById(context, picked.id, targetFolder, options);
 }
 
-/**
- * Launches the custom setup wizard for unknown/custom frameworks.
- */
 export async function runCustomSetupWizard(
     context: vscode.ExtensionContext,
     folder?: vscode.WorkspaceFolder,
@@ -234,115 +192,144 @@ export async function runCustomSetupWizard(
     await runFrameworkSetupWizard(context, folder);
 }
 
-// ─── Internal detection + prompt logic ───────────────────────────────────────
-
-async function checkFolderForFrameworkPreset(
+async function checkFolderForPluginPreset(
     context: vscode.ExtensionContext,
     folder: vscode.WorkspaceFolder,
-    precomputedResult?: DetectionResult,
-    { force = false }: { force?: boolean } = {},
+    catalog: GmodPluginCatalog,
+    precomputedResult?: PluginDetectionResult,
+    {
+        force = false,
+        resolvePluginBundlePath,
+    }: {
+        force?: boolean;
+        resolvePluginBundlePath?: (plugin: GmodPluginDescriptor) => Promise<string | undefined>;
+    } = {},
 ): Promise<void> {
-    const result = precomputedResult ?? await detectFramework(folder);
-    const fingerprint = buildDetectionFingerprint(result);
+    const result = precomputedResult ?? await detectGmodPlugin(folder, catalog);
+    const fingerprint = buildPluginDetectionFingerprint(result);
 
-    // Update stored detection info only when we ran detection here (not pre-supplied)
     if (!precomputedResult) {
         await updateLastDetection(
             context,
             folder,
-            result.detected?.id,
+            result.detected[0]?.id,
             undefined,
             fingerprint,
         );
     }
 
-    // If .gluarc.json already exists anywhere in the workspace, treat the project
-    // as configured and skip auto-prompts (unless this is a forced manual re-check).
     if (!force && gluarcExistsInAnyFolder()) {
         return;
     }
 
-    // No framework detected — offer wizard if it looks like a GMod project
-    if (!result.detected) {
-        if (!folderLooksLikeGmodProject(folder)) {
-            return;
-        }
-
+    if (result.detected.length === 0) {
+        if (!folderLooksLikeGmodProject(folder)) return;
         const state = readPresetState(context, folder);
-        if (isSuppressed(state, GUIDED_WIZARD_PROMPT_ID, fingerprint)) {
-            return;
-        }
-
-        await promptForSetupWizard(context, folder, result);
+        if (isSuppressed(state, GUIDED_WIZARD_PROMPT_ID, fingerprint)) return;
+        await promptForSetupWizard(context, folder, undefined, { resolvePluginBundlePath });
         return;
     }
 
-    // Framework detected — offer preset apply
-    const descriptor = result.detected;
-    const preset = descriptor.getPreset();
     const state = readPresetState(context, folder);
-
-    if (isSuppressed(state, preset.id, fingerprint)) {
-        return;
-    }
-
-    // Show notification prompt
-    await promptForPreset(context, folder, preset, descriptor.id);
+    const eligiblePlugins = result.detected.filter((plugin) => !isSuppressed(state, plugin.id, fingerprint));
+    if (eligiblePlugins.length === 0) return;
+    await promptForPluginPreset(context, folder, eligiblePlugins, { resolvePluginBundlePath });
 }
 
-async function promptForPreset(
+async function promptForPluginPreset(
     context: vscode.ExtensionContext,
     folder: vscode.WorkspaceFolder,
-    preset: FrameworkPreset,
-    frameworkId: string,
+    plugins: readonly GmodPluginDescriptor[],
+    options?: CatalogOptions,
 ): Promise<void> {
     const folderName = folder.name;
+    const pluginSummary = plugins
+        .map((plugin) => (plugin.kind === 'framework' ? plugin.label : `${plugin.label} (${plugin.kind})`))
+        .join(', ');
     const message =
-        `GLuaLS detected the ${preset.label} framework in "${folderName}". ` +
-        `Apply the ${preset.label} preset, or review setup in the wizard?`;
+        `GLuaLS detected plugin(s) in "${folderName}": ${pluginSummary}. ` +
+        'Apply selected plugin configs, or review setup in the wizard?';
 
     const action = await vscode.window.showInformationMessage(
         message,
         { modal: false },
-        'Apply',
+        'Apply Selected',
         'Review Setup',
         'Dismiss',
     );
 
-    if (action === 'Apply') {
-        await applyPreset(context, folder, preset);
+    if (action === 'Apply Selected') {
+        const picks = await vscode.window.showQuickPick(
+            plugins.map((plugin) => ({
+                label: plugin.label,
+                description: plugin.kind,
+                detail: plugin.description,
+                pluginId: plugin.id,
+                picked: true,
+            })),
+            {
+                title: 'Select detected plugins to apply',
+                placeHolder: 'Uncheck any plugin you do not want to apply',
+                ignoreFocusOut: true,
+                canPickMany: true,
+            },
+        );
+        if (!picks || picks.length === 0) {
+            return;
+        }
+
+        const selectedPluginIds = new Set(picks.map((pick) => pick.pluginId));
+        for (const plugin of plugins) {
+            if (!selectedPluginIds.has(plugin.id)) {
+                await markPresetDismissed(context, folder, plugin.id);
+            }
+        }
+        let restartRequired = false;
+        for (const plugin of plugins) {
+            if (!selectedPluginIds.has(plugin.id)) continue;
+            const applyResult = await applyPluginPreset(context, folder, plugin, options, {
+                restartServerOnSuccess: false,
+            });
+            if (applyResult.restartRequired) {
+                restartRequired = true;
+            }
+        }
+
+        if (restartRequired) {
+            await vscode.commands.executeCommand('gluals.restartServer');
+        }
     } else if (action === 'Review Setup') {
-        const descriptor = getFrameworkDescriptor(frameworkId);
-        const suggestedScopePaths = descriptor?.getPreset().classScopes
-            .map((scope) => scope.rootDir)
-            .filter((rootDir): rootDir is string => typeof rootDir === 'string' && rootDir.length > 0) ?? [];
-
+        const scopePathSet = new Set<string>();
+        for (const plugin of plugins) {
+            const fragment = await loadPluginFragment(plugin, options);
+            for (const scopePath of extractRecommendedScopePaths(fragment)) {
+                scopePathSet.add(scopePath);
+            }
+        }
         const wizardResult = await runFrameworkSetupWizard(context, folder, {
-            recommendedScopePaths: suggestedScopePaths,
+            recommendedScopePaths: [...scopePathSet],
         });
-
         if (wizardResult.applied) {
             await markPresetApplied(context, folder, GUIDED_WIZARD_PROMPT_ID);
         }
     } else if (action === 'Dismiss') {
-        await markPresetDismissed(context, folder, preset.id);
+        for (const plugin of plugins) {
+            await markPresetDismissed(context, folder, plugin.id);
+        }
     }
-    // No action (closed notification) = don't suppress
 }
 
 async function promptForSetupWizard(
     context: vscode.ExtensionContext,
     folder: vscode.WorkspaceFolder,
-    result: DetectionResult,
+    detectedPlugin?: GmodPluginDescriptor,
+    options?: CatalogOptions,
 ): Promise<void> {
+    const fragment = detectedPlugin ? await loadPluginFragment(detectedPlugin, options) : {};
     const folderName = folder.name;
-    const descriptor = result.detected;
-    const suggestedScopePaths = descriptor?.getPreset().classScopes
-        .map((scope) => scope.rootDir)
-        .filter((rootDir): rootDir is string => typeof rootDir === 'string' && rootDir.length > 0) ?? [];
+    const suggestedScopePaths = extractRecommendedScopePaths(fragment);
 
-    let message = `GLuaLS found a Garry's Mod project in "${folderName}", but couldn't auto-detect a framework. Review setup in the wizard?`;
-
+    const message = `GLuaLS found a Garry's Mod project in "${folderName}", but couldn't auto-detect a plugin. Review setup in the wizard?`;
     const action = await vscode.window.showInformationMessage(
         message,
         { modal: false },
@@ -354,7 +341,6 @@ async function promptForSetupWizard(
         const wizardResult = await runFrameworkSetupWizard(context, folder, {
             recommendedScopePaths: suggestedScopePaths,
         });
-
         if (wizardResult.applied) {
             await markPresetApplied(context, folder, GUIDED_WIZARD_PROMPT_ID);
         }
@@ -363,22 +349,30 @@ async function promptForSetupWizard(
 
     if (action === 'Dismiss') {
         await markPresetDismissed(context, folder, GUIDED_WIZARD_PROMPT_ID);
-        return;
     }
 }
 
-async function applyPreset(
+async function applyPluginPreset(
     context: vscode.ExtensionContext,
     folder: vscode.WorkspaceFolder,
-    preset: FrameworkPreset,
-): Promise<void> {
+    plugin: GmodPluginDescriptor,
+    options?: CatalogOptions,
+    runtimeOptions?: {
+        restartServerOnSuccess?: boolean;
+    },
+): Promise<{ restartRequired: boolean }> {
+    const restartServerOnSuccess = runtimeOptions?.restartServerOnSuccess ?? true;
     const created = await ensureGluarcExists(folder);
-    if (!created) return;
+    if (!created) return { restartRequired: false };
 
-    const entries = buildPresetPatchEntries({
-        classScopes: preset.classScopes,
-    });
-
+    const fragment = await loadPluginFragment(plugin, options);
+    if (Object.keys(fragment).length === 0) {
+        void vscode.window.showErrorMessage(
+            `GLuaLS: ${plugin.label} plugin bundle is unavailable. Please update annotations and try again.`,
+        );
+        return { restartRequired: false };
+    }
+    const entries = buildPluginPatchEntries(plugin.id, fragment);
     const summary = await applyGluarcPatch(folder, entries);
 
     const isCleanIdempotent = summary.added.length === 0 &&
@@ -387,41 +381,51 @@ async function applyPreset(
         summary.blocked.length === 0;
 
     if ((summary.modified || isCleanIdempotent) && summary.conflicts.length === 0 && summary.blocked.length === 0) {
-        await markPresetApplied(context, folder, preset.id);
+        await markPresetApplied(context, folder, plugin.id);
     }
 
     if (summary.added.length > 0 && !summary.modified) {
         void vscode.window.showErrorMessage(
-            `GLuaLS: ${preset.label} preset: failed to write changes to .gluarc.json. Check if the file is read-only.`,
+            `GLuaLS: ${plugin.label} plugin: failed to write changes to .gluarc.json. Check if the file is read-only.`,
         );
     } else if (summary.blocked.length > 0) {
         void vscode.window.showWarningMessage(
-            `GLuaLS: ${preset.label} preset: could not apply due to structural conflicts in .gluarc.json (e.g. expected an object but found a single value). Update manually if needed.`,
+            `GLuaLS: ${plugin.label} plugin: could not apply due to structural conflicts in .gluarc.json. Update manually if needed.`,
         );
     } else if (summary.conflicts.length > 0) {
         void vscode.window.showWarningMessage(
-            `GLuaLS: ${preset.label} preset: some entries were not applied because they already exist with different content. Update manually if needed.`,
+            `GLuaLS: ${plugin.label} plugin: some entries were not applied because they already exist with different content. Update manually if needed.`,
         );
     } else if (summary.modified) {
-        const alreadySetNote = summary.skipped.length > 0
-            ? ` Some entries were already set and left as-is.`
-            : '';
         void vscode.window.showInformationMessage(
-            `GLuaLS: Applied ${preset.label} preset. Added: ${summary.added.join(', ')}.${alreadySetNote}`,
+            `GLuaLS: Applied ${plugin.label} plugin configuration.`,
         );
-        await vscode.commands.executeCommand('gluals.restartServer');
-    } else if (summary.added.length === 0 && summary.skipped.length === 0 && summary.conflicts.length === 0 && summary.blocked.length === 0) {
+        if (restartServerOnSuccess) {
+            await vscode.commands.executeCommand('gluals.restartServer');
+        }
+        return { restartRequired: true };
+    } else if (isCleanIdempotent) {
         void vscode.window.showInformationMessage(
-            `GLuaLS: ${preset.label} preset applied — .gluarc.json already up to date.`,
-        );
-    } else if (summary.skipped.length > 0 && summary.added.length === 0) {
-        void vscode.window.showInformationMessage(
-            `GLuaLS: ${preset.label} preset: all entries already set — nothing new to add.`,
+            `GLuaLS: ${plugin.label} plugin applied — .gluarc.json already up to date.`,
         );
     }
+    return { restartRequired: false };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function loadPluginFragment(
+    plugin: GmodPluginDescriptor,
+    options?: CatalogOptions,
+): Promise<Record<string, unknown>> {
+    const resolvePluginBundlePath = options?.resolvePluginBundlePath;
+    if (!resolvePluginBundlePath) return {};
+
+    const bundlePath = await resolvePluginBundlePath(plugin);
+    if (!bundlePath) return {};
+
+    const bundleDefinition = loadPluginBundleDefinition(bundlePath, plugin.artifact.manifest || 'plugin.json');
+    if (!bundleDefinition) return {};
+    return bundleDefinition.gluarcFragment;
+}
 
 async function pickWorkspaceFolder(): Promise<vscode.WorkspaceFolder | undefined> {
     const folders = vscode.workspace.workspaceFolders;

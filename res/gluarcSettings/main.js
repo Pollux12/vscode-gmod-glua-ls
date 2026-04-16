@@ -17,6 +17,7 @@ import {
     renderScriptedClassTableEditor,
     renderScalarListEditor,
     renderIgnoreDirDefaultsEditor,
+    renderPluginListEditor,
 } from "./components/collectionEditors.js";
 import {
     isDiagnosticsStateField,
@@ -36,6 +37,7 @@ const currentState = {
     categories: [],
     config: {},
     autoSaveEnabled: false,
+    pluginCatalog: [],
 };
 
 let formatAutoSwitchedToCustom = false;
@@ -61,6 +63,7 @@ window.addEventListener("message", (event) => {
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            currentState.pluginCatalog = Array.isArray(message.pluginCatalog) ? message.pluginCatalog : [];
             updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             renderSettings();
@@ -80,6 +83,7 @@ window.addEventListener("message", (event) => {
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            currentState.pluginCatalog = Array.isArray(message.pluginCatalog) ? message.pluginCatalog : currentState.pluginCatalog;
             updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             updateAllWidgetValues();
@@ -90,6 +94,7 @@ window.addEventListener("message", (event) => {
                 message.config && typeof message.config === "object"
                     ? message.config
                     : {};
+            currentState.pluginCatalog = Array.isArray(message.pluginCatalog) ? message.pluginCatalog : currentState.pluginCatalog;
             updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             updateAllWidgetValues();
@@ -716,17 +721,6 @@ function generateInput(field, value, onChange) {
         return input;
     }
 
-    if (
-        type === "array" &&
-        items &&
-        (items.type === "string" ||
-            items.type === "enum" ||
-            items.type === "number" ||
-            items.type === "integer")
-    ) {
-        return renderScalarListEditor(field, value, onChange);
-    }
-
     if (type === "object" && Array.isArray(field.properties) && field.properties.length > 0) {
         return renderObjectGroup(field, value, onChange);
     }
@@ -739,6 +733,15 @@ function generateInput(field, value, onChange) {
         // useDefaultIgnores defaults to true when unset; only explicit false disables built-ins
         const defaultsActive = useDefaultIgnores !== false;
         return renderIgnoreDirDefaultsEditor(field, value, onChange, { defaultsActive });
+    }
+
+    if (
+        field.editor?.kind === "pluginList" &&
+        type === "array"
+    ) {
+        return renderPluginListEditor(field, value, onChange, {
+            catalog: currentState.pluginCatalog,
+        });
     }
 
     if (
@@ -766,6 +769,17 @@ function generateInput(field, value, onChange) {
             renderInput: (subField, subValue, subOnChange) =>
                 generateInput(subField, subValue, subOnChange),
         });
+    }
+
+    if (
+        type === "array" &&
+        items &&
+        (items.type === "string" ||
+            items.type === "enum" ||
+            items.type === "number" ||
+            items.type === "integer")
+    ) {
+        return renderScalarListEditor(field, value, onChange);
     }
 
     const textarea = document.createElement("textarea");

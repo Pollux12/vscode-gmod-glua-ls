@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
+import { loadGmodPluginCatalog } from './gmodPluginCatalog';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
@@ -158,6 +159,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 categories: this.categories,
                 config: this.config,
                 autoSaveEnabled: this._isAutoSaveEnabled(),
+                pluginCatalog: this._getPluginCatalogPayload(),
             });
 
             const messageDisposable = this.panel.webview.onDidReceiveMessage(async (msg: unknown) => {
@@ -201,11 +203,12 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     }
                     this._hasUnsavedChanges = false;
                     setTimeout(() => { this._isSelfWrite = false; }, 500);
-                    await this.panel.webview.postMessage({
-                        type: 'resetCompleted',
-                        config: this.config,
-                        autoSaveEnabled: this._isAutoSaveEnabled(),
-                    });
+                await this.panel.webview.postMessage({
+                    type: 'resetCompleted',
+                    config: this.config,
+                    autoSaveEnabled: this._isAutoSaveEnabled(),
+                    pluginCatalog: this._getPluginCatalogPayload(),
+                });
                     return;
                 }
 
@@ -286,6 +289,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     type: 'configUpdated',
                     config: this.config,
                     autoSaveEnabled: this._isAutoSaveEnabled(),
+                    pluginCatalog: this._getPluginCatalogPayload(),
                 });
             } catch (error) {
                 console.warn('[GLuaLS] Failed to reload .gluarc.json:', error instanceof Error ? error.message : error);
@@ -336,6 +340,19 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         return vscode.workspace
             .getConfiguration('gluals', this.workspaceFolder.uri)
             .get<boolean>(SETTINGS_AUTO_SAVE_KEY, false);
+    }
+
+    private _getPluginCatalogPayload(): Array<{ id: string; label: string; description: string }> {
+        const annotationPath = vscode.workspace.getConfiguration('gluals', this.workspaceFolder.uri).get<string>('ls.annotationPath');
+        const resolvedAnnotationPath = annotationPath?.trim()
+            ? annotationPath
+            : path.join(this.context.globalStorageUri.fsPath, 'gmod-annotations');
+        const catalog = loadGmodPluginCatalog(resolvedAnnotationPath);
+        return catalog.plugins.map((plugin) => ({
+            id: plugin.id,
+            label: plugin.label,
+            description: plugin.description,
+        }));
     }
 
     private setWebviewContent(): boolean {

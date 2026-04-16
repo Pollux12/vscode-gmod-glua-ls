@@ -51,6 +51,13 @@ export class ConfigurationManager {
     }
 
     /**
+     * Get local plugin bundle root override
+     */
+    getPluginBundlePath(): string | undefined {
+        return this.get<string>('ls.pluginBundlePath');
+    }
+
+    /**
      * Get language server global config path
      */
     getGlobalConfigPath(): string | undefined {
