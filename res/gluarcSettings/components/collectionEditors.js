@@ -422,7 +422,7 @@ export function renderPluginListEditor(field, value, onChange, options = {}) {
             : [];
 
     const normalize = (id) => String(id).trim();
-    enabledIds = enabledIds.map(normalize).filter((id) => id.length > 0);
+    enabledIds = [...new Set(enabledIds.map(normalize).filter((id) => id.length > 0))];
 
     const commit = () => onChange([...enabledIds]);
 
@@ -434,21 +434,41 @@ export function renderPluginListEditor(field, value, onChange, options = {}) {
     container.appendChild(table);
 
     const knownById = new Map();
+    const knownEntries = [];
     catalog.forEach((entry) => {
         if (entry && typeof entry.id === "string") {
             knownById.set(entry.id, entry);
+            knownEntries.push(entry);
         }
     });
 
+    const byLabel = (left, right) => {
+        const leftLabel = typeof left?.label === "string" && left.label.trim().length > 0
+            ? left.label
+            : left.id;
+        const rightLabel = typeof right?.label === "string" && right.label.trim().length > 0
+            ? right.label
+            : right.id;
+        return leftLabel.localeCompare(rightLabel, undefined, { sensitivity: "base" });
+    };
+
     const render = () => {
         table.innerHTML = "";
-        const disabledKnown = catalog
-            .map((entry) => entry.id)
-            .filter((id) => !enabledIds.includes(id));
-        const rows = [...enabledIds, ...disabledKnown];
+        const enabledSet = new Set(enabledIds);
+        const detectedNotEnabledKnown = knownEntries
+            .filter((entry) => entry?.detected === true && !enabledSet.has(entry.id))
+            .sort(byLabel)
+            .map((entry) => entry.id);
+        const everythingElseKnown = knownEntries
+            .filter((entry) => entry?.detected !== true && !enabledSet.has(entry.id))
+            .sort(byLabel)
+            .map((entry) => entry.id);
+        const rows = [...detectedNotEnabledKnown, ...enabledIds, ...everythingElseKnown];
 
         rows.forEach((id) => {
             const meta = knownById.get(id) ?? { id, label: id, description: "Unknown plugin id from .gluarc.json" };
+            const isEnabled = enabledSet.has(id);
+            const isDetected = meta?.detected === true;
             const row = document.createElement("div");
             row.className = "path-row";
 
@@ -457,7 +477,7 @@ export function renderPluginListEditor(field, value, onChange, options = {}) {
 
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
-            checkbox.checked = enabledIds.includes(id);
+            checkbox.checked = isEnabled;
             checkbox.onchange = () => {
                 if (checkbox.checked) {
                     if (!enabledIds.includes(id)) {
@@ -472,18 +492,28 @@ export function renderPluginListEditor(field, value, onChange, options = {}) {
             left.appendChild(checkbox);
 
             const label = document.createElement("span");
-            label.textContent = ` ${meta.label} (${id})`;
+            const tag = isDetected && !isEnabled
+                ? " • detected"
+                : isEnabled
+                    ? " • enabled"
+                    : "";
+            label.textContent = ` ${meta.label} (${id})${tag}`;
             left.appendChild(label);
             row.appendChild(left);
 
             const desc = document.createElement("div");
             desc.className = "path-cell";
-            desc.textContent = meta.description || "";
+            const status = isDetected && !isEnabled
+                ? "Detected in workspace"
+                : isEnabled
+                    ? "Enabled"
+                    : "";
+            desc.textContent = [status, meta.description || ""].filter(Boolean).join(" — ");
             row.appendChild(desc);
 
             const actions = document.createElement("div");
             actions.className = "path-cell";
-            if (enabledIds.includes(id)) {
+            if (isEnabled) {
                 const upBtn = document.createElement("button");
                 upBtn.type = "button";
                 upBtn.textContent = "↑";

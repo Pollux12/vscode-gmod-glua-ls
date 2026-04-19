@@ -8,6 +8,7 @@ import {
     markPresetDismissed,
     readPresetState,
     resetPresetSuppression,
+    updateLastDetection,
 } from '../../gmodPresetState';
 import { activateExtension, getFixtureUri } from './helper';
 
@@ -66,5 +67,18 @@ suite('Preset suppression state', () => {
         await resetPresetSuppression(context, folder);
         const state = readPresetState(context, folder);
         assert.deepStrictEqual(state.dismissedPresetIds, []);
+    });
+
+    test('last detection stores normalized plugin ids for settings panel', async () => {
+        await updateLastDetection(
+            context,
+            folder,
+            'darkrp',
+            undefined,
+            'detected:darkrp,cami',
+            [' darkrp ', 'cami', 'darkrp'],
+        );
+        const state = readPresetState(context, folder);
+        assert.deepStrictEqual(state.lastDetectedPluginIds, ['cami', 'darkrp']);
     });
 });

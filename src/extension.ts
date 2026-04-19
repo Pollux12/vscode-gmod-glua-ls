@@ -200,7 +200,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodRdbUpdates },
-        { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
+        { id: 'gluals.gmod.openSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
         // GMod debug control commands
@@ -476,7 +476,6 @@ async function initializeExtension(): Promise<void> {
     // Run plugin preset detection after server is ready (non-blocking)
     void runFrameworkPresetCheck(extensionContext.vscodeContext, {
         annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
-        resolvePluginBundlePath,
     });
 }
 
@@ -499,7 +498,6 @@ function onWorkspaceFoldersChanged(): void {
     // Suppression logic prevents prompt spam for folders already processed.
     void runFrameworkPresetCheck(extensionContext.vscodeContext, {
         annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
-        resolvePluginBundlePath,
     });
 }
 

@@ -13,6 +13,8 @@ export interface FrameworkPromptState {
     dismissedPresetIds: string[];
     /** Framework ID that was last detected. */
     lastDetectedFrameworkId: string | undefined;
+    /** Plugin ids detected for this folder on the last scan. */
+    lastDetectedPluginIds: string[];
     /**
      * Stable fingerprint of the last detection result.
      * When this changes the suppression is lifted and detection runs again.
@@ -50,6 +52,7 @@ export function readPresetState(
         appliedPresetIds: raw?.appliedPresetIds ? [...raw.appliedPresetIds] : [],
         dismissedPresetIds: raw?.dismissedPresetIds ? [...raw.dismissedPresetIds] : [],
         lastDetectedFrameworkId: raw?.lastDetectedFrameworkId ?? undefined,
+        lastDetectedPluginIds: raw?.lastDetectedPluginIds ? [...raw.lastDetectedPluginIds] : [],
         lastFingerprint: raw?.lastFingerprint ?? undefined,
         suppressUntilFingerprintChanges: raw?.suppressUntilFingerprintChanges ?? false,
     };
@@ -110,11 +113,18 @@ export async function updateLastDetection(
     frameworkId: string | undefined,
     _band: undefined,
     fingerprint: string | undefined,
+    detectedPluginIds: readonly string[] = [],
 ): Promise<void> {
     const state = readPresetState(context, folder);
     const fingerprintChanged = state.lastFingerprint !== fingerprint;
 
     state.lastDetectedFrameworkId = frameworkId;
+    state.lastDetectedPluginIds = [...new Set(
+        detectedPluginIds
+            .filter((entry): entry is string => typeof entry === 'string')
+            .map((entry) => entry.trim())
+            .filter((entry) => entry.length > 0),
+    )].sort((a, b) => a.localeCompare(b));
     state.lastFingerprint = fingerprint;
 
     // Lift suppression when the fingerprint changes

@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
 import { loadGmodPluginCatalog } from './gmodPluginCatalog';
+import { readPresetState } from './gmodPresetState';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
@@ -342,16 +343,26 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             .get<boolean>(SETTINGS_AUTO_SAVE_KEY, false);
     }
 
-    private _getPluginCatalogPayload(): Array<{ id: string; label: string; description: string }> {
+    private _getPluginCatalogPayload(): Array<{
+        id: string;
+        label: string;
+        description: string;
+        kind: string;
+        detected: boolean;
+    }> {
         const annotationPath = vscode.workspace.getConfiguration('gluals', this.workspaceFolder.uri).get<string>('ls.annotationPath');
         const resolvedAnnotationPath = annotationPath?.trim()
             ? annotationPath
             : path.join(this.context.globalStorageUri.fsPath, 'gmod-annotations');
         const catalog = loadGmodPluginCatalog(resolvedAnnotationPath);
+        const presetState = readPresetState(this.context, this.workspaceFolder);
+        const detectedPluginIds = new Set(presetState.lastDetectedPluginIds);
         return catalog.plugins.map((plugin) => ({
             id: plugin.id,
             label: plugin.label,
             description: plugin.description,
+            kind: plugin.kind,
+            detected: detectedPluginIds.has(plugin.id),
         }));
     }
 
