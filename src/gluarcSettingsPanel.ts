@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
-import { loadGmodPluginCatalog } from './gmodPluginCatalog';
+import { loadGmodPluginCatalog, type GmodPluginCatalog } from './gmodPluginCatalog';
 import { readPresetState } from './gmodPresetState';
 
 const SAVE_DEBOUNCE_MS = 5000;
@@ -18,6 +18,10 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     private categories: Category[] = [];
     private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
     private _saveTimer: ReturnType<typeof setTimeout> | undefined;
+    // Caches only the loaded catalog (disk read of plugin descriptors). Per-call payload
+    // recomputation is required because `detected` derives from preset state that can
+    // change while the panel is open (e.g. user re-runs framework detection).
+    private _cachedPluginCatalog: { annotationPath: string; catalog: GmodPluginCatalog } | undefined;
     private _hasUnsavedChanges = false;
     private _isSelfWrite = false;
     private readonly _disposables: vscode.Disposable[] = [];
@@ -204,12 +208,12 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     }
                     this._hasUnsavedChanges = false;
                     setTimeout(() => { this._isSelfWrite = false; }, 500);
-                await this.panel.webview.postMessage({
-                    type: 'resetCompleted',
-                    config: this.config,
-                    autoSaveEnabled: this._isAutoSaveEnabled(),
-                    pluginCatalog: this._getPluginCatalogPayload(),
-                });
+                    await this.panel.webview.postMessage({
+                        type: 'resetCompleted',
+                        config: this.config,
+                        autoSaveEnabled: this._isAutoSaveEnabled(),
+                        pluginCatalog: this._getPluginCatalogPayload(),
+                    });
                     return;
                 }
 
@@ -354,7 +358,13 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         const resolvedAnnotationPath = annotationPath?.trim()
             ? annotationPath
             : path.join(this.context.globalStorageUri.fsPath, 'gmod-annotations');
-        const catalog = loadGmodPluginCatalog(resolvedAnnotationPath);
+        let catalog: GmodPluginCatalog;
+        if (this._cachedPluginCatalog && this._cachedPluginCatalog.annotationPath === resolvedAnnotationPath) {
+            catalog = this._cachedPluginCatalog.catalog;
+        } else {
+            catalog = loadGmodPluginCatalog(resolvedAnnotationPath);
+            this._cachedPluginCatalog = { annotationPath: resolvedAnnotationPath, catalog };
+        }
         const presetState = readPresetState(this.context, this.workspaceFolder);
         const detectedPluginIds = new Set(presetState.lastDetectedPluginIds);
         return catalog.plugins.map((plugin) => ({

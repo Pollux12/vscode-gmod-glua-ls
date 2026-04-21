@@ -24,15 +24,8 @@ export function getLocalPluginBundleCandidates(options: LocalPluginBundleCandida
         candidates.push(path.join(siblingRoot, options.pluginId));
     }
 
-    const seen = new Set<string>();
-    const deduped: string[] = [];
-    for (const candidate of candidates) {
-        const normalized = path.resolve(candidate);
-        if (seen.has(normalized)) continue;
-        seen.add(normalized);
-        deduped.push(normalized);
-    }
-    return deduped;
+    const normalized = candidates.map(candidate => path.resolve(candidate));
+    return [...new Set(normalized)];
 }
 
 /**
@@ -104,7 +97,7 @@ export class GmodAnnotationManager implements vscode.Disposable {
             console.warn(`[GLuaLS] Configured annotation override path is invalid, inaccessible, or not a directory: ${overridePath}`);
             return undefined;
         }
-        
+
         // No override, check built-in annotations
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
 

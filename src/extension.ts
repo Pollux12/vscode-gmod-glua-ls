@@ -60,6 +60,7 @@ import {
     showApplyPresetPicker,
     runCustomSetupWizard,
 } from './gmodPresetManager';
+import { disposePluginDetectionRuntime, setPluginDetectionLsReadiness } from './gmodPluginDetection';
 
 /**
  * Command registration entry
@@ -169,6 +170,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * Extension deactivation
  */
 export async function deactivate(): Promise<void> {
+    setPluginDetectionLsReadiness(undefined);
+    disposePluginDetectionRuntime();
     if (gmodMcpHost) {
         await gmodMcpHost.stop();
         gmodMcpHost.dispose();
@@ -244,7 +247,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
                 resolvePluginBundlePath,
             }),
         },
-        { id: 'gluals.gmod.runFrameworkSetupWizard', handler: () => runCustomSetupWizard(context) },
+        { id: 'gluals.gmod.runFrameworkSetupWizard', handler: () => runCustomSetupWizard() },
         {
             id: 'gluals.gmod.rerunFrameworkDetection',
             handler: () => manualRerunFrameworkPresetCheck(context, {
@@ -593,6 +596,7 @@ async function startServer(): Promise<void> {
             onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
         } catch (reason) {
             const errorMessage = reason instanceof Error ? reason.message : String(reason);
+            setPluginDetectionLsReadiness(undefined);
             const client = extensionContext.client;
             extensionContext.client = undefined;
             if (client) {
@@ -650,6 +654,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): void {
                 extensionContext.setServerRunning();
                 break;
             case State.Stopped:
+                setPluginDetectionLsReadiness(undefined);
                 extensionContext.client = undefined;
                 if (extensionContext.serverStatus.state !== ServerState.Error) {
                     extensionContext.setServerStopped();
@@ -662,6 +667,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): void {
 }
 
 async function cleanupExistingClient(): Promise<void> {
+    setPluginDetectionLsReadiness(undefined);
     const existingClient = extensionContext.client;
     if (!existingClient) {
         return;
@@ -680,19 +686,27 @@ async function collectEnabledPluginIds(): Promise<string[]> {
     const ids: string[] = [];
     const seen = new Set<string>();
 
-    for (const folder of folders) {
-        try {
-            const config = await readGluarcConfig(folder);
-            const pluginsRaw = (config as any)?.gmod?.plugins;
-            if (!Array.isArray(pluginsRaw)) continue;
-            for (const pluginId of pluginsRaw) {
-                if (typeof pluginId !== 'string' || pluginId.trim().length === 0) continue;
-                if (seen.has(pluginId)) continue;
-                seen.add(pluginId);
-                ids.push(pluginId);
+    // Read all per-folder configs concurrently. We don't want a slow filesystem on one
+    // workspace root to serialize startup plugin discovery for the rest.
+    const configs = await Promise.all(
+        folders.map(async (folder) => {
+            try {
+                return await readGluarcConfig(folder);
+            } catch {
+                return undefined;
             }
-        } catch {
-            // ignore malformed/missing workspace configs during startup
+        }),
+    );
+
+    for (const config of configs) {
+        if (!config) continue;
+        const pluginsRaw = (config as { gmod?: { plugins?: unknown } }).gmod?.plugins;
+        if (!Array.isArray(pluginsRaw)) continue;
+        for (const pluginId of pluginsRaw) {
+            if (typeof pluginId !== 'string' || pluginId.trim().length === 0) continue;
+            if (seen.has(pluginId)) continue;
+            seen.add(pluginId);
+            ids.push(pluginId);
         }
     }
 
@@ -779,7 +793,12 @@ async function doStartServer(startupRunId: number): Promise<void> {
 
     throwIfStartupCancelled(startupRunId);
 
-    await client.start();
+    const ready = client.start();
+    setPluginDetectionLsReadiness({
+        ready,
+        isRunning: () => client.state === State.Running,
+    });
+    await ready;
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
 }

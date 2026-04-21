@@ -130,7 +130,7 @@ function isDeepEqual(a: unknown, b: unknown): boolean {
         if (allPrimitive) {
             const aSorted = [...aArr].sort();
             const bSorted = [...bArr].sort();
-            return aSorted.every((item, i) => isDeepEqual(item, bSorted[i]));
+            return aSorted.every((item, i) => item === bSorted[i]);
         }
         return aArr.every((item, i) => isDeepEqual(item, bArr[i]));
     }
@@ -199,6 +199,7 @@ function applyEntry(
     if (Array.isArray(value) && identityRule) {
         const useObjectId = identityRule.idKey !== undefined;
         const idKey = identityRule.idKey;
+        const id = idKey!;
 
         // Deduplicate within the incoming value array itself (keep first occurrence
         // of each identity so a single apply() call cannot append the same value twice).
@@ -207,7 +208,7 @@ function applyEntry(
         const seenIncoming = new Set<unknown>();
         const incomingItems = (value as unknown[]).filter((item) => {
             const rawId = useObjectId
-                ? (isObjectRecord(item) ? item[idKey!] : undefined)
+                ? (isObjectRecord(item) ? item[id] : undefined)
                 : item;
             // Object-mode items without the idKey pass through unchanged
             if (rawId === undefined && useObjectId) return true;
@@ -229,7 +230,7 @@ function applyEntry(
             for (const item of existing) {
                 if (useObjectId) {
                     if (isObjectRecord(item)) {
-                        existingIds.add(normalizeItemId(item[idKey!]));
+                        existingIds.add(normalizeItemId(item[id]));
                     }
                 } else {
                     existingIds.add(item);
@@ -338,23 +339,23 @@ export async function applyGluarcPatch(
 }
 
 export function buildPresetPatchEntries(opts: {
-    classScopes?: Array<{
+    classScopes?: ReadonlyArray<{
         id: string;
         /** Required by backend — entries without classGlobal are silently dropped. */
         classGlobal: string;
         fixedClassName?: string;
         /** Required by backend — entries without include are silently dropped. */
-        include: string[];
+        include: readonly string[];
         /** Required by backend — entries without label are silently dropped. */
         label: string;
         /** Required by backend — entries without path are silently dropped. */
-        path: string[];
+        path: readonly string[];
         rootDir?: string;
         isGlobalSingleton?: boolean;
         stripFilePrefix?: boolean;
         hideFromOutline?: boolean;
     }>;
-    diagnosticsGlobals?: string[];
+    diagnosticsGlobals?: readonly string[];
 }): PatchEntry[] {
     const entries: PatchEntry[] = [];
 
