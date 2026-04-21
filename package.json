@@ -2179,6 +2179,7 @@
         "test:grammar": "node ./build/grammar-test.cjs",
         "test:parity": "npm run compile && node ./build/gmod-debug-parity-test.js",
         "test:extension": "npm run compile && node ./out/test/runTest.js",
+        "bench:plugin-detection": "node ./scripts/bench-plugin-detection.js",
         "test:all": "npm run test:schema && npm run test:grammar && npm run test:parity && npm run test:extension",
         "test": "npm run test:all",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",
