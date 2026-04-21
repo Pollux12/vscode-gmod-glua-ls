@@ -52,6 +52,11 @@ function canonicalizeTitle(title) {
     return title;
 }
 
+const PLUGIN_BUNDLE_SETTING_KEY = "gluals.ls.pluginBundlePath";
+const WORKSPACE_CATEGORY_TITLE = "Workspace";
+const WORKSPACE_PLUGINS_CATEGORY_TITLE = "Workspace: Plugins";
+const ALWAYS_LAST_TITLES = ["Misc", "Language Server", "Decorations"];
+
 export function main() {
     const schema = readSchema();
     const definitions = schema.$defs || {};
@@ -228,8 +233,8 @@ function dumpPackageJson(rendered) {
         const title = canonicalizeTitle(configuration[i].title);
         const existing = configuration[i].properties;
 
-        // Ensure Misc, Language Server and Decorations stay at the end of config.
-        if (["Misc", "Language Server", "Decorations"].includes(title)) {
+        // Ensure selected categories stay at the end of config.
+        if (ALWAYS_LAST_TITLES.includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...existing,
@@ -245,8 +250,8 @@ function dumpPackageJson(rendered) {
     for (const [rawTitle, items] of Object.entries(rendered)) {
         const title = canonicalizeTitle(rawTitle);
 
-        // Ensure Misc, Language Server and Decorations stay at the end of config.
-        if (["Misc", "Language Server", "Decorations"].includes(title)) {
+        // Ensure selected categories stay at the end of config.
+        if (ALWAYS_LAST_TITLES.includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...items,
@@ -259,12 +264,53 @@ function dumpPackageJson(rendered) {
         }
     }
 
+    let pluginSetting;
+    for (const groups of [configurationByTitle, configurationByTitleAlwaysLast]) {
+        for (const settingsByTitle of Object.values(groups)) {
+            if (
+                settingsByTitle
+                && Object.prototype.hasOwnProperty.call(settingsByTitle, PLUGIN_BUNDLE_SETTING_KEY)
+            ) {
+                pluginSetting = settingsByTitle[PLUGIN_BUNDLE_SETTING_KEY];
+                delete settingsByTitle[PLUGIN_BUNDLE_SETTING_KEY];
+            }
+        }
+    }
+
+    if (pluginSetting) {
+        configurationByTitle[WORKSPACE_PLUGINS_CATEGORY_TITLE] = {
+            ...(configurationByTitle[WORKSPACE_PLUGINS_CATEGORY_TITLE] ?? {}),
+            [PLUGIN_BUNDLE_SETTING_KEY]: pluginSetting,
+        };
+    }
+
     const newConfiguration = [];
     let i = 0;
-    for (const [title, items] of Object.entries({
-        ...configurationByTitle,
-        ...configurationByTitleAlwaysLast,
-    })) {
+    const mainTitles = Object.keys(configurationByTitle);
+    const workspacePluginsIndex = mainTitles.indexOf(WORKSPACE_PLUGINS_CATEGORY_TITLE);
+    if (workspacePluginsIndex !== -1) {
+        mainTitles.splice(workspacePluginsIndex, 1);
+        const workspaceIndex = mainTitles.indexOf(WORKSPACE_CATEGORY_TITLE);
+        const insertIndex = workspaceIndex === -1 ? mainTitles.length : workspaceIndex + 1;
+        mainTitles.splice(insertIndex, 0, WORKSPACE_PLUGINS_CATEGORY_TITLE);
+    }
+
+    for (const title of mainTitles) {
+        const items = configurationByTitle[title];
+        if (!items || Object.keys(items).length === 0) {
+            continue;
+        }
+        newConfiguration.push({
+            title,
+            order: i++,
+            properties: items,
+        });
+    }
+
+    for (const [title, items] of Object.entries(configurationByTitleAlwaysLast)) {
+        if (!items || Object.keys(items).length === 0) {
+            continue;
+        }
         newConfiguration.push({
             title,
             order: i++,
