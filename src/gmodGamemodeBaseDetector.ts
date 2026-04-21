@@ -15,7 +15,7 @@ const BUILTIN_GAMEMODE_BASES = new Set(['sandbox', 'base']);
  */
 export async function detectGamemodeBaseLibraries(
     workspaceFolder: vscode.WorkspaceFolder
-): Promise<string[]> {
+): Promise<readonly string[]> {
     const folderPath = workspaceFolder.uri.fsPath;
     const folderName = path.basename(folderPath);
 

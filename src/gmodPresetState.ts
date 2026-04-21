@@ -111,7 +111,6 @@ export async function updateLastDetection(
     context: vscode.ExtensionContext,
     folder: vscode.WorkspaceFolder,
     frameworkId: string | undefined,
-    _band: undefined,
     fingerprint: string | undefined,
     detectedPluginIds: readonly string[] = [],
 ): Promise<void> {

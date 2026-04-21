@@ -7,6 +7,10 @@ export interface GmodPluginArtifactRef {
     readonly manifest: string;
 }
 
+export interface GmodPluginSearchHints {
+    readonly fileGlobs?: readonly string[];
+}
+
 export type GmodPluginKind = 'framework' | 'gamemode' | 'addon' | 'library';
 
 export interface GmodPluginDescriptor {
@@ -20,6 +24,7 @@ export interface GmodPluginDescriptor {
     readonly globalNames: readonly string[];
     readonly globalPatterns: readonly string[];
     readonly gamemodeBases: readonly string[];
+    readonly searchHints?: GmodPluginSearchHints;
     readonly artifact: GmodPluginArtifactRef;
 }
 
@@ -45,6 +50,7 @@ type PluginDetectionIndex = {
     globalNames?: unknown;
     globalPatterns?: unknown;
     globals?: unknown;
+    searchHints?: unknown;
 };
 
 type PluginIndexEntry = {
@@ -78,6 +84,13 @@ const BUILTIN_PLUGINS: readonly GmodPluginDescriptor[] = [
         globalNames: ['CAMI'],
         globalPatterns: [],
         gamemodeBases: [],
+        searchHints: {
+            fileGlobs: [
+                '**/cami*.lua',
+                '**/sh_cami.lua',
+                '**/lua/autorun/**/cami*.lua',
+            ],
+        },
         artifact: {
             branch: `${DEFAULT_PLUGIN_BRANCH_PREFIX}cami`,
             manifest: 'plugin.json',
@@ -109,13 +122,18 @@ function isSafeChildPath(rootPath: string, candidatePath: string): boolean {
     return !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
+function escapeForRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function normalizeDetection(rawDetection: unknown): {
-    manifestPatterns: string[];
-    gamemodeBases: string[];
-    folderNamePatterns: string[];
-    fileNamePatterns: string[];
-    globalNames: string[];
-    globalPatterns: string[];
+    manifestPatterns: readonly string[];
+    gamemodeBases: readonly string[];
+    folderNamePatterns: readonly string[];
+    fileNamePatterns: readonly string[];
+    globalNames: readonly string[];
+    globalPatterns: readonly string[];
+    searchHints?: GmodPluginSearchHints;
 } | undefined {
     const detection = asObject(rawDetection);
     if (!detection) return undefined;
@@ -126,10 +144,13 @@ function normalizeDetection(rawDetection: unknown): {
     const fileNamePatterns = asStringArray(detection.fileNamePatterns);
     const globalNames = asStringArray(detection.globalNames).concat(asStringArray(detection.globals));
     const globalPatterns = asStringArray(detection.globalPatterns);
+    const rawSearchHints = asObject(detection.searchHints);
+    const fileGlobs = asStringArray(rawSearchHints?.fileGlobs);
+    const searchHints = fileGlobs.length > 0 ? { fileGlobs } : undefined;
 
     const manifestPatterns = [
         ...explicitManifestPatterns,
-        ...gamemodeBases.map((base) => `"base"\\s+"${base}"`),
+        ...gamemodeBases.map((base) => `"base"\\s+"${escapeForRegex(base)}"`),
     ];
 
     if (
@@ -149,11 +170,12 @@ function normalizeDetection(rawDetection: unknown): {
         fileNamePatterns,
         globalNames,
         globalPatterns,
+        searchHints,
     };
 }
 
 function normalizePluginKind(rawKind: unknown, detection: {
-    gamemodeBases: string[];
+    gamemodeBases: readonly string[];
 }): GmodPluginKind {
     const normalized = typeof rawKind === 'string' ? rawKind.trim().toLowerCase() : '';
     switch (normalized) {
@@ -220,6 +242,7 @@ function normalizePluginIndexEntry(raw: unknown): GmodPluginDescriptor | undefin
         globalNames: normalizedDetection.globalNames,
         globalPatterns: normalizedDetection.globalPatterns,
         gamemodeBases: normalizedDetection.gamemodeBases,
+        searchHints: normalizedDetection.searchHints,
         artifact,
     };
 }

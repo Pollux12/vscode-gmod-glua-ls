@@ -20,6 +20,7 @@ import { ensureGluarcExists, readGluarcConfig } from './gluarcConfig';
 import { runFrameworkSetupWizard } from './gmodFrameworkWizard';
 
 let lastDetectionPromptFingerprint: string | undefined;
+const PLUGIN_SETTINGS_QUERY = '@ext:Pollux.gmod-glua-ls @id:gluals.ls.pluginBundlePath';
 
 interface CatalogOptions {
     annotationsPath?: string;
@@ -75,7 +76,7 @@ export async function runFrameworkPresetCheck(
         await Promise.all(
             folders.map(async (folder) => {
                 try {
-                    const result = await detectGmodPlugin(folder, activeCatalog);
+                    const result = await detectGmodPlugin(folder, activeCatalog, { bypassCache: force });
                     return { folder, result } as const;
                 } catch {
                     return {
@@ -95,7 +96,6 @@ export async function runFrameworkPresetCheck(
             context,
             folder,
             result.detected[0]?.id,
-            undefined,
             buildPluginDetectionFingerprint(result),
             result.detected.map((plugin) => plugin.id),
         );
@@ -186,10 +186,9 @@ export async function showApplyPresetPicker(
 }
 
 export async function runCustomSetupWizard(
-    context: vscode.ExtensionContext,
     folder?: vscode.WorkspaceFolder,
 ): Promise<void> {
-    await runFrameworkSetupWizard(context, folder);
+    await runFrameworkSetupWizard(folder);
 }
 
 function buildWorkspaceDetectionFingerprint(
@@ -232,50 +231,19 @@ async function promptForPluginManager(
         .join(', ');
 
     const action = await vscode.window.showInformationMessage(
-        `GLuaLS detected plugin(s) in this workspace: ${pluginSummary}. Configure them in GLua Settings → Plugins.`,
+        `GLuaLS detected plugin(s) in this workspace: ${pluginSummary}. Configure them in Settings → Workspace: Plugins.`,
         { modal: false },
         'Open Plugin Settings',
         'Later',
     );
 
-    if (action === 'Later') {
+    if (action !== 'Open Plugin Settings') {
         lastDetectionPromptFingerprint = fingerprint;
         return;
     }
 
-    if (action !== 'Open Plugin Settings') {
-        return;
-    }
-
-    const targetFolder = await pickDetectedWorkspaceFolder(folderResults);
-    if (!targetFolder) {
-        return;
-    }
-
-    await vscode.commands.executeCommand('gluals.gmod.openSettings', targetFolder.uri);
+    await vscode.commands.executeCommand('workbench.action.openSettings', PLUGIN_SETTINGS_QUERY);
     lastDetectionPromptFingerprint = fingerprint;
-}
-
-async function pickDetectedWorkspaceFolder(
-    folderResults: ReadonlyArray<{ folder: vscode.WorkspaceFolder; result: PluginDetectionResult }>,
-): Promise<vscode.WorkspaceFolder | undefined> {
-    if (folderResults.length === 1) {
-        return folderResults[0].folder;
-    }
-
-    const picked = await vscode.window.showQuickPick(
-        folderResults.map(({ folder, result }) => ({
-            label: folder.name,
-            description: result.detected.map((plugin) => plugin.label).sort().join(', '),
-            folder,
-        })),
-        {
-            title: 'Select workspace folder to configure plugins',
-            placeHolder: 'Choose folder for GLua plugin settings',
-            ignoreFocusOut: true,
-        },
-    );
-    return picked?.folder;
 }
 
 async function applyPluginPreset(

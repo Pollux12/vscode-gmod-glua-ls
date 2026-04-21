@@ -74,7 +74,6 @@ suite('Preset suppression state', () => {
             context,
             folder,
             'darkrp',
-            undefined,
             'detected:darkrp,cami',
             [' darkrp ', 'cami', 'darkrp'],
         );
