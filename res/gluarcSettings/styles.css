@@ -8,6 +8,13 @@
                 --premium-radius-md: 8px;
                 --premium-radius-lg: 12px;
                 --premium-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+                /* Unified table tokens. Zebra is subtle, hover is distinctly stronger so the
+                   two never visually collide on even rows. */
+                --table-surface: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+                --table-border: var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                --table-header-bg: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+                --table-zebra-bg: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+                --table-row-hover-bg: color-mix(in srgb, var(--vscode-list-hoverBackground) 75%, var(--vscode-foreground) 6%);
             }
 
             body {
@@ -907,8 +914,9 @@
             .path-table {
                 grid-column: 1;
                 border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
-                border-radius: 2px;
+                border-radius: 4px;
                 overflow: hidden;
+                background-color: var(--vscode-editor-background);
             }
 
             .path-table:empty {
@@ -925,6 +933,7 @@
                 font-size: 13px;
                 transition: background-color 0.1s;
                 min-height: 28px;
+                background-color: transparent;
             }
 
             .path-row:nth-child(even) {
@@ -1028,28 +1037,27 @@
             }
 
             .mapping-table-shell {
-                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border: 1px solid var(--table-border);
                 border-radius: var(--premium-radius-sm);
                 overflow: auto;
                 max-height: 480px;
-                background-color: var(--vscode-editor-background);
+                background-color: var(--table-surface);
                 position: relative;
-                scrollbar-gutter: stable;
                 overflow-anchor: none;
-                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+                box-shadow: none;
             }
 
             .mapping-table-header {
-                background-color: var(--vscode-editor-background);
-                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                background-color: var(--table-header-bg);
+                border-bottom: 1px solid var(--table-border);
                 position: sticky;
                 top: 0;
                 z-index: 2;
             }
 
             .mapping-table-add-row {
-                background-color: var(--vscode-editor-background);
-                border-top: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                background-color: var(--table-header-bg);
+                border-top: 1px solid var(--table-border);
                 position: sticky;
                 bottom: 0;
                 z-index: 2;
@@ -1065,16 +1073,13 @@
                 text-align: left;
             }
 
-            .mapping-table-heading.is-source,
             .mapping-table-heading.is-actions {
-                justify-self: center;
-                text-align: center;
-                width: 100%;
+                text-align: right;
             }
 
             .mapping-table-cell.is-actions {
                 display: flex;
-                justify-content: center;
+                justify-content: flex-end;
             }
 
             .mapping-table-cell.is-source.is-empty {
@@ -1086,20 +1091,18 @@
             }
 
             .mapping-table-row {
-                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
+                border-bottom: 1px solid var(--table-border);
                 transform-origin: center top;
+                background-color: transparent;
+                transition: background-color var(--premium-transition-fast);
             }
 
             .mapping-table-row:last-child {
                 border-bottom: none;
             }
 
-            .mapping-table-row:nth-child(even) {
-                background-color: var(--vscode-list-hoverBackground, transparent);
-            }
-
             .mapping-table-row:hover {
-                background-color: var(--vscode-list-hoverBackground, transparent);
+                background-color: var(--table-row-hover-bg);
             }
 
             .mapping-table-row.is-inactive {
@@ -1120,39 +1123,38 @@
             }
 
             .mapping-table-badge {
-                display: flex;
+                display: inline-flex;
                 align-items: center;
-                justify-content: center;
-                justify-self: stretch;
-                min-height: 22px;
+                justify-self: start;
+                min-height: 18px;
                 padding: 0;
                 background-color: transparent;
                 color: var(--vscode-descriptionForeground);
                 font-size: 12px;
                 font-weight: 500;
-                text-align: center;
+                letter-spacing: 0;
+                text-align: left;
                 white-space: nowrap;
+                border: none;
+                border-radius: 0;
             }
 
             .mapping-table-badge.is-override {
-                background-color: transparent;
                 color: var(--vscode-textLink-foreground);
             }
 
             .mapping-table-badge.is-custom {
-                background-color: transparent;
                 color: var(--vscode-charts-orange, var(--vscode-editor-foreground));
             }
 
             .mapping-table-badge.is-removed {
-                background-color: transparent;
                 color: var(--vscode-inputValidation-warningForeground, var(--vscode-editor-foreground));
             }
 
             .mapping-table-badge.is-default,
             .mapping-table-badge.is-built-in,
             .mapping-table-badge.is-workspace {
-                background-color: transparent;
+                color: var(--vscode-descriptionForeground);
             }
 
             .mapping-table-actions {
@@ -1364,6 +1366,19 @@
                 display: block;
             }
 
+            .object-compact-field {
+                gap: 6px;
+            }
+
+            .object-compact-field .setting-label {
+                font-size: 14px;
+            }
+
+            .object-compact-field .setting-description {
+                font-size: 13px;
+                margin-top: 0;
+            }
+
             .object-list-item {
                 border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
                 padding: 16px;
@@ -1428,7 +1443,7 @@
                 padding: 12px;
             }
 
-            /* Severity table */
+            /* Severity / diagnostics-state table — visually unified with mapping-table. */
             .severity-table-container {
                 display: flex;
                 flex-direction: column;
@@ -1455,48 +1470,55 @@
             .severity-table-scroll {
                 max-height: 480px;
                 overflow: auto;
-                border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
-                border-radius: 4px;
+                border: 1px solid var(--table-border);
+                border-radius: var(--premium-radius-sm);
+                background-color: var(--table-surface);
             }
 
             .severity-table {
                 width: 100%;
-                border-collapse: collapse;
+                border-collapse: separate;
+                border-spacing: 0;
                 font-size: 13px;
+                background-color: transparent;
             }
 
             .severity-table th,
             .severity-table td {
-                border-bottom: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
-                padding: 6px 12px;
+                border-bottom: 1px solid var(--table-border);
+                padding: 8px 16px;
                 text-align: left;
                 vertical-align: middle;
+                background-color: transparent;
+            }
+
+            .severity-table tbody tr:last-child td {
+                border-bottom: none;
             }
 
             .severity-table th {
                 position: sticky;
                 top: 0;
                 z-index: 1;
-                background-color: var(--vscode-editor-background);
+                background-color: var(--table-header-bg);
                 color: var(--vscode-descriptionForeground);
                 font-family: var(--vscode-font-family);
                 font-weight: 600;
                 font-size: 11px;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
-                padding: 6px 12px;
-            }
-
-            .severity-table tbody tr:hover {
-                background-color: var(--vscode-list-hoverBackground, transparent);
             }
 
             .severity-code {
                 font-family: inherit;
             }
 
-            .severity-table tbody tr:nth-child(even) {
-                background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+            .severity-table tbody tr {
+                transition: background-color var(--premium-transition-fast);
+            }
+
+            .severity-table tbody tr:hover td {
+                background-color: var(--table-row-hover-bg);
             }
 
             .severity-table select {
@@ -1506,8 +1528,7 @@
             }
 
             .severity-table tr.is-overridden td:first-child {
-                border-left: 3px solid var(--vscode-settings-modifiedItemIndicator, #0c7d9d);
-                padding-left: 9px;
+                box-shadow: inset 3px 0 0 var(--vscode-settings-modifiedItemIndicator, #0c7d9d);
             }
 
             .severity-table td:last-child {
@@ -1680,4 +1701,363 @@
     grid-template-columns: 1fr auto auto;
     gap: 6px;
     align-items: center;
+}
+
+/* ─── Plugin Editor ───────────────────────────────────────────────────────── */
+
+.plugin-editor {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.plugin-editor-toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+}
+
+.plugin-editor-search {
+    width: 100%;
+    max-width: none;
+}
+
+.plugin-editor-summary {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+/* (Removed) old .plugin-editor-sections wrapper rule no longer used. */
+
+/* One bordered card wraps both Enabled + Available groups for visual cohesion. */
+.plugin-editor-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--table-border);
+    border-radius: var(--premium-radius-sm);
+    background-color: var(--table-surface);
+    overflow: hidden;
+}
+
+/* Sections inside the card: heading bar + list, separated by border.
+   Override the global `section { margin-bottom: 32px }` so the card
+   doesn't accumulate dead space below each section. */
+.plugin-section {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+
+.plugin-section + .plugin-section {
+    border-top: 1px solid var(--table-border);
+}
+
+.plugin-section-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 10px;
+    background-color: var(--table-header-bg);
+    border-bottom: 1px solid var(--table-border);
+}
+
+.plugin-section-title {
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vscode-foreground);
+}
+
+.plugin-section-count {
+    font-size: 11.5px;
+    color: var(--vscode-descriptionForeground);
+    font-variant-numeric: tabular-nums;
+}
+
+.plugin-section-count::before {
+    content: "(";
+}
+
+.plugin-section-count::after {
+    content: ")";
+}
+
+.plugin-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Row ── */
+
+/* Same grid for both sections so columns line up. Available rows just leave
+   the handle column empty (it acts as consistent left padding). */
+.plugin-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--table-border);
+    background-color: transparent;
+    transition: background-color 0.12s ease;
+}
+
+.plugin-list .plugin-row:last-child {
+    border-bottom: none;
+}
+
+.plugin-row:hover {
+    background-color: var(--table-row-hover-bg);
+}
+
+.plugin-row.is-dragging {
+    opacity: 0.5;
+}
+
+.plugin-row.is-drop-before {
+    box-shadow: inset 0 2px 0 var(--vscode-focusBorder, var(--vscode-button-background));
+}
+
+.plugin-row.is-drop-after {
+    box-shadow: inset 0 -2px 0 var(--vscode-focusBorder, var(--vscode-button-background));
+}
+
+/* Drag handle */
+
+.plugin-row-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    line-height: 1;
+    letter-spacing: -2px;
+    user-select: none;
+    cursor: grab;
+    opacity: 0.45;
+    transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.plugin-row-handle.is-empty {
+    visibility: hidden;
+    cursor: default;
+}
+
+.plugin-row:hover .plugin-row-handle:not(.is-empty) {
+    opacity: 1;
+    color: var(--vscode-foreground);
+}
+
+.plugin-row.is-dragging .plugin-row-handle {
+    cursor: grabbing;
+}
+
+/* Body */
+
+.plugin-row-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.plugin-row-name-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.3;
+}
+
+.plugin-row-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--vscode-settings-headerForeground, var(--vscode-foreground));
+}
+
+a.plugin-row-label.is-source-link {
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.12s ease;
+}
+
+a.plugin-row-label.is-source-link:hover,
+a.plugin-row-label.is-source-link:focus-visible {
+    color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    outline: none;
+}
+
+.plugin-row-source-icon {
+    flex-shrink: 0;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+a.plugin-row-label.is-source-link:hover .plugin-row-source-icon,
+a.plugin-row-label.is-source-link:focus-visible .plugin-row-source-icon {
+    opacity: 1;
+    color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
+}
+
+.plugin-row-kind {
+    display: inline-flex;
+    align-items: center;
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vscode-descriptionForeground);
+    border: 1px solid color-mix(in srgb, var(--vscode-foreground) 22%, transparent);
+    border-radius: 2px;
+    padding: 2px 6px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.plugin-row-detected {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vscode-charts-green, var(--vscode-textLink-foreground));
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.plugin-row-update-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vscode-notificationsInfoIcon-foreground, var(--vscode-charts-blue, var(--vscode-textLink-foreground)));
+    border: 1px solid color-mix(in srgb, var(--vscode-notificationsInfoIcon-foreground, var(--vscode-charts-blue, var(--vscode-textLink-foreground))) 40%, transparent);
+    border-radius: 2px;
+    padding: 2px 6px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.plugin-action-btn-update {
+    color: var(--vscode-button-foreground, var(--vscode-foreground));
+    background-color: var(--vscode-button-background);
+    border-color: var(--vscode-button-border, transparent);
+}
+
+.plugin-action-btn-update:hover {
+    background-color: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+}
+
+.plugin-action-btn-update:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.plugin-row-description {
+    margin-top: 0;
+    font-size: 12.5px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+}
+
+/* Action button */
+
+.plugin-row-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.plugin-action-btn {
+    min-width: 88px;
+    min-height: 28px;
+    padding: 0 14px;
+    font-size: 12px;
+    border-radius: var(--premium-radius-sm);
+    border: 1px solid var(--vscode-button-border, transparent);
+    background-color: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
+    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.plugin-action-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground));
+}
+
+.plugin-action-btn.is-disable:hover {
+    color: var(--vscode-errorForeground, var(--vscode-button-secondaryForeground));
+    border-color: color-mix(in srgb, var(--vscode-errorForeground, var(--vscode-foreground)) 50%, transparent);
+}
+
+/* Empty-state body cell rendered in place of rows when a section is empty.
+   Padding mirrors a real row so the section keeps a balanced footprint and
+   the two section headings never visually collide. */
+.plugin-section-empty {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 12px;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+}
+
+.plugin-list-empty {
+    display: none;
+}
+
+@media (max-width: 720px) {
+    .plugin-editor-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .plugin-editor-summary {
+        white-space: normal;
+    }
+
+    .plugin-row {
+        grid-template-columns: 18px minmax(0, 1fr);
+        grid-template-areas:
+            "handle body"
+            "handle action";
+        row-gap: 6px;
+    }
+
+    .plugin-row-handle {
+        grid-area: handle;
+        align-items: flex-start;
+        padding-top: 4px;
+    }
+
+    .plugin-row-body {
+        grid-area: body;
+    }
+
+    .plugin-row-action {
+        grid-area: action;
+        justify-content: flex-start;
+    }
 }

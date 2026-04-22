@@ -362,8 +362,8 @@ export function renderScalarListEditor(field, value, onChange) {
     let currentArr = Array.isArray(value)
         ? [...value]
         : Array.isArray(field.default)
-          ? [...field.default]
-          : [];
+            ? [...field.default]
+            : [];
 
     const save = () => onChange([...currentArr]);
 
@@ -410,6 +410,382 @@ export function renderScalarListEditor(field, value, onChange) {
     }
 
     renderRows();
+    return container;
+}
+
+export function renderPluginListEditor(field, value, onChange, options = {}) {
+    const catalog = Array.isArray(options.catalog) ? options.catalog : [];
+    const openExternal = typeof options.openExternal === "function" ? options.openExternal : null;
+    const updatePlugin = typeof options.updatePlugin === "function" ? options.updatePlugin : null;
+    let enabledIds = Array.isArray(value)
+        ? value.filter((entry) => typeof entry === "string")
+        : Array.isArray(field.default)
+            ? field.default.filter((entry) => typeof entry === "string")
+            : [];
+
+    const normalize = (id) => String(id).trim();
+    enabledIds = [...new Set(enabledIds.map(normalize).filter((id) => id.length > 0))];
+
+    const commit = () => onChange([...enabledIds]);
+
+    // Catalog lookups.
+    const knownById = new Map();
+    const knownEntries = [];
+    catalog.forEach((entry) => {
+        if (entry && typeof entry.id === "string") {
+            knownById.set(entry.id, entry);
+            knownEntries.push(entry);
+        }
+    });
+
+    const byLabel = (left, right) => {
+        const leftLabel = typeof left?.label === "string" && left.label.trim().length > 0
+            ? left.label
+            : left.id;
+        const rightLabel = typeof right?.label === "string" && right.label.trim().length > 0
+            ? right.label
+            : right.id;
+        return leftLabel.localeCompare(rightLabel, undefined, { sensitivity: "base" });
+    };
+
+    const getPluginMeta = (id) => knownById.get(id) ?? {
+        id,
+        label: id,
+        description: "Unknown plugin id from .gluarc.json",
+        kind: "custom",
+        detected: false,
+    };
+
+    // ── Container & toolbar ─────────────────────────────────────────────────
+    const container = document.createElement("div");
+    container.className = "plugin-editor";
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "plugin-editor-toolbar";
+    container.appendChild(toolbar);
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.className = "plugin-editor-search";
+    searchInput.placeholder = "Search plugins...";
+    searchInput.spellcheck = false;
+    toolbar.appendChild(searchInput);
+
+    const summary = document.createElement("div");
+    summary.className = "plugin-editor-summary";
+    toolbar.appendChild(summary);
+
+    const sectionsHost = document.createElement("div");
+    sectionsHost.className = "plugin-editor-card";
+    container.appendChild(sectionsHost);
+
+    // ── Section factory ─────────────────────────────────────────────────────
+    const buildSection = (variant, titleText, emptyText) => {
+        const section = document.createElement("section");
+        section.className = `plugin-section plugin-section-${variant}`;
+
+        const heading = document.createElement("div");
+        heading.className = "plugin-section-heading";
+
+        const title = document.createElement("h3");
+        title.className = "plugin-section-title";
+        title.textContent = titleText;
+        heading.appendChild(title);
+
+        const count = document.createElement("span");
+        count.className = "plugin-section-count";
+        heading.appendChild(count);
+
+        section.appendChild(heading);
+
+        const list = document.createElement("div");
+        list.className = `plugin-list plugin-list-${variant}`;
+        section.appendChild(list);
+
+        const empty = document.createElement("div");
+        empty.className = "plugin-section-empty";
+        empty.textContent = emptyText;
+        empty.style.display = "none";
+        section.appendChild(empty);
+
+        return { section, list, count, empty };
+    };
+
+    const enabledUI = buildSection(
+        "enabled",
+        "Enabled",
+        "No plugins enabled. Enable one from the list below to get started.",
+    );
+    const availableUI = buildSection(
+        "available",
+        "Available",
+        "No plugins match your search.",
+    );
+    sectionsHost.appendChild(enabledUI.section);
+    sectionsHost.appendChild(availableUI.section);
+
+    // ── Search / filter ─────────────────────────────────────────────────────
+    const matchesSearch = (meta) => {
+        const query = searchInput.value.trim().toLowerCase();
+        if (!query) return true;
+        return [meta.label, meta.id, meta.description, meta.kind]
+            .filter(Boolean)
+            .some((token) => String(token).toLowerCase().includes(query));
+    };
+
+    // ── Drag & drop reorder for enabled list ────────────────────────────────
+    let dragId = null;
+
+    const clearDropMarkers = () => {
+        enabledUI.list.querySelectorAll(".is-drop-before, .is-drop-after").forEach((node) => {
+            node.classList.remove("is-drop-before", "is-drop-after");
+        });
+    };
+
+    const onListDragOver = (event) => {
+        if (dragId === null) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+
+        const target = event.target.closest(".plugin-row");
+        clearDropMarkers();
+        if (!target || target.dataset.pluginId === dragId) return;
+
+        const rect = target.getBoundingClientRect();
+        const before = (event.clientY - rect.top) < rect.height / 2;
+        target.classList.add(before ? "is-drop-before" : "is-drop-after");
+    };
+
+    const onListDrop = (event) => {
+        if (dragId === null) return;
+        event.preventDefault();
+
+        const target = event.target.closest(".plugin-row");
+        const movingId = dragId;
+        dragId = null;
+        clearDropMarkers();
+
+        if (!target || target.dataset.pluginId === movingId) return;
+
+        const targetId = target.dataset.pluginId;
+        const next = enabledIds.filter((id) => id !== movingId);
+        const targetIndex = next.indexOf(targetId);
+        if (targetIndex === -1) return;
+
+        const rect = target.getBoundingClientRect();
+        const before = (event.clientY - rect.top) < rect.height / 2;
+        next.splice(before ? targetIndex : targetIndex + 1, 0, movingId);
+        enabledIds = next;
+        commit();
+        render();
+    };
+
+    enabledUI.list.addEventListener("dragover", onListDragOver);
+    enabledUI.list.addEventListener("drop", onListDrop);
+    enabledUI.list.addEventListener("dragleave", (event) => {
+        if (!enabledUI.list.contains(event.relatedTarget)) clearDropMarkers();
+    });
+
+    // ── Row factory ─────────────────────────────────────────────────────────
+    const buildRow = (id, isEnabled) => {
+        const meta = getPluginMeta(id);
+        const isDetected = meta?.detected === true;
+
+        const row = document.createElement("div");
+        row.className = "plugin-row";
+        row.dataset.pluginId = id;
+        if (isEnabled) row.classList.add("is-enabled");
+
+        // Reorder gutter (always present so columns line up across sections).
+        const handle = document.createElement("div");
+        handle.className = "plugin-row-handle";
+        if (isEnabled) {
+            handle.title = "Drag to reorder priority";
+            handle.textContent = "⋮⋮";
+            row.draggable = true;
+            row.addEventListener("dragstart", (event) => {
+                dragId = id;
+                row.classList.add("is-dragging");
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", id);
+            });
+            row.addEventListener("dragend", () => {
+                dragId = null;
+                row.classList.remove("is-dragging");
+                clearDropMarkers();
+            });
+        } else {
+            handle.classList.add("is-empty");
+        }
+        row.appendChild(handle);
+
+        // Body: name + meta line + description.
+        const body = document.createElement("div");
+        body.className = "plugin-row-body";
+
+        const labelText = meta.label || meta.id;
+        const nameLine = document.createElement("div");
+        nameLine.className = "plugin-row-name-line";
+
+        const hasSource = openExternal && typeof meta.sourceUrl === "string" && meta.sourceUrl.length > 0;
+        const label = document.createElement(hasSource ? "a" : "span");
+        label.className = "plugin-row-label";
+        label.textContent = labelText;
+        if (hasSource) {
+            label.classList.add("is-source-link");
+            label.href = meta.sourceUrl;
+            label.title = `View source on GitHub: ${meta.sourceUrl}`;
+            label.rel = "noopener noreferrer";
+            label.onclick = (event) => {
+                event.preventDefault();
+                openExternal(meta.sourceUrl);
+            };
+            const githubIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            githubIcon.setAttribute("class", "plugin-row-source-icon");
+            githubIcon.setAttribute("viewBox", "0 0 16 16");
+            githubIcon.setAttribute("width", "14");
+            githubIcon.setAttribute("height", "14");
+            githubIcon.setAttribute("aria-hidden", "true");
+            const githubPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            githubPath.setAttribute("fill", "currentColor");
+            githubPath.setAttribute("fill-rule", "evenodd");
+            githubPath.setAttribute(
+                "d",
+                "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 " +
+                "0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 " +
+                "1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 " +
+                "0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 " +
+                "2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 " +
+                "0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 " +
+                "0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z",
+            );
+            githubIcon.appendChild(githubPath);
+            label.appendChild(githubIcon);
+        }
+        nameLine.appendChild(label);
+
+        if (meta.kind) {
+            const kindTag = document.createElement("span");
+            kindTag.className = "plugin-row-kind";
+            kindTag.textContent = meta.kind;
+            nameLine.appendChild(kindTag);
+        }
+
+        if (!isEnabled && isDetected) {
+            const detectedTag = document.createElement("span");
+            detectedTag.className = "plugin-row-detected";
+            detectedTag.title = "Plugin auto-detected from this workspace";
+            detectedTag.textContent = "detected";
+            nameLine.appendChild(detectedTag);
+        }
+
+        if (isEnabled && meta.updateAvailable === true) {
+            const updateTag = document.createElement("span");
+            updateTag.className = "plugin-row-update-tag";
+            updateTag.title = "A newer version of this plugin's annotations is available";
+            updateTag.textContent = "update available";
+            nameLine.appendChild(updateTag);
+        }
+
+        body.appendChild(nameLine);
+
+        if (meta.description && String(meta.description).trim().length > 0) {
+            const desc = document.createElement("div");
+            desc.className = "plugin-row-description";
+            desc.textContent = meta.description;
+            body.appendChild(desc);
+        }
+
+        row.appendChild(body);
+
+        // Action.
+        const action = document.createElement("div");
+        action.className = "plugin-row-action";
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className = "plugin-action-btn";
+        if (isEnabled) {
+            toggleBtn.classList.add("is-disable");
+            toggleBtn.textContent = "Disable";
+            toggleBtn.title = "Disable plugin for this workspace";
+        } else {
+            toggleBtn.classList.add("is-enable");
+            toggleBtn.textContent = "Enable";
+            toggleBtn.title = "Enable plugin for this workspace";
+        }
+        toggleBtn.onclick = () => {
+            if (isEnabled) {
+                enabledIds = enabledIds.filter((entry) => entry !== id);
+            } else if (!enabledIds.includes(id)) {
+                enabledIds.push(id);
+            }
+            commit();
+            render();
+        };
+        action.appendChild(toggleBtn);
+
+        if (isEnabled && updatePlugin && meta.updateAvailable === true) {
+            const updateBtn = document.createElement("button");
+            updateBtn.type = "button";
+            updateBtn.className = "plugin-action-btn plugin-action-btn-update";
+            updateBtn.title = `Update ${meta.label || meta.id} plugin annotations to the latest commit on the source branch`;
+            updateBtn.textContent = "Update";
+            updateBtn.onclick = () => {
+                updateBtn.disabled = true;
+                updateBtn.textContent = "Updating\u2026";
+                updatePlugin(meta.id);
+            };
+            action.appendChild(updateBtn);
+        }
+
+        row.appendChild(action);
+
+        return row;
+    };
+
+    // ── Render ──────────────────────────────────────────────────────────────
+    const render = () => {
+        enabledUI.list.innerHTML = "";
+        availableUI.list.innerHTML = "";
+
+        const enabledSet = new Set(enabledIds);
+
+        // Enabled rows: preserve user order from enabledIds.
+        let enabledVisible = 0;
+        enabledIds.forEach((id) => {
+            const meta = getPluginMeta(id);
+            if (!matchesSearch(meta)) return;
+            enabledUI.list.appendChild(buildRow(id, true));
+            enabledVisible += 1;
+        });
+
+        // Available rows: catalog minus enabled, alphabetised by label.
+        const availableEntries = knownEntries
+            .filter((entry) => !enabledSet.has(entry.id))
+            .sort(byLabel);
+
+        let availableVisible = 0;
+        availableEntries.forEach((entry) => {
+            if (!matchesSearch(entry)) return;
+            availableUI.list.appendChild(buildRow(entry.id, false));
+            availableVisible += 1;
+        });
+
+        enabledUI.count.textContent = `${enabledIds.length}`;
+        availableUI.count.textContent = `${availableEntries.length}`;
+
+        enabledUI.empty.style.display = enabledVisible === 0 ? "flex" : "none";
+        availableUI.empty.style.display = availableVisible === 0 ? "flex" : "none";
+
+        const detectedCount = knownEntries.filter((entry) => entry?.detected === true).length;
+        summary.textContent =
+            `${enabledIds.length} enabled \u00b7 ${detectedCount} detected \u00b7 ${knownEntries.length} total`;
+    };
+
+    searchInput.addEventListener("input", () => render());
+
+    render();
     return container;
 }
 
@@ -1003,6 +1379,7 @@ function normalizeScriptedClassDefinition(value) {
     const definition = { id };
     const label = typeof value.label === "string" ? value.label.trim() : "";
     const classGlobal = typeof value.classGlobal === "string" ? value.classGlobal.trim() : "";
+    const fixedClassName = typeof value.fixedClassName === "string" ? value.fixedClassName.trim() : "";
     const parentId = typeof value.parentId === "string" ? value.parentId.trim() : "";
     const icon = typeof value.icon === "string" ? value.icon.trim() : "";
     const rootDir = typeof value.rootDir === "string" ? value.rootDir.trim() : "";
@@ -1016,6 +1393,10 @@ function normalizeScriptedClassDefinition(value) {
     if (include.length > 0) definition.include = include;
     if (exclude.length > 0) definition.exclude = exclude;
     if (classGlobal) definition.classGlobal = classGlobal;
+    if (fixedClassName) definition.fixedClassName = fixedClassName;
+    if (typeof value.isGlobalSingleton === "boolean") definition.isGlobalSingleton = value.isGlobalSingleton;
+    if (typeof value.stripFilePrefix === "boolean") definition.stripFilePrefix = value.stripFilePrefix;
+    if (typeof value.hideFromOutline === "boolean") definition.hideFromOutline = value.hideFromOutline;
     if (parentId) definition.parentId = parentId;
     if (icon) definition.icon = icon;
     if (rootDir) definition.rootDir = rootDir;
@@ -1053,6 +1434,7 @@ function mergeScriptedClassDefinition(baseDefinition, overrideDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1062,6 +1444,21 @@ function mergeScriptedClassDefinition(baseDefinition, overrideDefinition) {
             merged[key] = cloneDefinition(overrideDefinition[key]);
         }
     });
+    if (overrideDefinition.isGlobalSingleton === true) {
+        merged.isGlobalSingleton = true;
+    } else if (overrideDefinition.isGlobalSingleton === false) {
+        delete merged.isGlobalSingleton;
+    }
+    if (overrideDefinition.stripFilePrefix === true) {
+        merged.stripFilePrefix = true;
+    } else if (overrideDefinition.stripFilePrefix === false) {
+        delete merged.stripFilePrefix;
+    }
+    if (overrideDefinition.hideFromOutline === true) {
+        merged.hideFromOutline = true;
+    } else if (overrideDefinition.hideFromOutline === false) {
+        delete merged.hideFromOutline;
+    }
     if (overrideDefinition.disabled === true) {
         merged.disabled = true;
     } else {
@@ -1163,6 +1560,7 @@ function buildScriptedClassOverride(defaultDefinition, effectiveDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1174,6 +1572,13 @@ function buildScriptedClassOverride(defaultDefinition, effectiveDefinition) {
             override[key] = cloneDefinition(effectiveValue);
         }
     });
+    for (const boolKey of ["isGlobalSingleton", "stripFilePrefix", "hideFromOutline"]) {
+        if (effectiveDefinition[boolKey] === true && defaultDefinition[boolKey] !== true) {
+            override[boolKey] = true;
+        } else if (effectiveDefinition[boolKey] !== true && defaultDefinition[boolKey] === true) {
+            override[boolKey] = false;
+        }
+    }
 
     return Object.keys(override).length > 1 ? override : null;
 }
@@ -1186,6 +1591,7 @@ function buildCustomScriptedClassPayload(effectiveDefinition) {
         "include",
         "exclude",
         "classGlobal",
+        "fixedClassName",
         "parentId",
         "icon",
         "rootDir",
@@ -1195,6 +1601,11 @@ function buildCustomScriptedClassPayload(effectiveDefinition) {
             payload[key] = cloneDefinition(effectiveDefinition[key]);
         }
     });
+    for (const boolKey of ["isGlobalSingleton", "stripFilePrefix", "hideFromOutline"]) {
+        if (effectiveDefinition[boolKey] === true) {
+            payload[boolKey] = true;
+        }
+    }
     return payload;
 }
 
@@ -1452,6 +1863,48 @@ export function renderScriptedClassTableEditor(field, value, onChange) {
                 nextDefinition.classGlobal = nextValue || row.defaultDefinition?.classGlobal || row.id.toUpperCase();
             });
         });
+
+        const fixedClassNameInput = createField("Fixed Class Name", createScriptedClassTextInput(definition.fixedClassName || ""));
+        fixedClassNameInput.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                const nextValue = fixedClassNameInput.value.trim();
+                if (nextValue) {
+                    nextDefinition.fixedClassName = nextValue;
+                } else {
+                    nextDefinition.fixedClassName = "";
+                }
+            });
+        });
+
+        const isGlobalSingletonCheckbox = document.createElement("input");
+        isGlobalSingletonCheckbox.type = "checkbox";
+        isGlobalSingletonCheckbox.checked = !!definition.isGlobalSingleton;
+        isGlobalSingletonCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.isGlobalSingleton = isGlobalSingletonCheckbox.checked;
+            });
+        });
+        createField("Global Singleton", isGlobalSingletonCheckbox);
+
+        const stripFilePrefixCheckbox = document.createElement("input");
+        stripFilePrefixCheckbox.type = "checkbox";
+        stripFilePrefixCheckbox.checked = !!definition.stripFilePrefix;
+        stripFilePrefixCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.stripFilePrefix = stripFilePrefixCheckbox.checked;
+            });
+        });
+        createField("Strip File Prefix", stripFilePrefixCheckbox);
+
+        const hideFromOutlineCheckbox = document.createElement("input");
+        hideFromOutlineCheckbox.type = "checkbox";
+        hideFromOutlineCheckbox.checked = !!definition.hideFromOutline;
+        hideFromOutlineCheckbox.addEventListener("change", () => {
+            updateEffectiveDefinition(row, (nextDefinition) => {
+                nextDefinition.hideFromOutline = hideFromOutlineCheckbox.checked;
+            });
+        });
+        createField("Hide From Outline", hideFromOutlineCheckbox);
 
         const rootDirInput = createField("Root Directory", createScriptedClassTextInput(definition.rootDir || ""));
         rootDirInput.addEventListener("change", () => {
@@ -1813,11 +2266,10 @@ export function renderObjectArrayEditor(field, value, onChange, options) {
 
         optionalFields.forEach((subField) => {
             const fieldRow = document.createElement("div");
-            fieldRow.className = "object-list-field";
+            fieldRow.className = "object-list-field object-compact-field";
 
             const label = document.createElement("div");
             label.className = "setting-label";
-            label.style.fontSize = "12px";
             label.textContent = subField.label;
             fieldRow.appendChild(label);
 
@@ -1825,7 +2277,6 @@ export function renderObjectArrayEditor(field, value, onChange, options) {
             if (description) {
                 const descEl = document.createElement("div");
                 descEl.className = "setting-description";
-                descEl.style.fontSize = "12px";
                 descEl.textContent = description;
                 fieldRow.appendChild(descEl);
             }
@@ -1855,8 +2306,8 @@ export function renderObjectArrayEditor(field, value, onChange, options) {
                 item && typeof item === "object" && !Array.isArray(item)
                     ? item
                     : typeof item === "string"
-                      ? { path: item }
-                      : {};
+                        ? { path: item }
+                        : {};
 
             const row = document.createElement("div");
             row.className = "path-row";

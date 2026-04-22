@@ -18,6 +18,7 @@ import { registerTerminalLinkProvider } from './luaTerminalLinkProvider';
 import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions';
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
+import { GmodPluginDescriptor, loadGmodPluginCatalog } from './gmodPluginCatalog';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
@@ -31,7 +32,8 @@ import {
     registerGmodErrorView,
 } from './gmodErrorView';
 import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
-import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import { GluarcSettingsPanel, type GluarcSettingsPanelTarget } from './gluarcSettingsPanel';
+import { readGluarcConfig } from './gluarcConfig';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
 import { GmodGetDebugStateTool } from './tools/gmodGetDebugStateTool';
@@ -52,6 +54,13 @@ import {
     isExpectedLifecycleRequestError,
     sendRequestWithStartupRetry,
 } from './languageServerRequests';
+import {
+    runFrameworkPresetCheck,
+    manualRerunFrameworkPresetCheck,
+    showApplyPresetPicker,
+    runCustomSetupWizard,
+} from './gmodPresetManager';
+import { disposePluginDetectionRuntime, setPluginDetectionLsReadiness } from './gmodPluginDetection';
 
 /**
  * Command registration entry
@@ -118,6 +127,13 @@ interface GmodToolLogEntry {
 const gmodToolOutputEntries: GmodToolLogEntry[] = [];
 const gmodToolErrorEntries: GmodToolLogEntry[] = [];
 
+async function resolvePluginBundlePath(plugin: GmodPluginDescriptor): Promise<string | undefined> {
+    if (!gmodAnnotationManager) {
+        return undefined;
+    }
+    return gmodAnnotationManager.ensurePluginBundle(plugin);
+}
+
 /**
  * Extension activation entry point
  */
@@ -154,6 +170,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * Extension deactivation
  */
 export async function deactivate(): Promise<void> {
+    setPluginDetectionLsReadiness(undefined);
+    disposePluginDetectionRuntime();
     if (gmodMcpHost) {
         await gmodMcpHost.stop();
         gmodMcpHost.dispose();
@@ -185,9 +203,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodRdbUpdates },
-        { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
-        { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
-        { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
+        { id: 'gluals.gmod.openSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createOrShow(context, target) },
+        { id: 'gluals.gmod.createSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createAndShow(context, target) },
+        { id: 'gluals.gmod.editSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createOrShow(context, target) },
         // GMod debug control commands
         { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
         { id: 'gluals.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
@@ -221,6 +239,22 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
         { id: 'gluals.gmod.explorer.copyClassName', handler: copyGmodExplorerClassName },
         { id: 'gluals.gmod.explorer.revealInExplorer', handler: revealGmodExplorerItemInExplorer },
+        // Plugin preset / wizard commands
+        {
+            id: 'gluals.gmod.applyFrameworkPreset',
+            handler: () => showApplyPresetPicker(context, undefined, {
+                annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+                resolvePluginBundlePath,
+            }),
+        },
+        { id: 'gluals.gmod.runFrameworkSetupWizard', handler: () => runCustomSetupWizard() },
+        {
+            id: 'gluals.gmod.rerunFrameworkDetection',
+            handler: () => manualRerunFrameworkPresetCheck(context, {
+                annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+                resolvePluginBundlePath,
+            }),
+        },
     ];
 
     // Register all commands
@@ -442,6 +476,10 @@ async function initializeExtension(): Promise<void> {
     await refreshGmodDebugConfigContext();
     initializeGmodMcpHost(extensionContext.vscodeContext);
     await startGmodMcpHost(false);
+    // Run plugin preset detection after server is ready (non-blocking)
+    void runFrameworkPresetCheck(extensionContext.vscodeContext, {
+        annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+    });
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -459,6 +497,11 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
 function onWorkspaceFoldersChanged(): void {
     onDidChangeConfiguration();
     void refreshGmodDebugConfigContext();
+    // Re-run plugin preset detection for any newly added folders.
+    // Suppression logic prevents prompt spam for folders already processed.
+    void runFrameworkPresetCheck(extensionContext.vscodeContext, {
+        annotationsPath: gmodAnnotationManager?.getAnnotationsPath(),
+    });
 }
 
 function onDidOpenTextDocument(document: vscode.TextDocument): void {
@@ -553,6 +596,7 @@ async function startServer(): Promise<void> {
             onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
         } catch (reason) {
             const errorMessage = reason instanceof Error ? reason.message : String(reason);
+            setPluginDetectionLsReadiness(undefined);
             const client = extensionContext.client;
             extensionContext.client = undefined;
             if (client) {
@@ -610,6 +654,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): void {
                 extensionContext.setServerRunning();
                 break;
             case State.Stopped:
+                setPluginDetectionLsReadiness(undefined);
                 extensionContext.client = undefined;
                 if (extensionContext.serverStatus.state !== ServerState.Error) {
                     extensionContext.setServerStopped();
@@ -622,6 +667,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): void {
 }
 
 async function cleanupExistingClient(): Promise<void> {
+    setPluginDetectionLsReadiness(undefined);
     const existingClient = extensionContext.client;
     if (!existingClient) {
         return;
@@ -633,6 +679,38 @@ async function cleanupExistingClient(): Promise<void> {
     } catch {
         // Ignore stale-client cleanup failures and continue with a fresh start.
     }
+}
+
+async function collectEnabledPluginIds(): Promise<string[]> {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const ids: string[] = [];
+    const seen = new Set<string>();
+
+    // Read all per-folder configs concurrently. We don't want a slow filesystem on one
+    // workspace root to serialize startup plugin discovery for the rest.
+    const configs = await Promise.all(
+        folders.map(async (folder) => {
+            try {
+                return await readGluarcConfig(folder);
+            } catch {
+                return undefined;
+            }
+        }),
+    );
+
+    for (const config of configs) {
+        if (!config) continue;
+        const pluginsRaw = (config as { gmod?: { plugins?: unknown } }).gmod?.plugins;
+        if (!Array.isArray(pluginsRaw)) continue;
+        for (const pluginId of pluginsRaw) {
+            if (typeof pluginId !== 'string' || pluginId.trim().length === 0) continue;
+            if (seen.has(pluginId)) continue;
+            seen.add(pluginId);
+            ids.push(pluginId);
+        }
+    }
+
+    return ids;
 }
 
 /**
@@ -650,6 +728,16 @@ async function doStartServer(startupRunId: number): Promise<void> {
         const annotationsPath = gmodAnnotationManager.getAnnotationsPath();
         if (annotationsPath) {
             initOptions.gmodAnnotationsPath = annotationsPath;
+
+            const pluginCatalog = loadGmodPluginCatalog({ annotationsPath });
+            const enabledPluginIds = await collectEnabledPluginIds();
+            const pluginLibraryPaths = await gmodAnnotationManager.resolvePluginAnnotationLibraryPaths(
+                enabledPluginIds,
+                pluginCatalog,
+            );
+            if (pluginLibraryPaths.length > 0) {
+                initOptions.gmodPluginLibraryPaths = pluginLibraryPaths;
+            }
         }
     }
 
@@ -705,7 +793,12 @@ async function doStartServer(startupRunId: number): Promise<void> {
 
     throwIfStartupCancelled(startupRunId);
 
-    await client.start();
+    const ready = client.start();
+    setPluginDetectionLsReadiness({
+        ready,
+        isRunning: () => client.state === State.Running,
+    });
+    await ready;
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
 }

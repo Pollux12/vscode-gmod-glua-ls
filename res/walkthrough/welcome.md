@@ -11,6 +11,7 @@ Things you need to know:
 This setup guide covers:
 - Viewing documentation
 - Downloading API annotations for type-checking.
+- Applying plugin presets (gamemode/addon/library, e.g. DarkRP/Helix/CAMI) and ordering them in `.gluarc.json`.
 - Configuring the live debugger.
 - Accessing workspace settings.
 

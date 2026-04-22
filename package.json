@@ -271,6 +271,24 @@
                 "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
+            },
+            {
+                "command": "gluals.gmod.applyFrameworkPreset",
+                "title": "Apply Plugin Preset",
+                "category": "GLuaLS",
+                "icon": "$(extensions)"
+            },
+            {
+                "command": "gluals.gmod.runFrameworkSetupWizard",
+                "title": "Plugin Setup Wizard",
+                "category": "GLuaLS",
+                "icon": "$(wand)"
+            },
+            {
+                "command": "gluals.gmod.rerunFrameworkDetection",
+                "title": "Re-run Plugin Detection",
+                "category": "GLuaLS",
+                "icon": "$(refresh)"
             }
         ],
         "languageModelTools": [
@@ -1743,7 +1761,7 @@
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
                         "default": true,
-                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
+                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the `annotations-gmod-glua-ls` repository. Disable this if you want to manage annotations manually or use a custom set."
                     },
                     "gluals.gmod.autoCheckAnnotationUpdates": {
                         "type": "boolean",
@@ -1903,6 +1921,11 @@
                         "type": "string",
                         "default": "",
                         "markdownDescription": "Override path to GMod annotations directory. When set, disables built-in annotations and uses the specified path instead. Useful for testing and debugging with custom annotation sets."
+                    },
+                    "gluals.ls.pluginBundlePath": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "Optional override path to local plugin bundles directory (`<root>/<plugin-id>/plugin.json`). When set, plugin bundles are resolved locally first and remote fallback is disabled. If unset and `gluals.ls.annotationPath` is set, GLuaLS auto-discovers local bundles from a sibling path: `<annotationPath>-plugins/<plugin-id>`."
                     },
                     "gluals.ls.globalConfigPath": {
                         "type": "string",
@@ -2150,6 +2173,7 @@
         "test:grammar": "node ./build/grammar-test.cjs",
         "test:parity": "npm run compile && node ./build/gmod-debug-parity-test.js",
         "test:extension": "npm run compile && node ./out/test/runTest.js",
+        "bench:plugin-detection": "node ./scripts/bench-plugin-detection.js",
         "test:all": "npm run test:schema && npm run test:grammar && npm run test:parity && npm run test:extension",
         "test": "npm run test:all",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",

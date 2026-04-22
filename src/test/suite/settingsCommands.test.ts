@@ -100,6 +100,19 @@ suite('Settings Commands', () => {
         }
     });
 
+    test('gluals.gmod.openSettings accepts a target object with categoryKey', async () => {
+        const targetUri = vscode.Uri.file(FIXTURE_ROOT);
+
+        try {
+            await vscode.commands.executeCommand('gluals.gmod.openSettings', {
+                uri: targetUri,
+                categoryKey: 'workspacePlugins',
+            });
+        } catch (error) {
+            assert.fail(`gluals.gmod.openSettings(target) threw: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    });
+
     /**
      * Regression test for the multi-root double-picker bug.
      *

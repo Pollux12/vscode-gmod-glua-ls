@@ -52,6 +52,8 @@ function canonicalizeTitle(title) {
     return title;
 }
 
+const ALWAYS_LAST_TITLES = ["Misc", "Language Server", "Decorations"];
+
 export function main() {
     const schema = readSchema();
     const definitions = schema.$defs || {};
@@ -228,8 +230,8 @@ function dumpPackageJson(rendered) {
         const title = canonicalizeTitle(configuration[i].title);
         const existing = configuration[i].properties;
 
-        // Ensure Misc, Language Server and Decorations stay at the end of config.
-        if (["Misc", "Language Server", "Decorations"].includes(title)) {
+        // Ensure selected categories stay at the end of config.
+        if (ALWAYS_LAST_TITLES.includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...existing,
@@ -245,8 +247,8 @@ function dumpPackageJson(rendered) {
     for (const [rawTitle, items] of Object.entries(rendered)) {
         const title = canonicalizeTitle(rawTitle);
 
-        // Ensure Misc, Language Server and Decorations stay at the end of config.
-        if (["Misc", "Language Server", "Decorations"].includes(title)) {
+        // Ensure selected categories stay at the end of config.
+        if (ALWAYS_LAST_TITLES.includes(title)) {
             configurationByTitleAlwaysLast[title] = {
                 ...(configurationByTitleAlwaysLast[title] ?? {}),
                 ...items,
