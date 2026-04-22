@@ -33,6 +33,8 @@ export interface Category {
 type SchemaObject = Record<string, unknown>;
 
 const META_CATEGORY_KEYS = new Set(['$schema', '$defs', 'definitions']);
+const WORKSPACE_PLUGINS_CATEGORY_KEY = 'workspacePlugins';
+const WORKSPACE_PLUGINS_CATEGORY_LABEL = 'Plugins';
 
 function asObject(value: unknown): SchemaObject | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -502,7 +504,6 @@ const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
     inferDynamicFields: 'completion',
     fileParamDefaults: 'completion',
     scriptedClassScopes: 'workspace',
-    plugins: 'workspace',
 };
 
 /**
@@ -547,6 +548,8 @@ function redistributeGmodFields(categories: Category[]): Category[] {
         }
     };
 
+    const pluginField = gmodCategory.fields.find((field) => field.key === 'plugins');
+
     // Move simple (non-compound) fields
     for (const field of gmodCategory.fields) {
         const target = GMOD_FIELD_REDISTRIBUTION[field.key];
@@ -572,6 +575,20 @@ function redistributeGmodFields(categories: Category[]): Category[] {
 
     // Remove gmod category
     categories.splice(gmodIndex, 1);
+
+    if (pluginField) {
+        const workspacePluginsCategory: Category = {
+            key: WORKSPACE_PLUGINS_CATEGORY_KEY,
+            label: WORKSPACE_PLUGINS_CATEGORY_LABEL,
+            description: 'Manage detected and enabled GLua plugin presets for this workspace.',
+            fields: [pluginField],
+        };
+
+        // Surface plugins at the very top of the settings menu so users see
+        // detected/enabled plugin presets and pending updates first.
+        categories.unshift(workspacePluginsCategory);
+    }
+
     return categories;
 }
 

@@ -38,6 +38,7 @@ const currentState = {
     config: {},
     autoSaveEnabled: false,
     pluginCatalog: [],
+    initialCategoryKey: undefined,
 };
 
 let formatAutoSwitchedToCustom = false;
@@ -64,6 +65,9 @@ window.addEventListener("message", (event) => {
                     ? message.config
                     : {};
             currentState.pluginCatalog = Array.isArray(message.pluginCatalog) ? message.pluginCatalog : [];
+            currentState.initialCategoryKey = typeof message.initialCategoryKey === "string"
+                ? message.initialCategoryKey
+                : undefined;
             updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             renderSettings();
@@ -72,6 +76,9 @@ window.addEventListener("message", (event) => {
                 setupSearch();
                 searchInitialized = true;
             }
+            requestAnimationFrame(() => {
+                focusCategoryByKey(currentState.initialCategoryKey);
+            });
             break;
         case "configUpdated":
             if (isDirty) {
@@ -102,8 +109,17 @@ window.addEventListener("message", (event) => {
         case "settingsUpdated":
             updateAutoSaveEnabled(message.autoSaveEnabled);
             break;
+        case "pluginCatalogUpdated":
+            if (Array.isArray(message.pluginCatalog)) {
+                currentState.pluginCatalog = message.pluginCatalog;
+                updateAllWidgetValues();
+            }
+            break;
         case "saved":
             onSaved();
+            break;
+        case "focusCategory":
+            focusCategoryByKey(typeof message.categoryKey === "string" ? message.categoryKey : undefined);
             break;
         default:
             break;
@@ -423,6 +439,7 @@ function renderSettings() {
         const item = document.createElement("li");
         item.className = "category-item";
         item.textContent = category.label;
+        item.dataset.categoryKey = category.key;
         item.dataset.target = categoryId;
         item.onclick = () => {
             document.getElementById(categoryId)?.scrollIntoView({
@@ -437,6 +454,7 @@ function renderSettings() {
 
         const section = document.createElement("section");
         section.id = categoryId;
+        section.dataset.categoryKey = category.key;
 
         const sectionHeading = document.createElement("div");
         sectionHeading.className = "section-heading";
@@ -495,6 +513,23 @@ function renderSettings() {
     if (searchInput && searchInput.value) {
         updateFilter(searchInput.value);
     }
+}
+
+function focusCategoryByKey(categoryKey) {
+    if (!categoryKey) {
+        return false;
+    }
+
+    const item = [...document.querySelectorAll(".category-item")].find(
+        (entry) => entry.dataset.categoryKey === categoryKey,
+    );
+
+    if (!(item instanceof HTMLElement)) {
+        return false;
+    }
+
+    item.click();
+    return true;
 }
 
 function getEffectiveDefault(field) {
@@ -741,6 +776,8 @@ function generateInput(field, value, onChange) {
     ) {
         return renderPluginListEditor(field, value, onChange, {
             catalog: currentState.pluginCatalog,
+            openExternal: (url) => vscode.postMessage({ type: "openExternal", url }),
+            updatePlugin: (pluginId) => vscode.postMessage({ type: "updatePlugin", pluginId }),
         });
     }
 

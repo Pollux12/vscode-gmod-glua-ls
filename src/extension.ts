@@ -32,7 +32,7 @@ import {
     registerGmodErrorView,
 } from './gmodErrorView';
 import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
-import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import { GluarcSettingsPanel, type GluarcSettingsPanelTarget } from './gluarcSettingsPanel';
 import { readGluarcConfig } from './gluarcConfig';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
@@ -203,9 +203,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.removeAnnotations', handler: removeGmodAnnotations },
         { id: 'gmodRdb.checkForUpdates', handler: checkForGmodRdbUpdates },
         { id: 'gmodRdbClient.checkForUpdates', handler: checkForGmodRdbUpdates },
-        { id: 'gluals.gmod.openSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
-        { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
-        { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
+        { id: 'gluals.gmod.openSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createOrShow(context, target) },
+        { id: 'gluals.gmod.createSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createAndShow(context, target) },
+        { id: 'gluals.gmod.editSettings', handler: async (target?: vscode.Uri | GluarcSettingsPanelTarget) => await GluarcSettingsPanel.createOrShow(context, target) },
         // GMod debug control commands
         { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
         { id: 'gluals.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },

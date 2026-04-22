@@ -1726,17 +1726,6 @@
                 }
             },
             {
-                "title": "Workspace: Plugins",
-                "order": 11,
-                "properties": {
-                    "gluals.ls.pluginBundlePath": {
-                        "type": "string",
-                        "default": "",
-                        "markdownDescription": "Optional override path to local plugin bundles directory (`<root>/<plugin-id>/plugin.json`). When set, plugin bundles are resolved locally first and remote fallback is disabled. If unset and `gluals.ls.annotationPath` is set, GLuaLS auto-discovers local bundles from a sibling path: `<annotationPath>-plugins/<plugin-id>`."
-                    }
-                }
-            },
-            {
                 "title": "Strict",
                 "order": 11,
                 "properties": {
@@ -1932,6 +1921,11 @@
                         "type": "string",
                         "default": "",
                         "markdownDescription": "Override path to GMod annotations directory. When set, disables built-in annotations and uses the specified path instead. Useful for testing and debugging with custom annotation sets."
+                    },
+                    "gluals.ls.pluginBundlePath": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "Optional override path to local plugin bundles directory (`<root>/<plugin-id>/plugin.json`). When set, plugin bundles are resolved locally first and remote fallback is disabled. If unset and `gluals.ls.annotationPath` is set, GLuaLS auto-discovers local bundles from a sibling path: `<annotationPath>-plugins/<plugin-id>`."
                     },
                     "gluals.ls.globalConfigPath": {
                         "type": "string",

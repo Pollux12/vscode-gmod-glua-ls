@@ -18,9 +18,10 @@ import {
 import { applyGluarcPatch, buildPluginPatchEntries } from './gluarcPatch';
 import { ensureGluarcExists, readGluarcConfig } from './gluarcConfig';
 import { runFrameworkSetupWizard } from './gmodFrameworkWizard';
+import type { GluarcSettingsPanelTarget } from './gluarcSettingsPanel';
 
 let lastDetectionPromptFingerprint: string | undefined;
-const PLUGIN_SETTINGS_QUERY = '@ext:Pollux.gmod-glua-ls @id:gluals.ls.pluginBundlePath';
+const PLUGIN_SETTINGS_CATEGORY_KEY = 'workspacePlugins';
 
 interface CatalogOptions {
     annotationsPath?: string;
@@ -231,7 +232,7 @@ async function promptForPluginManager(
         .join(', ');
 
     const action = await vscode.window.showInformationMessage(
-        `GLuaLS detected plugin(s) in this workspace: ${pluginSummary}. Configure them in Settings → Workspace: Plugins.`,
+        `GLuaLS detected plugin(s) in this workspace: ${pluginSummary}. Configure them in GLua Settings → Plugins.`,
         { modal: false },
         'Open Plugin Settings',
         'Later',
@@ -242,8 +243,40 @@ async function promptForPluginManager(
         return;
     }
 
-    await vscode.commands.executeCommand('workbench.action.openSettings', PLUGIN_SETTINGS_QUERY);
+    const targetFolder = await pickDetectedWorkspaceFolder(folderResults);
+    if (!targetFolder) {
+        return;
+    }
+
+    const settingsTarget: GluarcSettingsPanelTarget = {
+        uri: targetFolder.uri,
+        categoryKey: PLUGIN_SETTINGS_CATEGORY_KEY,
+    };
+    await vscode.commands.executeCommand('gluals.gmod.openSettings', settingsTarget);
     lastDetectionPromptFingerprint = fingerprint;
+}
+
+async function pickDetectedWorkspaceFolder(
+    folderResults: ReadonlyArray<{ folder: vscode.WorkspaceFolder; result: PluginDetectionResult }>,
+): Promise<vscode.WorkspaceFolder | undefined> {
+    if (folderResults.length === 1) {
+        return folderResults[0].folder;
+    }
+
+    const picked = await vscode.window.showQuickPick(
+        folderResults.map(({ folder, result }) => ({
+            label: folder.name,
+            description: result.detected.map((plugin) => plugin.label).sort().join(', '),
+            folder,
+        })),
+        {
+            title: 'Select workspace folder to configure plugins',
+            placeHolder: 'Choose folder for GLua plugin settings',
+            ignoreFocusOut: true,
+        },
+    );
+
+    return picked?.folder;
 }
 
 async function applyPluginPreset(

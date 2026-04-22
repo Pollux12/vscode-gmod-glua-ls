@@ -52,9 +52,6 @@ function canonicalizeTitle(title) {
     return title;
 }
 
-const PLUGIN_BUNDLE_SETTING_KEY = "gluals.ls.pluginBundlePath";
-const WORKSPACE_CATEGORY_TITLE = "Workspace";
-const WORKSPACE_PLUGINS_CATEGORY_TITLE = "Workspace: Plugins";
 const ALWAYS_LAST_TITLES = ["Misc", "Language Server", "Decorations"];
 
 export function main() {
@@ -264,53 +261,12 @@ function dumpPackageJson(rendered) {
         }
     }
 
-    let pluginSetting;
-    for (const groups of [configurationByTitle, configurationByTitleAlwaysLast]) {
-        for (const settingsByTitle of Object.values(groups)) {
-            if (
-                settingsByTitle
-                && Object.prototype.hasOwnProperty.call(settingsByTitle, PLUGIN_BUNDLE_SETTING_KEY)
-            ) {
-                pluginSetting = settingsByTitle[PLUGIN_BUNDLE_SETTING_KEY];
-                delete settingsByTitle[PLUGIN_BUNDLE_SETTING_KEY];
-            }
-        }
-    }
-
-    if (pluginSetting) {
-        configurationByTitle[WORKSPACE_PLUGINS_CATEGORY_TITLE] = {
-            ...(configurationByTitle[WORKSPACE_PLUGINS_CATEGORY_TITLE] ?? {}),
-            [PLUGIN_BUNDLE_SETTING_KEY]: pluginSetting,
-        };
-    }
-
     const newConfiguration = [];
     let i = 0;
-    const mainTitles = Object.keys(configurationByTitle);
-    const workspacePluginsIndex = mainTitles.indexOf(WORKSPACE_PLUGINS_CATEGORY_TITLE);
-    if (workspacePluginsIndex !== -1) {
-        mainTitles.splice(workspacePluginsIndex, 1);
-        const workspaceIndex = mainTitles.indexOf(WORKSPACE_CATEGORY_TITLE);
-        const insertIndex = workspaceIndex === -1 ? mainTitles.length : workspaceIndex + 1;
-        mainTitles.splice(insertIndex, 0, WORKSPACE_PLUGINS_CATEGORY_TITLE);
-    }
-
-    for (const title of mainTitles) {
-        const items = configurationByTitle[title];
-        if (!items || Object.keys(items).length === 0) {
-            continue;
-        }
-        newConfiguration.push({
-            title,
-            order: i++,
-            properties: items,
-        });
-    }
-
-    for (const [title, items] of Object.entries(configurationByTitleAlwaysLast)) {
-        if (!items || Object.keys(items).length === 0) {
-            continue;
-        }
+    for (const [title, items] of Object.entries({
+        ...configurationByTitle,
+        ...configurationByTitleAlwaysLast,
+    })) {
         newConfiguration.push({
             title,
             order: i++,

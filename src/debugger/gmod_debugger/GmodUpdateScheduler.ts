@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { GmodAnnotationManager } from '../../gmodAnnotationManager';
+import { loadGmodPluginCatalog } from '../../gmodPluginCatalog';
 import { GmodRdbUpdater } from './GmodRdbUpdater';
 import { GmodClientRdbUpdater } from './GmodClientRdbUpdater';
 import {
@@ -113,6 +114,12 @@ export class GmodUpdateScheduler implements vscode.Disposable {
                 console.error('[GLuaLS] Annotation update check failed:', error);
             }
 
+            try {
+                await this.checkPluginUpdates();
+            } catch (error) {
+                console.error('[GLuaLS] Plugin update check failed:', error);
+            }
+
             for (const serverPath of serverPaths.values()) {
                 try {
                     await this.rdbUpdater.runBootTimeCheck(serverPath);
@@ -137,6 +144,45 @@ export class GmodUpdateScheduler implements vscode.Disposable {
         if (this.interval) {
             clearInterval(this.interval);
             this.interval = undefined;
+        }
+    }
+
+    /**
+     * Best-effort check for plugin annotation updates. CI stamps every plugin
+     * entry in the local plugin index with a build timestamp on each release;
+     * after the main annotations bundle is refreshed, locally-installed plugin
+     * versions become stale relative to the new index. This surfaces a single
+     * non-modal notification offering to open the settings panel where the
+     * user can review and update individual plugins. No network calls.
+     */
+    private async checkPluginUpdates(): Promise<void> {
+        const annotationPathOverride = vscode.workspace
+            .getConfiguration('gluals')
+            .get<string>('ls.annotationPath');
+        const resolvedAnnotationPath = annotationPathOverride?.trim()
+            ? annotationPathOverride.trim()
+            : path.join(this.context.globalStorageUri.fsPath, 'gmod-annotations');
+
+        const catalog = loadGmodPluginCatalog(resolvedAnnotationPath);
+        const allIds = catalog.plugins.map((p) => p.id);
+        if (allIds.length === 0) {
+            return;
+        }
+
+        const updates = this.annotationManager.checkPluginUpdates(allIds, catalog);
+        if (updates.length === 0) {
+            return;
+        }
+
+        const labels = updates
+            .map((id) => catalog.byId.get(id)?.label ?? id)
+            .join(', ');
+        const message = updates.length === 1
+            ? `GLuaLS: Plugin annotation update available for ${labels}.`
+            : `GLuaLS: Plugin annotation updates available for ${labels}.`;
+        const action = await vscode.window.showInformationMessage(message, 'Open Settings', 'Later');
+        if (action === 'Open Settings') {
+            await vscode.commands.executeCommand('gluals.gmod.openSettings');
         }
     }
 }

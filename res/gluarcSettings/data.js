@@ -158,10 +158,13 @@ const DESCRIPTION_OVERRIDES = {
         "When enabled, Markdown in documentation comments is rendered in hover popups and tooltips instead of shown as raw text.",
     "doc.syntax":
         "Documentation comment syntax style. Recommended to use `md` for markdown.",
+    "gmod.plugins":
+        "Enable plugin presets for this workspace, search them quickly, and adjust enabled-plugin priority without reordering the visible table.",
 };
 
 const LABEL_OVERRIDES = {
     "diagnostics.enables": "Diagnostic State Overrides",
+    "gmod.plugins": "Enabled Plugin Presets",
 };
 
 const PATH_FIELD_KEYWORDS = [

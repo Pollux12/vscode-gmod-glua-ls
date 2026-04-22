@@ -6,10 +6,18 @@ import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
 import { loadGmodPluginCatalog, type GmodPluginCatalog } from './gmodPluginCatalog';
 import { readPresetState } from './gmodPresetState';
+import { GmodAnnotationManager } from './gmodAnnotationManager';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
 const SETTINGS_AUTO_SAVE_SECTION = 'gluals.gmod.settingsAutoSave';
+
+export interface GluarcSettingsPanelTarget {
+    readonly uri?: vscode.Uri;
+    readonly categoryKey?: string;
+}
+
+type GluarcSettingsTargetInput = vscode.Uri | GluarcSettingsPanelTarget | undefined;
 
 export class GluarcSettingsPanel implements vscode.Disposable {
     private static current: GluarcSettingsPanel | undefined;
@@ -22,8 +30,12 @@ export class GluarcSettingsPanel implements vscode.Disposable {
     // recomputation is required because `detected` derives from preset state that can
     // change while the panel is open (e.g. user re-runs framework detection).
     private _cachedPluginCatalog: { annotationPath: string; catalog: GmodPluginCatalog } | undefined;
+    private _annotationManager: GmodAnnotationManager | undefined;
+    private _pluginUpdatesAvailable = new Set<string>();
     private _hasUnsavedChanges = false;
     private _isSelfWrite = false;
+    private _isInitialized = false;
+    private _pendingFocusCategoryKey: string | undefined;
     private readonly _disposables: vscode.Disposable[] = [];
 
     /**
@@ -31,12 +43,14 @@ export class GluarcSettingsPanel implements vscode.Disposable {
      * minimal `{}` skeleton if missing), then opens the settings panel.
      * Used by the `gluals.gmod.createSettings` command.
      */
-    static async createAndShow(context: vscode.ExtensionContext, targetUri?: vscode.Uri): Promise<void> {
+    static async createAndShow(context: vscode.ExtensionContext, target?: GluarcSettingsTargetInput): Promise<void> {
         const folders = vscode.workspace.workspaceFolders;
         if (!folders || folders.length === 0) {
             vscode.window.showErrorMessage('Open a workspace folder to create GLua settings');
             return;
         }
+
+        const { uri: targetUri, categoryKey } = GluarcSettingsPanel.normalizeTarget(target);
 
         let workspaceFolder = targetUri
             ? GluarcSettingsPanel.resolveWorkspaceFolderFromUri(targetUri)
@@ -62,15 +76,17 @@ export class GluarcSettingsPanel implements vscode.Disposable {
 
         // Pass the already-resolved workspaceFolder directly to avoid a
         // second showWorkspaceFolderPick call in multi-root workspaces.
-        await GluarcSettingsPanel.createOrShow(context, workspaceFolder.uri);
+        await GluarcSettingsPanel.createOrShow(context, { uri: workspaceFolder.uri, categoryKey });
     }
 
-    static async createOrShow(context: vscode.ExtensionContext, targetUri?: vscode.Uri): Promise<void> {
+    static async createOrShow(context: vscode.ExtensionContext, target?: GluarcSettingsTargetInput): Promise<void> {
         const folders = vscode.workspace.workspaceFolders;
         if (!folders || folders.length === 0) {
             vscode.window.showErrorMessage('Open a workspace folder to edit GLua settings');
             return;
         }
+
+        const { uri: targetUri, categoryKey } = GluarcSettingsPanel.normalizeTarget(target);
 
         let workspaceFolder = targetUri
             ? GluarcSettingsPanel.resolveWorkspaceFolderFromUri(targetUri)
@@ -96,6 +112,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 current.panel.dispose();
             } else {
                 current.panel.reveal(vscode.ViewColumn.One);
+                await current.focusCategory(categoryKey);
                 return;
             }
         }
@@ -111,8 +128,16 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             }
         );
 
-        const instance = new GluarcSettingsPanel(panel, context, workspaceFolder);
+        const instance = new GluarcSettingsPanel(panel, context, workspaceFolder, categoryKey);
         GluarcSettingsPanel.current = instance;
+    }
+
+    private static normalizeTarget(target: GluarcSettingsTargetInput): GluarcSettingsPanelTarget {
+        if (target instanceof vscode.Uri) {
+            return { uri: target };
+        }
+
+        return target ?? {};
     }
 
     private static resolveWorkspaceFolderFromUri(targetUri: vscode.Uri): vscode.WorkspaceFolder | undefined {
@@ -134,7 +159,9 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         private readonly panel: vscode.WebviewPanel,
         private readonly context: vscode.ExtensionContext,
         private readonly workspaceFolder: vscode.WorkspaceFolder,
+        initialCategoryKey?: string,
     ) {
+        this._pendingFocusCategoryKey = initialCategoryKey;
         this._disposables.push(
             this.panel.onDidDispose(() => {
                 GluarcSettingsPanel.current = undefined;
@@ -165,16 +192,65 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 config: this.config,
                 autoSaveEnabled: this._isAutoSaveEnabled(),
                 pluginCatalog: this._getPluginCatalogPayload(),
+                initialCategoryKey: this._pendingFocusCategoryKey,
             });
+            this._isInitialized = true;
+
+            // Best-effort: probe the network for plugin annotation updates after
+            // the panel renders. Silent on failure; pushes a refreshed payload
+            // when results are in.
+            void this._refreshPluginUpdatesAvailable();
 
             const messageDisposable = this.panel.webview.onDidReceiveMessage(async (msg: unknown) => {
                 if (!msg || typeof msg !== 'object') {
                     return;
                 }
 
-                const message = msg as { type?: unknown; path?: unknown; value?: unknown };
+                const message = msg as { type?: unknown; path?: unknown; value?: unknown; url?: unknown; pluginId?: unknown };
                 if (message.type === 'reloadServer') {
                     await vscode.commands.executeCommand('gluals.restartServer');
+                    return;
+                }
+
+                if (message.type === 'openExternal') {
+                    if (typeof message.url === 'string') {
+                        try {
+                            const parsed = vscode.Uri.parse(message.url, true);
+                            if (parsed.scheme === 'https' || parsed.scheme === 'http') {
+                                await vscode.env.openExternal(parsed);
+                            }
+                        } catch {
+                            // Ignore malformed URLs.
+                        }
+                    }
+                    return;
+                }
+
+                if (message.type === 'updatePlugin') {
+                    if (typeof message.pluginId !== 'string' || message.pluginId.length === 0) {
+                        return;
+                    }
+                    const catalog = loadGmodPluginCatalog(this._resolvedAnnotationPath());
+                    const plugin = catalog.byId.get(message.pluginId);
+                    if (!plugin) return;
+                    const result = await this._getAnnotationManager().updatePluginBundle(plugin);
+                    if (result) {
+                        this._pluginUpdatesAvailable.delete(plugin.id);
+                        await this._postPluginCatalogPayload();
+                        const action = await vscode.window.showInformationMessage(
+                            `${plugin.label} plugin annotations updated. Restart language server to apply?`,
+                            'Restart',
+                            'Later',
+                        );
+                        if (action === 'Restart') {
+                            await vscode.commands.executeCommand('gluals.restartServer');
+                        }
+                    }
+                    return;
+                }
+
+                if (message.type === 'checkPluginUpdates') {
+                    void this._refreshPluginUpdatesAvailable();
                     return;
                 }
 
@@ -353,6 +429,8 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         description: string;
         kind: string;
         detected: boolean;
+        sourceUrl: string;
+        updateAvailable: boolean;
     }> {
         const annotationPath = vscode.workspace.getConfiguration('gluals', this.workspaceFolder.uri).get<string>('ls.annotationPath');
         const resolvedAnnotationPath = annotationPath?.trim()
@@ -373,7 +451,48 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             description: plugin.description,
             kind: plugin.kind,
             detected: detectedPluginIds.has(plugin.id),
+            sourceUrl: `https://github.com/Pollux12/annotations-gmod-glua-ls/tree/${plugin.artifact.branch}`,
+            updateAvailable: this._pluginUpdatesAvailable.has(plugin.id),
         }));
+    }
+
+    private _getAnnotationManager(): GmodAnnotationManager {
+        if (!this._annotationManager) {
+            this._annotationManager = new GmodAnnotationManager(this.context);
+        }
+        return this._annotationManager;
+    }
+
+    private _resolvedAnnotationPath(): string {
+        const configured = vscode.workspace
+            .getConfiguration('gluals', this.workspaceFolder.uri)
+            .get<string>('ls.annotationPath');
+        return configured?.trim()
+            ? configured.trim()
+            : path.join(this.context.globalStorageUri.fsPath, 'gmod-annotations');
+    }
+
+    private async _refreshPluginUpdatesAvailable(): Promise<void> {
+        try {
+            const catalog = loadGmodPluginCatalog(this._resolvedAnnotationPath());
+            const ids = catalog.plugins.map((p) => p.id);
+            const updates = this._getAnnotationManager().checkPluginUpdates(ids, catalog);
+            this._pluginUpdatesAvailable = new Set(updates);
+            await this._postPluginCatalogPayload();
+        } catch (error) {
+            console.warn('[GLuaLS] Plugin update detection failed:', error instanceof Error ? error.message : error);
+        }
+    }
+
+    private async _postPluginCatalogPayload(): Promise<void> {
+        try {
+            await this.panel.webview.postMessage({
+                type: 'pluginCatalogUpdated',
+                pluginCatalog: this._getPluginCatalogPayload(),
+            });
+        } catch {
+            // Webview disposed; ignore.
+        }
     }
 
     private setWebviewContent(): boolean {
@@ -422,6 +541,22 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         }
     }
 
+    private async focusCategory(categoryKey: string | undefined): Promise<void> {
+        if (!categoryKey) {
+            return;
+        }
+
+        this._pendingFocusCategoryKey = categoryKey;
+        if (!this._isInitialized) {
+            return;
+        }
+
+        await this.panel.webview.postMessage({
+            type: 'focusCategory',
+            categoryKey,
+        });
+    }
+
     dispose(): void {
         // Flush any pending debounced save synchronously to prevent data loss
         if (this._saveTimer && this._isAutoSaveEnabled()) {
@@ -446,5 +581,6 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         }
 
         GluarcSettingsPanel.current = undefined;
+        this._isInitialized = false;
     }
 }

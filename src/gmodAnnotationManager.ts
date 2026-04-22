@@ -305,6 +305,97 @@ export class GmodAnnotationManager implements vscode.Disposable {
     }
 
     /**
+     * For each given plugin id, check whether the locally-installed bundle
+     * version differs from the version published in the (already-loaded) plugin
+     * catalog. CI stamps every plugin entry with the same build timestamp on
+     * release, so a mismatch here means the local annotations bundle has been
+     * updated since this plugin was last installed and the plugin should be
+     * refreshed.
+     *
+     * This is purely a local comparison — no network calls.
+     */
+    public checkPluginUpdates(
+        pluginIds: readonly string[],
+        catalog: GmodPluginCatalog,
+    ): string[] {
+        const updates: string[] = [];
+        const seen = new Set<string>();
+
+        for (const id of pluginIds) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+
+            const plugin = catalog.byId.get(id);
+            if (!plugin) continue;
+
+            const expectedVersion = plugin.artifact.version;
+            if (!expectedVersion) continue;
+
+            const installPath = this.getPluginInstallPath(plugin.id);
+            if (!fs.existsSync(installPath)) continue;
+
+            const installedVersion = this.getInstalledPluginVersion(installPath);
+            if (!installedVersion) continue;
+
+            if (installedVersion !== expectedVersion) {
+                updates.push(plugin.id);
+            }
+        }
+
+        return updates;
+    }
+
+    /**
+     * Force a re-download of a plugin bundle, bypassing the currency check.
+     * Returns the install path on success, undefined on failure.
+     */
+    public async updatePluginBundle(plugin: GmodPluginDescriptor): Promise<string | undefined> {
+        const localOverrideMode = !!this.getAnnotationPathOverride() || !!this.getPluginBundlePathOverride();
+        if (localOverrideMode) {
+            console.warn(`[GLuaLS] Plugin update skipped for ${plugin.id} (local override mode active).`);
+            return undefined;
+        }
+
+        const pluginInstallPath = this.getPluginInstallPath(plugin.id);
+        const zipUrl = this.getPluginBranchZipUrl(plugin.artifact.branch);
+        const innerFolder = this.getPluginBranchInnerFolder(plugin.artifact.branch);
+
+        try {
+            await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Updating ${plugin.label} plugin annotations...`,
+                    cancellable: false,
+                },
+                async (progress) => {
+                    await downloadAndExtractZip(zipUrl, pluginInstallPath, innerFolder, progress);
+                },
+            );
+
+            const manifestRelPath = plugin.artifact.manifest || 'plugin.json';
+            if (!fs.existsSync(path.join(pluginInstallPath, manifestRelPath))) {
+                throw new Error(`Plugin manifest "${plugin.artifact.manifest}" missing after update`);
+            }
+
+            if (plugin.artifact.version) {
+                fs.writeFileSync(
+                    path.join(pluginInstallPath, '__plugin_metadata.json'),
+                    `${JSON.stringify({ version: plugin.artifact.version }, null, 2)}\n`,
+                    'utf8',
+                );
+            }
+
+            return pluginInstallPath;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showWarningMessage(
+                `GLuaLS: Failed to update ${plugin.label} plugin bundle (${plugin.artifact.branch}): ${errorMessage}`,
+            );
+            return undefined;
+        }
+    }
+
+    /**
      * Check if a newer version of annotations is available on the remote branch.
      * Called by GmodUpdateScheduler on boot and periodically.
      */

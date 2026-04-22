@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { detectGmodPlugin, disposePluginDetectionRuntime } from '../../gmodPluginDetection';
+import { detectGmodPlugin, disposePluginDetectionRuntime, setPluginDetectionLsReadiness } from '../../gmodPluginDetection';
 import { GmodPluginCatalog } from '../../gmodPluginCatalog';
 
 function makeTempDir(): string {
@@ -289,7 +289,6 @@ suite('Plugin Detection', () => {
         const filePath = path.join(nestedDir, 'sv_permissions.lua');
         fs.writeFileSync(filePath, 'if CAMI then\nend\n', 'utf8');
 
-        let shouldThrow = true;
         let symbolQueryCalls = 0;
         symbolResolver = (query) => {
             if (query !== 'CAMI') {
@@ -297,20 +296,21 @@ suite('Plugin Detection', () => {
             }
 
             symbolQueryCalls += 1;
-            if (shouldThrow) {
-                throw new Error('simulated symbol failure');
-            }
-
             return [makeSymbol('CAMI', filePath)];
         };
+
+        setPluginDetectionLsReadiness({
+            ready: Promise.reject(new Error('simulated LS readiness failure')),
+            isRunning: () => false,
+        });
 
         const first = await detectGmodPlugin(makeWorkspaceFolder(tmpDir), CATALOG);
         assert.ok(!first.detected.some((plugin) => plugin.id === 'cami'));
 
-        shouldThrow = false;
+        setPluginDetectionLsReadiness(undefined);
         const second = await detectGmodPlugin(makeWorkspaceFolder(tmpDir), CATALOG);
         assert.ok(second.detected.some((plugin) => plugin.id === 'cami'));
-        assert.ok(symbolQueryCalls >= 2, 'second run should re-query symbols instead of using degraded cache');
+        assert.strictEqual(symbolQueryCalls, 1, 'symbol query should only happen after degraded result is retried');
     });
 
     test('bypasses cache when requested', async () => {
