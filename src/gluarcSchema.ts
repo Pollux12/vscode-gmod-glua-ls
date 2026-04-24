@@ -504,8 +504,7 @@ const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
  * Compound gmod fields whose children should be extracted and placed
  * individually into target categories. Each entry maps
  * `parentKey.childKey` to the target category.
- * Parent fields not listed (e.g. `network.enabled`, `network.diagnostics.*`)
- * are intentionally hidden because they duplicate the main diagnostics system.
+ * Parent fields not listed (e.g. `network.enabled`) are intentionally hidden
  */
 const GMOD_COMPOUND_REDISTRIBUTION: Record<string, Record<string, string>> = {
     network: {

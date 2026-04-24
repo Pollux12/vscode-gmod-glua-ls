@@ -756,7 +756,7 @@
                         "body": {
                             "type": "gluals_gmod_client",
                             "request": "attach",
-"name": "[CLIENT] Attach to Gmod",
+                            "name": "[CLIENT] Attach to Gmod",
                             "host": "127.0.0.1",
                             "port": 21112,
                             "sourceRoot": "${workspaceFolder}",
@@ -1704,6 +1704,52 @@
                         "editPresentation": "singlelineText",
                         "default": null,
                         "markdownDescription": "%config.gluals.workspace.reindexDuration.description%"
+                    },
+                    "gluals.workspace.enableIsolation": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.gluals.workspace.enableIsolation.description%"
+                    },
+                    "gluals.workspace.useDefaultIgnores": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "markdownDescription": "%config.gluals.workspace.useDefaultIgnores.description%"
                     }
                 }
             },
@@ -1836,7 +1882,7 @@
             },
             {
                 "title": "Decorations",
-                "order": 12,
+                "order": 13,
                 "properties": {
                     "gluals.decorations.globalUnderline": {
                         "type": "boolean",
@@ -1867,7 +1913,7 @@
             },
             {
                 "title": "Misc",
-                "order": 13,
+                "order": 14,
                 "properties": {
                     "gluals.language.completeAnnotation": {
                         "type": "boolean",
@@ -1884,7 +1930,7 @@
             },
             {
                 "title": "Language Server",
-                "order": 14,
+                "order": 15,
                 "properties": {
                     "gluals.ls.startParameters": {
                         "type": "array",

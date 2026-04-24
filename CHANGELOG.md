@@ -1,16 +1,30 @@
 ﻿# Changelog
 
-## [1.1.x] [WIP] - Unreleased
+---
+
+## [1.0.17] [Pre-Release] - 2026-04-23
 
 ### VS Code Extension
-- Add gamemode setup wizard
-- Add presets for common gamemodes
-  - If gamemode is detected, user is prompted via notification for preset/wizard
-  - This generates an initial `.gluarc.json` configuration to add basic support for opened gamemode
+- Improve language server start, stop and restart handling.
 
 ### Language Server
-- Add automatic gamemode scanning to apply presets
-- Refactor scriped class system for better gamemode support with globals (e.g. schema)
+- Add advanced base gamemode detection + automatic library load attempt.
+- Add undefined-global-argument diagnostic (warning) to split undefined-global diagnostic (error) into severe and non-severe cases.
+- Add code lens and rich hover info for net messages.
+- Add hover link to open the Garry's Mod wiki for API functions.
+- Improve net message diagnostics to track dynamic read/write patterns.
+- Improve realm-aware narrowing and fix some realm mismatch issues.
+- Improve workspace loading performance.
+- Improve performance with additional indexing optimizations.
+- Fix various unknown member, undefined global and infer issues.
+- Fix string union field assignment false positives.
+- Fix invalid unused diagnostics for scripted classes.
+- Fix table field inference false positives and hover displaying nil incorrectly.
+- Fix incorrect narrowing from child class field definitions.
+- Fix multi-return local variable handling. (thanks @apyrr)
+
+### Annotations
+- Annotations are being moved to a new repo, and won't be updated until next pre-release.
 
 ---
 

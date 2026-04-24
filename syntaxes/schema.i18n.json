@@ -90,6 +90,9 @@
     "DiagnosticCode.gmod-net-missing-network-counterpart": {
         "en": "gmod-net-missing-network-counterpart"
     },
+    "DiagnosticCode.gmod-net-read-write-bits-mismatch": {
+        "en": "gmod-net-read-write-bits-mismatch"
+    },
     "DiagnosticCode.gmod-net-read-write-order-mismatch": {
         "en": "gmod-net-read-write-order-mismatch"
     },
@@ -211,6 +214,12 @@
     "DiagnosticCode.undefined-global": {
         "en": "Undefined global",
         "zh-CN": "未定义的全局变量。"
+    },
+    "DiagnosticCode.undefined-global-argument": {
+        "en": "Deprecated alias for `undefined-global-assignment`. Accepted for backward compatibility."
+    },
+    "DiagnosticCode.undefined-global-assignment": {
+        "en": "Undefined global passed as a function argument or assigned to a\nvariable / table field. These are silent uses (no immediate runtime\nerror) so they're warned rather than errored."
     },
     "DiagnosticCode.unknown-doc-tag": {
         "en": "Unknown doc annotation",
@@ -631,6 +640,9 @@
     "EmmyrcGmodOutlineVerbosity.verbose": {
         "en": "Show everything (legacy behavior, includes control-flow blocks and all locals)."
     },
+    "EmmyrcGmodScriptedClassDefinition.classNamePrefix": {
+        "en": "Optional prefix prepended to class names derived from the folder segment.\nFor example, gamemodes use `\"gamemode_\"` so a folder `sandbox` produces the\nclass name `gamemode_sandbox`, matching the runtime convention."
+    },
     "EmmyrcHover.customDetail": {
         "en": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize"
     },
@@ -781,7 +793,7 @@
         "zh-CN": "是否启用严格模式 require 路径。严格模式时 require 必须从指定的根目录开始。"
     },
     "EmmyrcWorkspace.enableIsolation": {
-        "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, workspace configs are merged into one global baseline (first workspace config wins scalar conflicts, arrays are unioned), and local workspace configs can still override file-scoped behavior for that workspace."
+        "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, workspace configs are merged into one global baseline\n(first workspace config wins scalar conflicts, arrays are unioned), while\nlocal workspace configs can still override file-scoped behavior."
     },
     "EmmyrcWorkspace.enableReindex": {
         "en": "Enable full project reindex after changing a file.",
