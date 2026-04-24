@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as Mocha from 'mocha';
+import Mocha = require('mocha');
 
 function collectTestFiles(root: string): string[] {
     const discovered: string[] = [];
@@ -45,7 +45,7 @@ export function run(): Promise<void> {
     }
 
     return new Promise((resolve, reject) => {
-        mocha.run((failures) => {
+        mocha.run((failures: number) => {
             if (failures > 0) {
                 reject(new Error(`${failures} tests failed.`));
                 return;
