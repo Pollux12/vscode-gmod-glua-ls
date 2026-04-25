@@ -132,6 +132,13 @@ function isMacGarrysModAppBundleName(name: string): boolean {
 function normalizeSrcdsRootInput(rawPath: string): ResolvedSrcdsPath {
     const resolved = path.resolve(rawPath.trim());
     if (process.platform === 'darwin') {
+        if (isMacGarrysModAppBundleName(path.basename(resolved))) {
+            const gameRoot = path.dirname(resolved);
+            return {
+                srcdsRoot: gameRoot,
+                garrysmodPath: path.join(gameRoot, 'garrysmod'),
+            };
+        }
         const appContentMarkers = ['Contents', 'MacOS'];
         const parts = resolved.split(path.sep);
         const markerIndex = parts.findIndex((part, index) => isMacGarrysModAppBundleName(part) && parts[index + 1] === appContentMarkers[0]);
@@ -1304,7 +1311,11 @@ function pickLaunchProgram(srcdsRoot: string, srcdsRootExpression?: string): Lau
     const executablePath = path.join(srcdsRoot, executableName);
 
     if (process.platform !== 'win32') {
-        ensureExecutableIfPossible(executablePath);
+        if (!ensureExecutableIfPossible(executablePath)) {
+            vscode.window.showWarningMessage(
+                `Could not make "${executablePath}" executable. The launch configuration may not work correctly — check file permissions.`
+            );
+        }
     }
 
     const program = srcdsRootExpression

@@ -175,7 +175,7 @@ async function makeInstalledModuleUsable(modulePath: string): Promise<void> {
         return;
     }
 
-    await fs.promises.chmod(modulePath, 0o755);
+    await fs.promises.chmod(modulePath, 0o755).catch(() => {});
 
     if (process.platform === 'darwin') {
         await execFileAsync('xattr', ['-d', 'com.apple.quarantine', modulePath], { timeout: 8000 }).catch(() => {});
@@ -405,7 +405,7 @@ export async function downloadAndInstallRelease(options: InstallReleaseOptions):
                         await fs.promises.rename(stagingPath, destinationPath);
 
                         await makeInstalledModuleUsable(destinationPath);
-                        await writeModuleVersionSidecar(destinationPath, release.tag_name);
+                        await writeModuleVersionSidecar(destinationPath, release.tag_name).catch(() => {});
 
                         if (backupPath) {
                             await fs.promises.unlink(backupPath).catch(() => {});
