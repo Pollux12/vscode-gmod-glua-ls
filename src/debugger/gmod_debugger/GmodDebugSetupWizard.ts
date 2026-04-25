@@ -25,6 +25,7 @@ const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
     'Windows 32-bit': 'gmsv_rdb_win32.dll',
     'Linux 64-bit': 'gmsv_rdb_linux64.dll',
     'Linux 32-bit': 'gmsv_rdb_linux.dll',
+    'macOS 64-bit (experimental)': 'gmsv_rdb_osx64.dll',
 };
 
 const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS);
@@ -34,6 +35,7 @@ const GM_RDB_CLIENT_PLATFORM_DLLS: Record<string, string> = {
     'Windows 32-bit': 'gmcl_rdb_win32.dll',
     'Linux 64-bit': 'gmcl_rdb_linux64.dll',
     'Linux 32-bit': 'gmcl_rdb_linux.dll',
+    'macOS 64-bit (experimental)': 'gmcl_rdb_osx64.dll',
 };
 
 export const ALL_RDB_CLIENT_DLLS = Object.values(GM_RDB_CLIENT_PLATFORM_DLLS);
@@ -119,6 +121,18 @@ function toWorkspaceExpression(relativePath: string): string {
 
 function normalizeSrcdsRootInput(rawPath: string): ResolvedSrcdsPath {
     const resolved = path.resolve(rawPath.trim());
+    if (process.platform === 'darwin') {
+        const appContentMarkers = ['Contents', 'MacOS'];
+        const parts = resolved.split(path.sep);
+        const markerIndex = parts.findIndex((part, index) => part === 'GarrysMod.app' && parts[index + 1] === appContentMarkers[0]);
+        if (markerIndex >= 0) {
+            const gameRoot = parts.slice(0, markerIndex).join(path.sep) || path.sep;
+            return {
+                srcdsRoot: gameRoot,
+                garrysmodPath: path.join(gameRoot, 'garrysmod'),
+            };
+        }
+    }
     if (path.basename(resolved).toLowerCase() === 'garrysmod') {
         return {
             srcdsRoot: path.dirname(resolved),
@@ -202,7 +216,9 @@ export function detectGmRdb(garrysmodPath: string): string | undefined {
 
     const candidates = process.platform === 'linux'
         ? ['gmsv_rdb_linux64.so', 'gmsv_rdb_linux.so', 'gmsv_rdb_linux64.dll', 'gmsv_rdb_linux.dll']
-        : ALL_RDB_DLLS;
+        : process.platform === 'darwin'
+            ? ['gmsv_rdb_osx64.dll', 'gmsv_rdb_osx.dll']
+            : ALL_RDB_DLLS;
 
     for (const candidate of candidates) {
         if (fs.existsSync(path.join(binDir, candidate))) {
@@ -242,6 +258,12 @@ export function hasSrcdsExecutable(srcdsRoot: string): boolean {
         return fs.existsSync(path.join(srcdsRoot, 'srcds_run'));
     }
 
+    if (process.platform === 'darwin') {
+        return fs.existsSync(path.join(srcdsRoot, 'srcds_run'))
+            || fs.existsSync(path.join(srcdsRoot, 'srcds_osx'))
+            || fs.existsSync(path.join(srcdsRoot, 'srcds_osx64'));
+    }
+
     return false;
 }
 
@@ -253,7 +275,9 @@ export function detectGmRdbClient(garrysmodPath: string): string | undefined {
 
     const candidates = process.platform === 'linux'
         ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux.so', 'gmcl_rdb_linux64.dll', 'gmcl_rdb_linux.dll']
-        : ALL_RDB_CLIENT_DLLS;
+        : process.platform === 'darwin'
+            ? ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll']
+            : ALL_RDB_CLIENT_DLLS;
 
     for (const candidate of candidates) {
         if (fs.existsSync(path.join(binDir, candidate))) {
@@ -328,6 +352,10 @@ function collectSteamRootsForPlatform(): string[] {
             path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam'),
             path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam')
         );
+    } else if (process.platform === 'darwin') {
+        roots.push(
+            path.join(home, 'Library', 'Application Support', 'Steam')
+        );
     }
 
     const seen = new Set<string>();
@@ -385,10 +413,20 @@ function detectClientGarrysmodInstallPath(): string | undefined {
             continue;
         }
 
+        if (process.platform === 'darwin' && !hasGarrysModAppBundle(gameRoot)) {
+            continue;
+        }
+
         return gameRoot;
     }
 
     return undefined;
+}
+
+function hasGarrysModAppBundle(gameRoot: string): boolean {
+    const appPath = path.join(gameRoot, 'GarrysMod.app');
+    return fs.existsSync(path.join(appPath, 'Contents', 'Info.plist'))
+        || fs.existsSync(path.join(appPath, 'Contents', 'MacOS'));
 }
 
 export function validateClientInstallPath(inputPath: string): ClientInstallPathValidation {
@@ -398,6 +436,7 @@ export function validateClientInstallPath(inputPath: string): ClientInstallPathV
     const garrysmodPath = normalized.garrysmodPath;
     const hasSrcdsExe = hasSrcdsExecutable(gameRoot);
     const hasGmodExe = process.platform === 'win32' && fs.existsSync(path.join(gameRoot, 'gmod.exe'));
+    const hasGmodApp = process.platform === 'darwin' && hasGarrysModAppBundle(gameRoot);
 
     if (!fs.existsSync(garrysmodPath)) {
         warnings.push(`The garrysmod folder does not exist at ${garrysmodPath}.`);
@@ -407,12 +446,16 @@ export function validateClientInstallPath(inputPath: string): ClientInstallPathV
         warnings.push(`Could not find garrysmod.ver in ${garrysmodPath}.`);
     }
 
-    if (hasSrcdsExe && !hasGmodExe) {
+    if (hasSrcdsExe && !hasGmodExe && !hasGmodApp) {
         warnings.push(`Found SRCDS executable in ${gameRoot}, which suggests this is a server install.`);
     }
 
     if (process.platform === 'win32' && !hasGmodExe) {
         warnings.push(`Could not find gmod.exe in ${gameRoot}, so this may not be a client install.`);
+    }
+
+    if (process.platform === 'darwin' && !hasGmodApp) {
+        warnings.push(`Could not find a valid GarrysMod.app bundle in ${gameRoot}, so this may not be a macOS client install.`);
     }
 
     return { warnings };
@@ -739,6 +782,18 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
         }
     }
 
+    if (process.platform === 'darwin') {
+        const detectedIndex = platformItems.findIndex((item) => item.description === 'gmsv_rdb_osx64.dll');
+        if (detectedIndex >= 0) {
+            const [detectedItem] = platformItems.splice(detectedIndex, 1);
+            detectedItem.label = `${detectedItem.label} (detected)`;
+            platformItems.unshift(detectedItem);
+        }
+        vscode.window.showWarningMessage(
+            'macOS gm_rdb support is experimental. Install only if you are using a compatible macOS Garry\'s Mod/SRCDS setup; Windows/Linux behavior is unchanged.'
+        );
+    }
+
     const platformChoice = await vscode.window.showQuickPick(platformItems, {
         title: 'Install gm_rdb — Select Server Platform',
         placeHolder: 'Which platform is your SRCDS (server) running on? (NOT your client)',
@@ -787,7 +842,8 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
         }
     );
 
-    vscode.window.showInformationMessage(`gm_rdb installed to ${destinationPath}.`);
+    const macNote = process.platform === 'darwin' ? ' macOS debugger support is experimental; restart SRCDS and verify manually before relying on it.' : '';
+    vscode.window.showInformationMessage(`gm_rdb installed to ${destinationPath}.${macNote}`);
 }
 
 function getLaunchFileUri(workspaceFolder: vscode.WorkspaceFolder): vscode.Uri {
@@ -961,7 +1017,7 @@ async function promptForSrcdsPath(
                 ?? (detectedSrcdsPathValid ? detectedSrcdsPath : undefined)
                 ?? savedSrcdsPath
                 ?? detectedSrcdsPath
-                ?? (os.platform() === 'win32' ? 'C:\\srcds' : '/home/steam/srcds');
+                ?? (os.platform() === 'win32' ? 'C:\\srcds' : os.platform() === 'darwin' ? path.join(os.homedir(), 'srcds') : '/home/steam/srcds');
             const typed = await vscode.window.showInputBox({
                 title: 'SRCDS Root Path',
                 prompt: 'Enter the SRCDS root path (the folder that contains garrysmod/)',
@@ -1049,7 +1105,9 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
         ?? normalizedDetectedPath?.gameRoot
         ?? (os.platform() === 'win32'
             ? 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\GarrysMod'
-            : '/home/steam/.steam/steam/steamapps/common/GarrysMod');
+            : os.platform() === 'darwin'
+                ? path.join(os.homedir(), 'Library', 'Application Support', 'Steam', 'steamapps', 'common', 'GarrysMod')
+                : '/home/steam/.steam/steam/steamapps/common/GarrysMod');
 
     while (true) {
         const detectedValidation = normalizedDetectedPath ? validateClientInstallPath(normalizedDetectedPath.gameRoot) : undefined;
@@ -1181,7 +1239,9 @@ function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Re
 function pickLaunchProgram(srcdsRoot: string, srcdsRootExpression?: string): string {
     const executableName = process.platform === 'win32'
         ? (fs.existsSync(path.join(srcdsRoot, 'srcds_win64.exe')) ? 'srcds_win64.exe' : 'srcds.exe')
-        : 'srcds_run';
+        : process.platform === 'darwin'
+            ? (fs.existsSync(path.join(srcdsRoot, 'srcds_osx64')) ? 'srcds_osx64' : fs.existsSync(path.join(srcdsRoot, 'srcds_osx')) ? 'srcds_osx' : 'srcds_run')
+            : 'srcds_run';
 
     if (srcdsRootExpression) {
         return `${srcdsRootExpression}/${executableName}`;

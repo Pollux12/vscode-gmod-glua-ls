@@ -29,10 +29,14 @@ jobs:
       tag_version: ${{ steps.release_meta.outputs.tag_version }}
       is_publish_event: ${{ steps.release_meta.outputs.is_publish_event }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { target: win32-x64,  file: glua_ls-win32-x64.zip }
           - { target: linux-x64,  file: glua_ls-linux-x64-glibc.2.17.tar.gz }
+          - { target: darwin-x64, file: glua_ls-darwin-x64-experimental.tar.gz }
+          - { target: darwin-arm64, file: glua_ls-darwin-arm64-experimental.tar.gz }
+    continue-on-error: ${{ startsWith(matrix.target, 'darwin-') }}
 
     runs-on: ubuntu-latest
 
@@ -185,6 +189,18 @@ jobs:
             const tag = process.env.TAG_NAME;
             const prerelease = process.env.PUBLISH_CHANNEL === 'prerelease';
 
+            const macosWarning = [
+              '## macOS support is experimental',
+              '',
+              'macOS VSIX packages bundle experimental darwin-x64 and darwin-arm64 language server builds. Debugger support on macOS is also experimental and may require extra validation before regular use.',
+            ].join('\n');
+            const appendMacosWarning = (body = '') => {
+              if (body.includes('## macOS support is experimental')) {
+                return body;
+              }
+              return [body.trim(), macosWarning].filter(Boolean).join('\n\n');
+            };
+
             try {
               const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
               await github.rest.repos.updateRelease({
@@ -193,6 +209,7 @@ jobs:
                 release_id: existing.data.id,
                 tag_name: tag,
                 name: tag,
+                body: appendMacosWarning(existing.data.body ?? ''),
                 prerelease,
                 draft: false,
               });
@@ -207,6 +224,7 @@ jobs:
                 repo,
                 tag_name: tag,
                 name: tag,
+                body: macosWarning,
                 prerelease,
                 draft: false,
               });

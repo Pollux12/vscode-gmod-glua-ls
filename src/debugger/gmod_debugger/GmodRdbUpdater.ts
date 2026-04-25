@@ -249,7 +249,9 @@ export class GmodRdbUpdater {
                 ? (isX64
                     ? ['gmsv_rdb_linux64.so', 'gmsv_rdb_linux64.dll']
                     : ['gmsv_rdb_linux.so', 'gmsv_rdb_linux.dll'])
-                : [];
+                : process.platform === 'darwin'
+                    ? ['gmsv_rdb_osx64.dll', 'gmsv_rdb_osx.dll']
+                    : [];
 
         const preferredAsset = findAssetByNameCandidates(release, preferredCandidates);
         if (preferredAsset) {
@@ -276,6 +278,13 @@ export class GmodRdbUpdater {
                 'gmsv_rdb_linux64.dll',
                 'gmsv_rdb_linux.dll',
             ];
+        }
+
+        if (process.platform === 'darwin') {
+            vscode.window.showWarningMessage(
+                'macOS gm_rdb updates are experimental. The updater will use Garry\'s Mod _osx64.dll/_osx.dll module names and may not match all SRCDS layouts.'
+            );
+            return ['gmsv_rdb_osx64.dll', 'gmsv_rdb_osx.dll'];
         }
 
         return [];

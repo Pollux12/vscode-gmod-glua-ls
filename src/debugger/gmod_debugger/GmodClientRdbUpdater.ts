@@ -239,7 +239,9 @@ export class GmodClientRdbUpdater {
                 ? (isX64
                     ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux64.dll']
                     : ['gmcl_rdb_linux.so', 'gmcl_rdb_linux.dll'])
-                : [];
+                : process.platform === 'darwin'
+                    ? ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll']
+                    : [];
 
         const preferredAsset = findAssetByNameCandidates(release, preferredCandidates);
         if (preferredAsset) {
@@ -265,6 +267,13 @@ export class GmodClientRdbUpdater {
                 'gmcl_rdb_linux.so',
                 ...ALL_RDB_CLIENT_DLLS.filter((name) => name.includes('linux')),
             ];
+        }
+
+        if (process.platform === 'darwin') {
+            vscode.window.showWarningMessage(
+                'macOS rdb_client updates are experimental. The updater will use Garry\'s Mod _osx64.dll/_osx.dll module names and may not match all client layouts.'
+            );
+            return ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll'];
         }
 
         return [];

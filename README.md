@@ -44,6 +44,9 @@
 > This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
 > Report bugs or suggest features here: https://github.com/Pollux12/gmod-glua-ls/issues
 
+> [!WARNING]
+> macOS extension packages are experimental. The bundled macOS language server builds and debugger support on macOS may have rough edges and need extra validation before regular use.
+
 Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod GLua development.
 
 ---
@@ -65,6 +68,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 ## 🐞 Integrated Server (SRCDS) Debugger
 
 * **Binary Module:** Runtime debugger for (currently SRCDS server only), works alongside auto generated lua file for advanced debugging features.
+* **macOS Status:** Debugger support on macOS is experimental and may require manual validation for your setup.
 * **Easier Debugging:** Everything you'd expect from a modern debugger. Set visual breakpoints, pause code execution, inspect local variables, global tables, upvalues, and call stacks live within VS Code.
 * **Lua Execution:** Run selected code, entire files (including refresh), or execute engine commands straight from the editor.
 * **Lua Error Tracking:** Catch and view runtime Lua errors in a dedicated panel and click through to the precise source code location, helping you easily identify and fix problems. Debugger pause on errors can be configured (default off) for better insight.

@@ -6,6 +6,7 @@
 
 ### VS Code Extension
 - Improve language server start, stop and restart handling.
+- Add experimental macOS VSIX packaging for darwin-x64 and darwin-arm64. macOS language server builds and debugger support are experimental.
 
 ### Language Server
 - Add advanced base gamemode detection + automatic library load attempt.
