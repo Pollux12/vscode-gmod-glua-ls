@@ -249,17 +249,19 @@ jobs:
       - name: Publish to VS Code Marketplace
         shell: bash
         run: |
-          PACKAGE_PATHS=$(find vscode-gmod-ls* -iname "*.vsix")
+          mapfile -t PACKAGE_PATHS < <(find vscode-gmod-ls* -iname "*.vsix" -type f)
 
-          if [[ -z "${PACKAGE_PATHS}" ]]; then
+          if [[ "${#PACKAGE_PATHS[@]}" -eq 0 ]]; then
             echo "No VSIX package found to publish."
             exit 1
           fi
 
-          if [[ "${{ needs.build.outputs.publish_channel }}" == "prerelease" ]]; then
-            npx @vscode/vsce publish --pre-release --packagePath ${PACKAGE_PATHS}
-          else
-            npx @vscode/vsce publish --packagePath ${PACKAGE_PATHS}
-          fi
+          for package_path in "${PACKAGE_PATHS[@]}"; do
+            if [[ "${{ needs.build.outputs.publish_channel }}" == "prerelease" ]]; then
+              npx @vscode/vsce publish --pre-release --packagePath "${package_path}"
+            else
+              npx @vscode/vsce publish --packagePath "${package_path}"
+            fi
+          done
         env:
           VSCE_PAT: ${{ secrets.VSCE_ACCESS_TOKEN }}

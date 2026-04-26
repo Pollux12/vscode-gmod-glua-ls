@@ -490,7 +490,8 @@ function ensureExecutableIfPossible(filePath: string): boolean {
         return true;
     } catch {
         try {
-            fs.chmodSync(filePath, 0o755);
+            const stats = fs.statSync(filePath);
+            fs.chmodSync(filePath, stats.mode | 0o100);
             fs.accessSync(filePath, fs.constants.X_OK);
             return true;
         } catch {
