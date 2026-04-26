@@ -42,7 +42,9 @@
 
 > [!IMPORTANT]
 > This is an early release. There may be some minor bugs, please report any issues you run into! You should be able to resolve most issues via the config system (e.g. disabling diagnostics or changing folder paths).
+> >
 > Report bugs or suggest features here: https://github.com/Pollux12/gmod-glua-ls/issues
+>
 > macOS support is currently experimental - expect issues!
 
 Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod GLua development.
