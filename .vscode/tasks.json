@@ -18,7 +18,7 @@
         },
         {
             "type": "npm",
-            "script": "package:dev:win32-x64",
+            "script": "package:dev",
             "label": "vscode-gmod-glua-ls: Dev Build",
             "problemMatcher": [],
             "group": {

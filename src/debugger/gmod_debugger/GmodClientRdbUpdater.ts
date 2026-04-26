@@ -28,6 +28,7 @@ export class GmodClientRdbUpdater {
     private static readonly EXPECTED_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
     private readonly SKIP_EXPECTED_VERSION_KEY = 'gmodRdbClientUpdater.skipExpectedVersion';
     private readonly INSTALLED_STATE_KEY = 'gmodRdbUpdater.client.installedState';
+    private hasShownMacExperimentalWarning = false;
 
     private readonly updateState: ActiveUpdateState = {
         activeUpdate: undefined,
@@ -177,6 +178,8 @@ export class GmodClientRdbUpdater {
     }
 
     private async downloadAndInstallInternal(garrysmodPath: string): Promise<void> {
+        this.showMacExperimentalWarningOnce();
+
         let installGarrysmodPath = garrysmodPath;
         while (true) {
             const validation = validateClientInstallPath(installGarrysmodPath);
@@ -239,7 +242,9 @@ export class GmodClientRdbUpdater {
                 ? (isX64
                     ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux64.dll']
                     : ['gmcl_rdb_linux.so', 'gmcl_rdb_linux.dll'])
-                : [];
+                : process.platform === 'darwin'
+                    ? ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll']
+                    : [];
 
         const preferredAsset = findAssetByNameCandidates(release, preferredCandidates);
         if (preferredAsset) {
@@ -267,7 +272,22 @@ export class GmodClientRdbUpdater {
             ];
         }
 
+        if (process.platform === 'darwin') {
+            return ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll'];
+        }
+
         return [];
+    }
+
+    private showMacExperimentalWarningOnce(): void {
+        if (process.platform !== 'darwin' || this.hasShownMacExperimentalWarning) {
+            return;
+        }
+
+        this.hasShownMacExperimentalWarning = true;
+        vscode.window.showWarningMessage(
+            'macOS rdb_client updates are experimental. The updater will use Garry\'s Mod _osx64.dll/_osx.dll module names and may not match all client layouts.'
+        );
     }
 
     private shouldAutoPrompt(): boolean {

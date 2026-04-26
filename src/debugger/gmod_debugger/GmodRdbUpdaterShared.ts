@@ -2,9 +2,12 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { promisify } from 'util';
 import * as vscode from 'vscode';
 import { downloadFile } from '../../netHelpers';
 import { fetchReleaseForCurrentExtensionChannel, GmRdbRelease, ReleaseAsset } from './GmodDebugSetupWizard';
+
+const execFileAsync = promisify(child_process.execFile);
 
 export interface InstalledModuleState {
     readonly version: string;
@@ -134,6 +137,49 @@ async function cleanupStaleBackups(binDir: string, assetName: string): Promise<v
 
         const backupPath = path.join(binDir, entry);
         await fs.promises.unlink(backupPath).catch(() => {});
+    }
+}
+
+function getModuleVersionSidecarPath(modulePath: string): string {
+    return `${modulePath}.version`;
+}
+
+async function readModuleVersionSidecar(modulePath: string): Promise<string | undefined> {
+    if (process.platform === 'win32') {
+        return undefined;
+    }
+
+    try {
+        const raw = await fs.promises.readFile(getModuleVersionSidecarPath(modulePath), 'utf8');
+        const version = raw.trim();
+        return version.length > 0 ? normalizeComparableVersion(version) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+async function writeModuleVersionSidecar(modulePath: string, releaseTag: string): Promise<void> {
+    if (process.platform === 'win32') {
+        return;
+    }
+
+    await fs.promises.writeFile(
+        getModuleVersionSidecarPath(modulePath),
+        `${normalizeComparableVersion(releaseTag)}\n`,
+        'utf8'
+    );
+}
+
+async function makeInstalledModuleUsable(modulePath: string): Promise<void> {
+    if (process.platform === 'win32') {
+        return;
+    }
+
+    if (process.platform === 'darwin') {
+        await fs.promises.stat(modulePath)
+            .then((stats) => fs.promises.chmod(modulePath, stats.mode | 0o100))
+            .catch(() => {});
+        await execFileAsync('xattr', ['-d', 'com.apple.quarantine', modulePath], { timeout: 8000 }).catch(() => {});
     }
 }
 
@@ -272,6 +318,11 @@ export async function resolveInstalledModuleVersion(
         return state.version;
     }
 
+    const sidecarVersion = await readModuleVersionSidecar(binaryPath);
+    if (sidecarVersion) {
+        return sidecarVersion;
+    }
+
     return undefined;
 }
 
@@ -353,6 +404,9 @@ export async function downloadAndInstallRelease(options: InstallReleaseOptions):
                         }
 
                         await fs.promises.rename(stagingPath, destinationPath);
+
+                        await makeInstalledModuleUsable(destinationPath);
+                        await writeModuleVersionSidecar(destinationPath, release.tag_name).catch(() => {});
 
                         if (backupPath) {
                             await fs.promises.unlink(backupPath).catch(() => {});
