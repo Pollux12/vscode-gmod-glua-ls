@@ -2,6 +2,19 @@
 
 ---
 
+## [1.0.18] [Pre-Release] - 2026-04-26
+
+### VS Code Extension
+- Add experimental macOS support.
+
+### Language Server
+- Add experimental macOS support.
+
+### Debugger
+- Add experimental macOS support.
+
+---
+
 ## [1.0.17] [Pre-Release] - 2026-04-23
 
 ### VS Code Extension
