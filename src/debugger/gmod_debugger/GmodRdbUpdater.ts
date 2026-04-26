@@ -39,6 +39,7 @@ export class GmodRdbUpdater {
     private static readonly EXPECTED_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
     private readonly SKIP_EXPECTED_VERSION_KEY = 'gmodRdbUpdater.skipExpectedVersion';
     private readonly INSTALLED_STATE_KEY = 'gmodRdbUpdater.server.installedState';
+    private hasShownMacExperimentalWarning = false;
 
     private readonly updateState: ActiveUpdateState = {
         activeUpdate: undefined,
@@ -211,6 +212,8 @@ export class GmodRdbUpdater {
     }
 
     private async downloadAndInstallInternal(garrysmodPath: string): Promise<void> {
+        this.showMacExperimentalWarningOnce();
+
         const installedRelease = await downloadAndInstallRelease({
             garrysmodPath,
             progressTitle: 'Updating gm_rdb...',
@@ -281,13 +284,21 @@ export class GmodRdbUpdater {
         }
 
         if (process.platform === 'darwin') {
-            vscode.window.showWarningMessage(
-                'macOS gm_rdb updates are experimental. The updater will use Garry\'s Mod _osx64.dll/_osx.dll module names and may not match all SRCDS layouts.'
-            );
             return ['gmsv_rdb_osx64.dll', 'gmsv_rdb_osx.dll'];
         }
 
         return [];
+    }
+
+    private showMacExperimentalWarningOnce(): void {
+        if (process.platform !== 'darwin' || this.hasShownMacExperimentalWarning) {
+            return;
+        }
+
+        this.hasShownMacExperimentalWarning = true;
+        vscode.window.showWarningMessage(
+            'macOS gm_rdb updates are experimental. The updater will use Garry\'s Mod _osx64.dll/_osx.dll module names and may not match all SRCDS layouts.'
+        );
     }
 
     private shouldAutoPrompt(): boolean {

@@ -175,9 +175,10 @@ async function makeInstalledModuleUsable(modulePath: string): Promise<void> {
         return;
     }
 
-    await fs.promises.chmod(modulePath, 0o755).catch(() => {});
-
     if (process.platform === 'darwin') {
+        await fs.promises.stat(modulePath)
+            .then((stats) => fs.promises.chmod(modulePath, stats.mode | 0o100))
+            .catch(() => {});
         await execFileAsync('xattr', ['-d', 'com.apple.quarantine', modulePath], { timeout: 8000 }).catch(() => {});
     }
 }
