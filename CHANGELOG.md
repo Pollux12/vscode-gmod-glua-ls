@@ -2,6 +2,24 @@
 
 ---
 
+## [1.0.19] [Pre-Release] - 2026-04-29
+
+## Language Server
+- Add support for metatable registration complex types and methods.
+- Fix table keys being nil in for loops.
+- Fix unknown field access not being potentially nil.
+- Fix no warning diagnostic on attempt to access a field for a potentially nil variable.
+- Fix guarded table assignments not being registered correctly.
+- Fix over-eager narrowing to any and restored unknown for no type found.
+- Fix some diagnostics being unstable / non-deterministic due to race conditions.
+- Fix narrowing for globals after valid checks.
+- Fix language server dropping narrowed types too early.
+- Fix table access for sequential tables being inferred as nil.
+- Fix field index not strictly looking for exact matches.
+- Various other minor fixes and improvements.
+
+---
+
 ## [1.0.18] [Pre-Release] - 2026-04-26
 
 ### VS Code Extension
@@ -41,6 +59,7 @@
 - Annotations are being moved to a new repo, and won't be updated until next pre-release.
 
 ---
+
 
 ## [1.0.16] [Pre-Release] - 2026-04-13
 
