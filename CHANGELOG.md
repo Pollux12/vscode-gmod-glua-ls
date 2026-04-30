@@ -2,6 +2,34 @@
 
 ---
 
+## [1.0.20] [Pre-Release] - 2026-05-01
+
+## VS Code Extension
+- Move to the new dedicated `annotations-gmod-glua-ls` repository for GMod annotation downloads.
+- Add `gluals.gmod.annotationsRepository` and `gluals.gmod.annotationsBranch` settings to use a custom annotation source.
+
+## Language Server
+- Fix false positive undefined-field errors on numerically-indexed tables.
+- Fix SWEP default tool file exclusion being too broad and excluding unrelated files.
+- Fix nested NetworkVars not being detected in scripted classes.
+- Fix scripted class file exclusions not being scoped correctly.
+
+## Annotations
+- Move to dedicated `annotations-gmod-glua-ls` repository — annotations are now up to date after several pre-releases without updates.
+- Add `HTTPRequest` type override.
+- Add `collectgarbage` override.
+- Add `string.Split` override.
+- Add `scripted_ents.GetMember` override.
+- Add overrides for `LeftClick` and `RightClick` hooks.
+- Improve struct class annotations using `@field` for better type information.
+- Fix `Entity.BaseClass` typed as `Entity?`.
+- Fix `debug.getinfo` incorrect parameters and return type.
+- Fix `os.date` incorrect return type.
+- Fix `string.gsub` incorrect parameters.
+- Fix numerical enum annotations.
+
+---
+
 ## [1.0.19] [Pre-Release] - 2026-04-29
 
 ## Language Server
