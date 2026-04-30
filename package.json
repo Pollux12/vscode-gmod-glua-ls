@@ -1789,7 +1789,17 @@
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
                         "default": true,
-                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. Annotations are downloaded from the `gluals-annotations` branch of the gmod-luals-addon repository. Disable this if you want to manage annotations manually or use a custom set."
+                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. By default, annotations are downloaded from the `gluals-annotations` branch of the annotations-gmod-glua-ls repository. Disable this if you want to manage annotations manually or use a custom set."
+                    },
+                    "gluals.gmod.annotationsRepository": {
+                        "type": "string",
+                        "default": "Pollux12/annotations-gmod-glua-ls",
+                        "markdownDescription": "GitHub repository used for automatic GMod annotation downloads. Accepts `owner/repository` or a GitHub repository URL."
+                    },
+                    "gluals.gmod.annotationsBranch": {
+                        "type": "string",
+                        "default": "gluals-annotations",
+                        "markdownDescription": "Git branch used for automatic GMod annotation downloads. The branch must contain the generated annotation files and `__metadata.json` at its root. Plugin artifact branches are not supported here."
                     },
                     "gluals.gmod.autoCheckAnnotationUpdates": {
                         "type": "boolean",
