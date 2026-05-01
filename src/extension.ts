@@ -106,6 +106,22 @@ const GMOD_DEBUG_SETUP_CONTEXT_KEY = 'gluals.gmod.needsDebugSetup';
 const GMOD_TOOL_LOG_MAX_SIZE = 1000;
 const DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES = 6;
 const DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS = 250;
+const SERVER_STATUS_NOTIFICATION = 'gluals/serverStatus';
+const LSP_PROGRESS_NOTIFICATION = '$/progress';
+const STARTUP_LOAD_PROGRESS_TOKEN = 0;
+const STARTUP_DIAGNOSE_PROGRESS_TOKEN = 1;
+
+interface ServerStatusNotificationParams {
+    readonly state: 'startupComplete';
+}
+
+interface ProgressNotificationParams {
+    readonly token: number | string;
+    readonly value: {
+        readonly kind: 'begin' | 'report' | 'end';
+        readonly message?: string;
+    };
+}
 
 interface GmodToolLogEntry {
     readonly timestamp: string;
@@ -596,28 +612,101 @@ async function startServer(): Promise<void> {
     await serverStartPromise;
 }
 
-function registerLanguageClientStateHandlers(client: LanguageClient): void {
-    client.onDidChangeState((event) => {
-        if (extensionContext.client !== client) {
-            return;
-        }
+function registerLanguageClientStateHandlers(client: LanguageClient): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let startupSettled = false;
+        let startupComplete = false;
+        let notificationDisposable: vscode.Disposable | undefined;
+        let progressDisposable: vscode.Disposable | undefined;
+        const completedStartupTasks = new Set<number>();
 
-        switch (event.newState) {
-            case State.Starting:
-                extensionContext.setServerStarting();
-                break;
-            case State.Running:
-                extensionContext.setServerRunning();
-                break;
-            case State.Stopped:
-                extensionContext.client = undefined;
-                if (extensionContext.serverStatus.state !== ServerState.Error) {
-                    extensionContext.setServerStopped();
+        const isStartupProgressToken = (token: number | string): token is number => {
+            return token === STARTUP_LOAD_PROGRESS_TOKEN || token === STARTUP_DIAGNOSE_PROGRESS_TOKEN;
+        };
+
+        const resolveStartup = (): void => {
+            if (startupSettled) {
+                return;
+            }
+
+            startupSettled = true;
+            startupComplete = true;
+            notificationDisposable?.dispose();
+            progressDisposable?.dispose();
+            resolve();
+        };
+
+        const rejectStartup = (message: string): void => {
+            if (startupSettled) {
+                return;
+            }
+
+            startupSettled = true;
+            notificationDisposable?.dispose();
+            progressDisposable?.dispose();
+            reject(new Error(message));
+        };
+
+        client.onDidChangeState((event) => {
+            const isActiveClient = extensionContext.client === client;
+
+            switch (event.newState) {
+                case State.Starting:
+                    if (isActiveClient) {
+                        extensionContext.setServerStarting();
+                    }
+                    break;
+                case State.Running:
+                    if (isActiveClient && !startupComplete) {
+                        extensionContext.setServerStarting('Loading workspace and diagnostics...');
+                    }
+                    break;
+                case State.Stopped:
+                    if (isActiveClient) {
+                        extensionContext.client = undefined;
+                        if (extensionContext.serverStatus.state !== ServerState.Error) {
+                            extensionContext.setServerStopped();
+                        }
+                    }
+                    if (!startupComplete) {
+                        rejectStartup('GLua Language Server stopped before startup completed');
+                    }
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        notificationDisposable = client.onNotification(
+            SERVER_STATUS_NOTIFICATION,
+            (params: ServerStatusNotificationParams) => {
+                if (params.state === 'startupComplete') {
+                    resolveStartup();
                 }
-                break;
-            default:
-                break;
-        }
+            }
+        );
+
+        progressDisposable = client.onNotification(
+            LSP_PROGRESS_NOTIFICATION,
+            (params: ProgressNotificationParams) => {
+                if (!isStartupProgressToken(params.token)) {
+                    return;
+                }
+
+                if (!startupComplete && extensionContext.client === client && params.value.message) {
+                    extensionContext.setServerStarting(params.value.message);
+                }
+
+                if (params.value.kind !== 'end') {
+                    return;
+                }
+
+                completedStartupTasks.add(params.token);
+                if (completedStartupTasks.size === 2) {
+                    resolveStartup();
+                }
+            }
+        );
     });
 }
 
@@ -700,12 +789,14 @@ async function doStartServer(startupRunId: number): Promise<void> {
         serverOptions,
         clientOptions
     );
-    registerLanguageClientStateHandlers(client);
+    const startupComplete = registerLanguageClientStateHandlers(client);
     extensionContext.client = client;
 
     throwIfStartupCancelled(startupRunId);
 
     await client.start();
+    throwIfStartupCancelled(startupRunId);
+    await startupComplete;
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
 }
