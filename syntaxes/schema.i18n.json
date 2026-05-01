@@ -203,6 +203,9 @@
         "en": "Unbalanced assignments",
         "zh-CN": "不平衡的赋值。"
     },
+    "DiagnosticCode.unchecked-nil-access": {
+        "en": "Unchecked nil access"
+    },
     "DiagnosticCode.undefined-doc-param": {
         "en": "Undefined Doc Param",
         "zh-CN": "未使用注解定义的参数。"
