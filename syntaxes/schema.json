@@ -2451,6 +2451,11 @@
           "default": false,
           "description": "Whether to enable strict mode require path.",
           "type": "boolean"
+        },
+        "strictTypeCoercion": {
+          "default": false,
+          "description": "When enabled, `param-type-mismatch` requires exact types and disables GLua-aware\nprimitive coercions. By default (disabled), the following are accepted:\n- `number`, `integer`, and `boolean` values where `string` is expected\n  (Lua's `tostring()` handles these cleanly).\n- String literals that are valid numbers (e.g. `\"2\"`) where `number` or `integer`\n  is expected (Lua's `tonumber()` handles these cleanly).",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -2961,7 +2966,8 @@
         "inferredTypeMismatch": false,
         "metaOverrideFileDefine": true,
         "requireExportGlobal": false,
-        "requirePath": false
+        "requirePath": false,
+        "strictTypeCoercion": false
       }
     },
     "workspace": {

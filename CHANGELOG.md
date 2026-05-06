@@ -2,31 +2,59 @@
 
 ---
 
-## [1.0.20] [Pre-Release] - 2026-05-01
+## [1.0.20] [Pre-Release] - 2026-05-07
 
 ## VS Code Extension
-- Move to the new dedicated `annotations-gmod-glua-ls` repository for GMod annotation downloads.
-- Add `gluals.gmod.annotationsRepository` and `gluals.gmod.annotationsBranch` settings to use a custom annotation source.
+- Move to dedicated `annotations-gmod-glua-ls` repository for GMod annotation downloads.
+- Add `gluals.gmod.annotationsRepository` setting.
+- Add `gluals.gmod.annotationsBranch` setting.
+- Fix language server status being shown as ready too early.
+- Fix existing annotations using the old source not being refreshed automatically.
 
 ## Language Server
+- Add `func` to `function` default parameter mapping.
+- Add default GLua parameter type conversion.
+- Add `strictTypeCoercion` mode.
+- Add built-in `std.Split` support.
+- Add `BaseClass` support for panel classes.
 - Fix false positive undefined-field errors on numerically-indexed tables.
+- Fix whitespace breaking table indexing.
+- Fix `pairs()` on exact tables losing key and value types.
+- Fix workspace overrides hiding documented library return types.
+- Fix TOOL files under `lua/weapons/gmod_tool/stools/**` being treated as SWEPs.
 - Fix SWEP default tool file exclusion being too broad and excluding unrelated files.
-- Fix nested NetworkVars not being detected in scripted classes.
 - Fix scripted class file exclusions not being scoped correctly.
+- Fix nested `NetworkVar`s not being detected in scripted classes.
+- Fix file-scoped dynamic fields leaking across files when globals are disabled.
+- Fix `scripted_ents.GetMember(...)` not carrying over `NetworkVar` accessors.
+- Fix false positives from nil checks and initialized table assignment chains.
+- Fix startup-complete status being sent before initial workspace diagnostics finish.
+- Improve dynamic fields for metatable-based objects.
+- Improve dynamic field completion, hover and go-to-definition.
+- Improve hover ordering and explicit realm display.
 
 ## Annotations
-- Move to dedicated `annotations-gmod-glua-ls` repository — annotations are now up to date after several pre-releases without updates.
+- Move to dedicated `annotations-gmod-glua-ls` repository.
+- Add `string.Explode` override.
 - Add `HTTPRequest` type override.
 - Add `collectgarbage` override.
-- Add `string.Split` override.
+- Add `WEAPON:Holster` hook override.
+- Add `net.ReadTable` override.
+- Add `SKIN` class override.
+- Add `Label:SetFont` and `Label:SetTextColor` methods.
 - Add `scripted_ents.GetMember` override.
 - Add overrides for `LeftClick` and `RightClick` hooks.
-- Improve struct class annotations using `@field` for better type information.
-- Fix `Entity.BaseClass` typed as `Entity?`.
+- Add `Panel.BaseClass` field.
+- Improve struct class annotations using `@field`.
+- Fix `os.date` `*t` overloads to return `DateData`.
 - Fix `debug.getinfo` incorrect parameters and return type.
-- Fix `os.date` incorrect return type.
+- Fix `FindMetaTable` incorrectly returning `nil`.
+- Fix `Entity.BaseClass` typed as `Entity?`.
 - Fix `string.gsub` incorrect parameters.
 - Fix numerical enum annotations.
+- Improve `string.Split` typing.
+- Improve `ipairs` iterator return typing.
+- Improve global `Entity` typing.
 
 ---
 
