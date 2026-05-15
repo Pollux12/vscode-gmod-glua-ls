@@ -2,7 +2,7 @@
 
 ---
 
-## [1.0.20] [Pre-Release] - 2026-05-07
+## [1.0.20] [Pre-Release] - 2026-05-15
 
 ## VS Code Extension
 - Move to dedicated `annotations-gmod-glua-ls` repository for GMod annotation downloads.
@@ -17,6 +17,9 @@
 - Add `strictTypeCoercion` mode.
 - Add built-in `std.Split` support.
 - Add `BaseClass` support for panel classes.
+- Add `---@outparam` tag support.
+- Add default value syntax support for optional parameters.
+- Add `NULL` entity support.
 - Fix false positive undefined-field errors on numerically-indexed tables.
 - Fix whitespace breaking table indexing.
 - Fix `pairs()` on exact tables losing key and value types.
@@ -29,12 +32,17 @@
 - Fix `scripted_ents.GetMember(...)` not carrying over `NetworkVar` accessors.
 - Fix false positives from nil checks and initialized table assignment chains.
 - Fix startup-complete status being sent before initial workspace diagnostics finish.
+- Fix optional/default parameter type handling.
+- Fix type handling for `self`, locals and default members.
 - Improve dynamic fields for metatable-based objects.
 - Improve dynamic field completion, hover and go-to-definition.
 - Improve hover ordering and explicit realm display.
+- Improve scripted class dynamic field resolution.
+- Improve references, definitions, hover and implementations.
 
 ## Annotations
 - Move to dedicated `annotations-gmod-glua-ls` repository.
+- Add `NULL` entity support.
 - Add `string.Explode` override.
 - Add `HTTPRequest` type override.
 - Add `collectgarbage` override.
