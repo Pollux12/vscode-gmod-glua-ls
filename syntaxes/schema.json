@@ -344,6 +344,11 @@
           "type": "string"
         },
         {
+          "const": "gmod-null-check",
+          "description": "gmod-null-check",
+          "type": "string"
+        },
+        {
           "const": "undefined-global-argument",
           "description": "Deprecated alias for `undefined-global-assignment`. Accepted for backward compatibility.",
           "type": "string"

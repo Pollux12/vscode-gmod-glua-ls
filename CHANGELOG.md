@@ -2,7 +2,8 @@
 
 ---
 
-## [1.0.20] [Pre-Release] - 2026-05-15
+## [1.0.20] [Pre-Release (RC1)] - 2026-05-18
+> Release candidate for 1.1.0
 
 ## VS Code Extension
 - Move to dedicated `annotations-gmod-glua-ls` repository for GMod annotation downloads.
@@ -20,25 +21,36 @@
 - Add `---@outparam` tag support.
 - Add default value syntax support for optional parameters.
 - Add `NULL` entity support.
+- Improve dynamic fields for metatable-based objects.
+- Improve dynamic field completion, hover and go-to-definition.
+- Improve hover ordering and explicit realm display.
+- Improve scripted class dynamic field resolution.
+- Improve metatable inference.
+- Improve references, definitions, hover and implementations.
+- Improve performance for indexing and diagnostic phases.
 - Fix false positive undefined-field errors on numerically-indexed tables.
+- Fix false positive type mismatch errors on inherited class method parameters.
+- Fix false positives from nil checks and initialized table assignment chains.
+- Fix type narrowing being cut short in large files.
 - Fix whitespace breaking table indexing.
 - Fix `pairs()` on exact tables losing key and value types.
 - Fix workspace overrides hiding documented library return types.
+- Fix globals not being resolved correctly in some cases.
 - Fix TOOL files under `lua/weapons/gmod_tool/stools/**` being treated as SWEPs.
 - Fix SWEP default tool file exclusion being too broad and excluding unrelated files.
 - Fix scripted class file exclusions not being scoped correctly.
 - Fix nested `NetworkVar`s not being detected in scripted classes.
 - Fix file-scoped dynamic fields leaking across files when globals are disabled.
 - Fix `scripted_ents.GetMember(...)` not carrying over `NetworkVar` accessors.
-- Fix false positives from nil checks and initialized table assignment chains.
 - Fix startup-complete status being sent before initial workspace diagnostics finish.
 - Fix optional/default parameter type handling.
 - Fix type handling for `self`, locals and default members.
-- Improve dynamic fields for metatable-based objects.
-- Improve dynamic field completion, hover and go-to-definition.
-- Improve hover ordering and explicit realm display.
-- Improve scripted class dynamic field resolution.
-- Improve references, definitions, hover and implementations.
+- Fix floats in default parameter values being parsed as integers.
+- Fix duplicate outparam tags not being merged correctly.
+- Fix `NULL` not being removed after an `IsValid` check.
+- Fix inconsistent diagnostics caused by unstable type ordering.
+- Fix diagnostic flickering during analysis.
+- Fix fields default values not being treated as optional.
 
 ## Annotations
 - Move to dedicated `annotations-gmod-glua-ls` repository.
@@ -53,7 +65,6 @@
 - Add `scripted_ents.GetMember` override.
 - Add overrides for `LeftClick` and `RightClick` hooks.
 - Add `Panel.BaseClass` field.
-- Improve struct class annotations using `@field`.
 - Fix `os.date` `*t` overloads to return `DateData`.
 - Fix `debug.getinfo` incorrect parameters and return type.
 - Fix `FindMetaTable` incorrectly returning `nil`.
@@ -61,8 +72,9 @@
 - Fix `string.gsub` incorrect parameters.
 - Fix numerical enum annotations.
 - Improve `string.Split` typing.
-- Improve `ipairs` iterator return typing.
 - Improve global `Entity` typing.
+- Improve `ipairs` iterator return typing.
+- Improve struct class annotations using `@field`.
 
 ---
 
