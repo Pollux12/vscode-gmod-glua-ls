@@ -11,6 +11,9 @@
 - Add `gluals.gmod.annotationsBranch` setting.
 - Fix language server status being shown as ready too early.
 - Fix existing annotations using the old source not being refreshed automatically.
+- Fix extension startup not completing if the language server takes too long to respond.
+- Fix annotation download URL not encoding branch names with special characters correctly.
+- Improve annotation validation when annotations are from a different source.
 
 ## Language Server
 - Add `func` to `function` default parameter mapping.
@@ -28,6 +31,7 @@
 - Improve metatable inference.
 - Improve references, definitions, hover and implementations.
 - Improve performance for indexing and diagnostic phases.
+- Improve documentation for annotations, configuration, language features, and debugger.
 - Fix false positive undefined-field errors on numerically-indexed tables.
 - Fix false positive type mismatch errors on inherited class method parameters.
 - Fix false positives from nil checks and initialized table assignment chains.
@@ -39,7 +43,8 @@
 - Fix TOOL files under `lua/weapons/gmod_tool/stools/**` being treated as SWEPs.
 - Fix SWEP default tool file exclusion being too broad and excluding unrelated files.
 - Fix scripted class file exclusions not being scoped correctly.
-- Fix nested `NetworkVar`s not being detected in scripted classes.
+- Fix `NetworkVar`s defined outside of `shared.lua` not being detected.
+- Fix `NetworkVar`s not being detected in scripted classes.
 - Fix file-scoped dynamic fields leaking across files when globals are disabled.
 - Fix `scripted_ents.GetMember(...)` not carrying over `NetworkVar` accessors.
 - Fix startup-complete status being sent before initial workspace diagnostics finish.
