@@ -20,6 +20,10 @@ type AnnotationMetadata = {
     glualsAnnotationSource?: string;
 };
 
+function encodeGitHubRefPath(ref: string): string {
+    return ref.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
 /**
  * Manages Garry's Mod GLuaLS annotations
  * Handles downloading and updating from the gluals-annotations branch
@@ -96,14 +100,15 @@ export class GmodAnnotationManager implements vscode.Disposable {
         const branch = this.getAnnotationBranch();
         const repositoryName = repository.split('/').pop() ?? repository;
         const branchFolderName = branch.replace(/[\\/]/g, '-');
+        const encodedBranchPath = encodeGitHubRefPath(branch);
 
         return {
             repository,
             branch,
             sourceId: `${repository}:${branch}`,
-            zipUrl: `https://github.com/${repository}/archive/refs/heads/${branch}.zip`,
+            zipUrl: `https://github.com/${repository}/archive/refs/heads/${encodedBranchPath}.zip`,
             zipInnerFolder: `${repositoryName}-${branchFolderName}`,
-            metadataUrl: `https://raw.githubusercontent.com/${repository}/${branch}/__metadata.json`,
+            metadataUrl: `https://raw.githubusercontent.com/${repository}/${encodedBranchPath}/__metadata.json`,
         };
     }
 
@@ -140,11 +145,15 @@ export class GmodAnnotationManager implements vscode.Disposable {
             return undefined;
         }
 
-        // Return path only if annotations exist
-        if (this.annotationsExist()) {
+        if (!this.annotationsExist()) {
+            return undefined;
+        }
+
+        if (this.isCurrentAnnotationSource(this.readLocalMetadata())) {
             return this.annotationsPath;
         }
 
+        console.warn('[GLuaLS] Ignoring managed annotations from a different source until they are refreshed');
         return undefined;
     }
 
@@ -173,9 +182,16 @@ export class GmodAnnotationManager implements vscode.Disposable {
     }
 
     private markCurrentAnnotationSource(sourceId: string): void {
-        const metadata = this.readLocalMetadata() ?? {};
-        metadata.glualsAnnotationSource = sourceId;
-        fs.writeFileSync(path.join(this.annotationsPath, '__metadata.json'), JSON.stringify(metadata, null, 2));
+        const metadata = this.readLocalMetadata();
+        if (!metadata) {
+            console.warn('[GLuaLS] Downloaded annotations archive did not include a valid __metadata.json; writing source metadata only');
+        }
+
+        const nextMetadata: AnnotationMetadata = {
+            ...(metadata ?? {}),
+            glualsAnnotationSource: sourceId,
+        };
+        fs.writeFileSync(path.join(this.annotationsPath, '__metadata.json'), JSON.stringify(nextMetadata, null, 2));
     }
 
     /**
