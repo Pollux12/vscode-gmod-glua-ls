@@ -1,17 +1,24 @@
 import { join } from "path";
 import { readFileSync, writeFileSync, createWriteStream } from "fs";
 import { dirname } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import download from "download";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function downloadTo(url, path) {
-    return new Promise((r, e) => {
-        const d = download(url);
-        d.then(r).catch((err) => e(err));
-        d.pipe(createWriteStream(path));
-    });
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(
+            `HTTP ${response.status} ${response.statusText} when downloading ${url}`
+        );
+    }
+    if (!response.body) {
+        throw new Error(`No response body when downloading ${url}`);
+    }
+
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(path));
 }
 
 export function ensureNl(s) {

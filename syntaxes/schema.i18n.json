@@ -99,6 +99,9 @@
     "DiagnosticCode.gmod-net-read-write-type-mismatch": {
         "en": "gmod-net-read-write-type-mismatch"
     },
+    "DiagnosticCode.gmod-null-check": {
+        "en": "gmod-null-check"
+    },
     "DiagnosticCode.gmod-realm-mismatch": {
         "en": "gmod-realm-mismatch (strict realm mismatch)"
     },
