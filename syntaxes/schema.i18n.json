@@ -99,6 +99,9 @@
     "DiagnosticCode.gmod-net-read-write-type-mismatch": {
         "en": "gmod-net-read-write-type-mismatch"
     },
+    "DiagnosticCode.gmod-null-check": {
+        "en": "gmod-null-check"
+    },
     "DiagnosticCode.gmod-realm-mismatch": {
         "en": "gmod-realm-mismatch (strict realm mismatch)"
     },
@@ -202,6 +205,9 @@
     "DiagnosticCode.unbalanced-assignments": {
         "en": "Unbalanced assignments",
         "zh-CN": "不平衡的赋值。"
+    },
+    "DiagnosticCode.unchecked-nil-access": {
+        "en": "Unchecked nil access"
     },
     "DiagnosticCode.undefined-doc-param": {
         "en": "Undefined Doc Param",
@@ -791,6 +797,9 @@
     "EmmyrcStrict.requirePath": {
         "en": "Whether to enable strict mode require path.",
         "zh-CN": "是否启用严格模式 require 路径。严格模式时 require 必须从指定的根目录开始。"
+    },
+    "EmmyrcStrict.strictTypeCoercion": {
+        "en": "When enabled, `param-type-mismatch` requires exact types and disables GLua-aware\nprimitive coercions. By default (disabled), the following are accepted:\n- `number`, `integer`, and `boolean` values where `string` is expected\n  (Lua's `tostring()` handles these cleanly).\n- String literals that are valid numbers (e.g. `\"2\"`) where `number` or `integer`\n  is expected (Lua's `tonumber()` handles these cleanly)."
     },
     "EmmyrcWorkspace.enableIsolation": {
         "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, workspace configs are merged into one global baseline\n(first workspace config wins scalar conflicts, arrays are unioned), while\nlocal workspace configs can still override file-scoped behavior."

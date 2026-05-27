@@ -124,6 +124,11 @@
           "type": "string"
         },
         {
+          "const": "unchecked-nil-access",
+          "description": "Unchecked nil access",
+          "type": "string"
+        },
+        {
           "const": "await-in-sync",
           "description": "Await in sync",
           "type": "string"
@@ -336,6 +341,11 @@
         {
           "const": "gmod-duplicate-system-registration",
           "description": "gmod-duplicate-system-registration",
+          "type": "string"
+        },
+        {
+          "const": "gmod-null-check",
+          "description": "gmod-null-check",
           "type": "string"
         },
         {
@@ -1500,6 +1510,7 @@
             "dmginfo": "CTakeDamageInfo",
             "ent": "Entity",
             "entity": "Entity",
+            "func": "function",
             "inflictor": "Entity",
             "mat": "IMaterial",
             "npc": "NPC",
@@ -1589,7 +1600,7 @@
               {
                 "classGlobal": "SWEP",
                 "exclude": [
-                  "weapons/gmod_tool/**"
+                  "weapons/gmod_tool/stools/**"
                 ],
                 "icon": "folder-library",
                 "id": "weapons",
@@ -1964,7 +1975,7 @@
             {
               "classGlobal": "SWEP",
               "exclude": [
-                "weapons/gmod_tool/**"
+                "weapons/gmod_tool/stools/**"
               ],
               "icon": "folder-library",
               "id": "weapons",
@@ -2445,6 +2456,11 @@
           "default": false,
           "description": "Whether to enable strict mode require path.",
           "type": "boolean"
+        },
+        "strictTypeCoercion": {
+          "default": false,
+          "description": "When enabled, `param-type-mismatch` requires exact types and disables GLua-aware\nprimitive coercions. By default (disabled), the following are accepted:\n- `number`, `integer`, and `boolean` values where `string` is expected\n  (Lua's `tostring()` handles these cleanly).\n- String literals that are valid numbers (e.g. `\"2\"`) where `number` or `integer`\n  is expected (Lua's `tonumber()` handles these cleanly).",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -2707,6 +2723,7 @@
           "dmginfo": "CTakeDamageInfo",
           "ent": "Entity",
           "entity": "Entity",
+          "func": "function",
           "inflictor": "Entity",
           "mat": "IMaterial",
           "npc": "NPC",
@@ -2776,7 +2793,7 @@
             {
               "classGlobal": "SWEP",
               "exclude": [
-                "weapons/gmod_tool/**"
+                "weapons/gmod_tool/stools/**"
               ],
               "icon": "folder-library",
               "id": "weapons",
@@ -2954,7 +2971,8 @@
         "inferredTypeMismatch": false,
         "metaOverrideFileDefine": true,
         "requireExportGlobal": false,
-        "requirePath": false
+        "requirePath": false,
+        "strictTypeCoercion": false
       }
     },
     "workspace": {

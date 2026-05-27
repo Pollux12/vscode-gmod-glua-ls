@@ -187,7 +187,7 @@ export const onDidChangeConfiguration = (): void => {
 };
 
 // 防抖定时器
-let timeoutToReqAnn: NodeJS.Timer | undefined;
+let timeoutToReqAnn: ReturnType<typeof setTimeout> | undefined;
 
 /**
  * 请求注释器 - 带防抖功能

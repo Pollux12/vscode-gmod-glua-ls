@@ -1,8 +1,9 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import * as vscode from 'vscode';
-import fetch from 'node-fetch';
 import AdmZip = require('adm-zip');
 
 /**
@@ -13,20 +14,30 @@ export interface FetchOptions {
     headers?: Record<string, string>;
 }
 
+async function fetchWithTimeout(url: string, options: FetchOptions | undefined, defaultTimeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? defaultTimeoutMs);
+
+    try {
+        return await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'vscode-gmod-glua-ls',
+                ...options?.headers,
+            },
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 /**
  * Request JSON from a given URL
  */
 export async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
-    const response = await fetch(url, {
-        timeout: options?.timeoutMs ?? 10000,
-        headers: {
-            'User-Agent': 'vscode-gmod-glua-ls',
-            ...options?.headers,
-        },
-    });
+    const response = await fetchWithTimeout(url, options, 10000);
 
     if (!response.ok) {
-        response.body?.resume();
         throw new Error(`HTTP ${response.status} ${response.statusText} when fetching ${url}`);
     }
 
@@ -42,13 +53,9 @@ export async function downloadFile(
     progress?: vscode.Progress<{ message?: string; increment?: number }>,
     options?: FetchOptions
 ): Promise<void> {
-    const response = await fetch(url, {
-        timeout: options?.timeoutMs ?? 30000,
-        headers: { 'User-Agent': 'vscode-gmod-glua-ls', ...options?.headers },
-    });
+    const response = await fetchWithTimeout(url, options, 30000);
 
     if (!response.ok || !response.body) {
-        response.body?.resume();
         throw new Error(`HTTP ${response.status} ${response.statusText} when downloading ${url}`);
     }
 
@@ -59,60 +66,43 @@ export async function downloadFile(
     let lastReportedPercentage = 0;
     let lastReportedMb = -1;
 
-    await new Promise<void>((resolve, reject) => {
-        const fileStream = fs.createWriteStream(destinationPath);
-        let errorHandled = false;
+    const body = Readable.fromWeb(response.body);
+    body.on('data', (chunk: Buffer) => {
+        if (progress) {
+            downloadedBytes += chunk.length;
 
-        const handleError = (err: Error) => {
-            if (errorHandled) return;
-            errorHandled = true;
-            fileStream.close(() => {
-                fs.unlink(destinationPath, () => {
-                    reject(err);
-                });
-            });
-        };
+            if (totalBytes > 0) {
+                const percentage = Math.floor((downloadedBytes / totalBytes) * 100);
+                if (percentage > lastReportedPercentage) {
+                    const increment = percentage - lastReportedPercentage;
+                    progress.report({
+                        message: `Downloading... ${percentage}%`,
+                        increment,
+                    });
+                    lastReportedPercentage = percentage;
+                }
+            } else {
+                // Indeterminate progress (no Content-Length header, e.g. GitHub archives)
+                const currentMbStr = (downloadedBytes / (1024 * 1024)).toFixed(1);
+                const currentMbNum = Math.floor(downloadedBytes / (1024 * 1024));
 
-        response.body.on('error', handleError);
-        fileStream.on('error', handleError);
-
-        fileStream.once('close', () => {
-            if (!errorHandled) {
-                resolve();
-            }
-        });
-
-        response.body.on('data', (chunk: Buffer) => {
-            if (progress) {
-                downloadedBytes += chunk.length;
-
-                if (totalBytes > 0) {
-                    const percentage = Math.floor((downloadedBytes / totalBytes) * 100);
-                    if (percentage > lastReportedPercentage) {
-                        const increment = percentage - lastReportedPercentage;
-                        progress.report({
-                            message: `Downloading... ${percentage}%`,
-                            increment,
-                        });
-                        lastReportedPercentage = percentage;
-                    }
-                } else {
-                    // Indeterminate progress (no Content-Length header, e.g. GitHub archives)
-                    const currentMbStr = (downloadedBytes / (1024 * 1024)).toFixed(1);
-                    const currentMbNum = Math.floor(downloadedBytes / (1024 * 1024));
-
-                    if (currentMbNum > lastReportedMb || lastReportedMb === -1) {
-                        progress.report({
-                            message: `Downloading... ${currentMbStr} MB`,
-                        });
-                        lastReportedMb = currentMbNum;
-                    }
+                if (currentMbNum > lastReportedMb || lastReportedMb === -1) {
+                    progress.report({
+                        message: `Downloading... ${currentMbStr} MB`,
+                    });
+                    lastReportedMb = currentMbNum;
                 }
             }
-        });
-
-        response.body.pipe(fileStream);
+        }
     });
+
+    try {
+        const fileStream = fs.createWriteStream(destinationPath);
+        await pipeline(body, fileStream);
+    } catch (error) {
+        fs.unlink(destinationPath, () => undefined);
+        throw error;
+    }
 }
 
 /**

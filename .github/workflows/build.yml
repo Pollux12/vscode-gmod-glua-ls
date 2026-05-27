@@ -105,31 +105,31 @@ jobs:
         echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
         echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
         echo "is_publish_event=${IS_PUBLISH_EVENT}" >> "$GITHUB_OUTPUT"
-    - name: Set up Node 20.x
+    - name: Set up Node 24.x
       uses: actions/setup-node@v4
       with:
-        node-version: 20.x
+        node-version: 24.x
+    - name: Install yarn
+      run: npm install -g yarn@1.22.22
     - name: Set extension version for channel
       if: steps.release_meta.outputs.is_publish_event == 'true'
       shell: bash
       run: |
-        npm version "${{ steps.release_meta.outputs.tag_version }}" --no-git-tag-version
+        yarn version --new-version "${{ steps.release_meta.outputs.tag_version }}" --no-git-tag-version
 
         echo "Extension version for this build: $(node -p "require('./package.json').version")"
-    - name: Install yarn
-      run: npm install -g yarn
     - name: Install dependencies
       run: yarn install --frozen-lockfile
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Validate schema files
-      run: npm run test:schema
+      run: yarn run test:schema
     - name: Run grammar tests
-      run: npm run test:grammar
+      run: yarn run test:grammar
     - name: Run debugger parity tests
-      run: npm run test:parity
+      run: yarn run test:parity
     - name: Run extension-host tests
-      run: xvfb-run -a npm run test:extension
+      run: xvfb-run -a yarn run test:extension
     - name: Build
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -147,7 +147,7 @@ jobs:
         fi
 
         node ./build/prepare.js "${PREPARE_ARGS[@]}"
-        npx @vscode/vsce package "${PACKAGE_ARGS[@]}"
+        yarn run vsce package "${PACKAGE_ARGS[@]}"
     - name: Verify bundled language server
       run: |
         node ./build/verify-vsix.js "vscode-gmod-ls-${{ matrix.target }}.vsix" "${{ matrix.target }}"
@@ -258,9 +258,9 @@ jobs:
 
           for package_path in "${PACKAGE_PATHS[@]}"; do
             if [[ "${{ needs.build.outputs.publish_channel }}" == "prerelease" ]]; then
-              npx @vscode/vsce publish --pre-release --packagePath "${package_path}"
+              npx @vscode/vsce@3.9.1 publish --pre-release --packagePath "${package_path}"
             else
-              npx @vscode/vsce publish --packagePath "${package_path}"
+              npx @vscode/vsce@3.9.1 publish --packagePath "${package_path}"
             fi
           done
         env:
