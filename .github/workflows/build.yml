@@ -148,7 +148,7 @@ jobs:
       run: |
         node ./build/verify-vsix.js "vscode-gmod-ls-${{ matrix.target }}.vsix" "${{ matrix.target }}"
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: vscode-gmod-ls-${{ matrix.target }}
         path: ${{ github.workspace }}/vscode-gmod-ls*.vsix
