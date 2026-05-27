@@ -226,7 +226,7 @@ jobs:
               });
               core.info(`Created release ${tag} (prerelease=${prerelease}).`);
             }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - name: Upload VSIX artifacts to GitHub release
         shell: bash
         env:
