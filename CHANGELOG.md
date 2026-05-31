@@ -2,6 +2,28 @@
 
 ---
 
+## [1.0.21] [Pre-Release (RC2)] - 2026-05-31
+>
+> Release candidate for 1.1.0
+
+## Language Server
+
+- Improved performance and stability.
+- Improve IsX checks and move to annotation level
+- Fix shared diagnostics being lost on the currently open file.
+- Fix realm mismatch false positive when there are multiple definitions on different realms.
+- Fix param-type-mismatch when there's a union containing type `any`.
+- Fix guarded tables overwriting previous definitions for that table.
+- Fix self assigned to variable sometimes becoming a literal table rather than remaining as a class
+
+## Annotations
+
+- Add IsX annotations to replace hardcoded functions.
+- Fix iterator not returning correct function.
+- Fix IsPlayer not narrowing to player type.
+
+---
+
 ## [1.0.20] [Pre-Release (RC1)] - 2026-05-26
 >
 > Release candidate for 1.1.0
