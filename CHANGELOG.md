@@ -2,7 +2,7 @@
 
 ---
 
-## [1.0.24] [Pre-Release (RC3)] - 2026-06-01
+## [1.0.24] [Pre-Release (RC5)] - 2026-06-02
 >
 > Release candidate for 1.1.0
 
@@ -16,7 +16,7 @@
 
 ---
 
-## [1.0.23] [Pre-Release (RC3)] - 2026-05-31
+## [1.0.23] [Pre-Release (RC4)] - 2026-06-01
 >
 > Release candidate for 1.1.0
 
