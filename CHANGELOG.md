@@ -2,6 +2,16 @@
 
 ---
 
+## [1.0.23] [Pre-Release (RC3)] - 2026-05-31
+>
+> Release candidate for 1.1.0
+
+## Language Server
+- Speculative fixes for more potential table index nil false positives (refactored table indexing with new merge system).
+- Various performance and stability improvements.
+
+---
+
 ## [1.0.22] [Pre-Release (RC3)] - 2026-05-31
 >
 > Release candidate for 1.1.0
