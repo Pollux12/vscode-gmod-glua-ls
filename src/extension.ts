@@ -52,6 +52,10 @@ import {
     isExpectedLifecycleRequestError,
     sendRequestWithStartupRetry,
 } from './languageServerRequests';
+import {
+    enableCompletionColorPreviewHtml,
+    enableCompletionColorPreviewHtmlForResult,
+} from './completionColorPreview';
 
 /**
  * Command registration entry
@@ -413,6 +417,9 @@ async function initializeExtension(): Promise<void> {
     setClientGetter(() => extensionContext.client);
 
     await startServer();
+    if (vscode.window.activeTextEditor && extensionContext.client) {
+        activeEditor = vscode.window.activeTextEditor;
+    }
     if (typeof vscode.lm.registerTool === 'function') {
         const controlToolCallbacks = {
             executeControlCommand: executeGmodControlCommand,
@@ -502,12 +509,12 @@ function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
 }
 
 function onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): void {
+    activeEditor = editor;
     if (editor &&
         editor.document.languageId === extensionContext.LANGUAGE_ID &&
         extensionContext.client
     ) {
-        activeEditor = editor;
-        Annotator.requestAnnotators(activeEditor, extensionContext.client);
+        Annotator.requestAnnotators(editor, extensionContext.client);
     }
 }
 
@@ -803,6 +810,23 @@ async function doStartServer(startupRunId: number): Promise<void> {
     const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
         initializationOptions: initOptions,
+        middleware: {
+            async provideCompletionItem(document, position, context, token, next) {
+                const result = await next(document, position, context, token);
+                return enableCompletionColorPreviewHtmlForResult(result);
+            },
+            async resolveCompletionItem(item, token, next) {
+                const resolvedItem = await next(item, token);
+                if (!resolvedItem) {
+                    return resolvedItem;
+                }
+
+                return enableCompletionColorPreviewHtml(resolvedItem);
+            },
+            async provideHover(document, position, token, next) {
+                return next(document, position, token);
+            },
+        },
     };
 
     let serverOptions: ServerOptions;

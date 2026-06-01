@@ -630,7 +630,7 @@
       "properties": {
         "enable": {
           "default": true,
-          "description": "Enable parsing strings for color tags and showing a color picker next to them.",
+          "description": "Enable color previews and color picker support for strings, GMod color calls, color tuples, and color variables.",
           "type": "boolean",
           "x-vscode-setting": true
         }

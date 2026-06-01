@@ -26,6 +26,7 @@ const decorationCache = new Map<string, vscode.TextEditorDecorationType>();
 // 当前装饰器实例
 let decorations: Partial<DecorationMap> = {};
 
+
 /**
  * 创建装饰器的工厂函数
  */
@@ -215,15 +216,17 @@ const requestAnnotatorsImpl = async (editor: vscode.TextEditor, client: Language
     };
 
     try {
-        const annotationList = await sendRequestWithStartupRetry<notifications.IAnnotator[]>(
+        const response = await sendRequestWithStartupRetry<notifications.IAnnotatorResult>(
             client,
             "gluals/annotator",
             params,
         );
 
-        if (!annotationList) {
+        if (!response) {
             return;
         }
+
+        const annotationList = response.annotators ?? [];
 
         // 使用 Map 来优化数据收集
         const rangeMap = new Map<AnnotatorType, vscode.Range[]>([

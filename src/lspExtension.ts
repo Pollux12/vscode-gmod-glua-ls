@@ -19,6 +19,14 @@ export interface IAnnotator {
     type: AnnotatorType;
 }
 
+/**
+ * Response of the `gluals/annotator` request: style annotators (underlines,
+ * doc emphasis).
+ */
+export interface IAnnotatorResult {
+    annotators: IAnnotator[];
+}
+
 export interface IProgressReport {
     text: string;
     percent: number;
