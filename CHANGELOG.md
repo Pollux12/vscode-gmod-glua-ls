@@ -2,6 +2,20 @@
 
 ---
 
+## [1.0.24] [Pre-Release (RC3)] - 2026-06-01
+>
+> Release candidate for 1.1.0
+
+## VS Code Extension
+- Add support for rich color previews in autocomplete and hover.
+
+## Language Server
+- Add rich color previews in autocomplete and hover.
+- Add better type information in autocomplete for many known types.
+- Various performance and stability improvements.
+
+---
+
 ## [1.0.23] [Pre-Release (RC3)] - 2026-05-31
 >
 > Release candidate for 1.1.0
