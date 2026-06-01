@@ -2,6 +2,17 @@
 
 ---
 
+## [1.0.22] [Pre-Release (RC3)] - 2026-05-31
+>
+> Release candidate for 1.1.0
+
+## Language Server
+- Fix functions definition signature binding to local variables rather than actual definition.
+- Fix "goto definition" going to variable definition rather than function definition.
+- Fix usages count showing all references rather than just function usages.
+
+---
+
 ## [1.0.21] [Pre-Release (RC2)] - 2026-05-31
 >
 > Release candidate for 1.1.0
