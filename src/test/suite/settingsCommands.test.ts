@@ -5,6 +5,7 @@
  * - gluals.gmod.openSettings executes without throwing
  * - gluals.gmod.createSettings creates .gluarc.json if it doesn't exist
  * - gluals.gmod.editSettings executes without throwing for an existing file
+ * - gluals.gmod.addDirectoryToIgnoreList appends a workspace-relative folder entry
  * - gluals.gmod.createSettings in a simulated multi-root workspace only prompts once
  *
  * Tests use the test-fixtures/workspace folder as the workspace root.
@@ -98,6 +99,33 @@ suite('Settings Commands', () => {
         } catch (error) {
             assert.fail(`gluals.gmod.editSettings threw: ${error instanceof Error ? error.message : String(error)}`);
         }
+    });
+
+    test('gluals.gmod.addDirectoryToIgnoreList adds a workspace-relative folder once', async () => {
+        cleanupGluarc();
+
+        const targetUri = vscode.Uri.file(path.join(FIXTURE_ROOT, '.vscode'));
+
+        try {
+            await vscode.commands.executeCommand('gluals.gmod.addDirectoryToIgnoreList', targetUri);
+            await vscode.commands.executeCommand('gluals.gmod.addDirectoryToIgnoreList', targetUri);
+        } catch (error) {
+            assert.fail(`gluals.gmod.addDirectoryToIgnoreList threw: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        assert.ok(
+            fs.existsSync(GLUARC_PATH),
+            '.gluarc.json should have been created by gluals.gmod.addDirectoryToIgnoreList',
+        );
+
+        const raw = fs.readFileSync(GLUARC_PATH, 'utf8');
+        const parsed = JSON.parse(raw) as {
+            workspace?: {
+                ignoreDir?: string[];
+            };
+        };
+
+        assert.deepStrictEqual(parsed.workspace?.ignoreDir, ['.vscode']);
     });
 
     /**

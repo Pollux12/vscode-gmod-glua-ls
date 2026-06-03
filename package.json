@@ -87,6 +87,12 @@
                 "icon": "$(settings-gear)"
             },
             {
+                "command": "gluals.gmod.addDirectoryToIgnoreList",
+                "title": "Add Directory to Ignore List",
+                "category": "GLuaLS",
+                "icon": "$(exclude)"
+            },
+            {
                 "command": "gluals.addUndefinedGlobalToGlobals",
                 "title": "Add unknown variable to Global Table (config)",
                 "category": "GLuaLS"
@@ -996,6 +1002,11 @@
                     "command": "gluals.gmod.createSettings",
                     "when": "explorerResourceIsFolder",
                     "group": "2_workspace@99"
+                },
+                {
+                    "command": "gluals.gmod.addDirectoryToIgnoreList",
+                    "when": "explorerResourceIsFolder",
+                    "group": "2_workspace@100"
                 },
                 {
                     "command": "gluals.gmod.scaffold.new",

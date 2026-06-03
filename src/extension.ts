@@ -32,6 +32,7 @@ import {
 } from './gmodErrorView';
 import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } from './gmodEntityExplorerView';
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
+import { ensureGluarcExists, getNestedValue, readGluarcConfig, setNestedValue, writeGluarcConfig } from './gluarcConfig';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
 import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
 import { GmodGetDebugStateTool } from './tools/gmodGetDebugStateTool';
@@ -214,6 +215,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.openSettings', handler: async () => await GluarcSettingsPanel.createOrShow(context) },
         { id: 'gluals.gmod.createSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createAndShow(context, uri) },
         { id: 'gluals.gmod.editSettings', handler: async (uri?: vscode.Uri) => await GluarcSettingsPanel.createOrShow(context, uri) },
+        { id: 'gluals.gmod.addDirectoryToIgnoreList', handler: addDirectoryToIgnoreList },
         // GMod debug control commands
         { id: 'gluals.gmod.pauseSoft', handler: () => runGmodControlCommand('pauseSoft') },
         { id: 'gluals.gmod.pauseNow', handler: () => runGmodControlCommand('pauseNow') },
@@ -1264,6 +1266,77 @@ async function runGmodRunCommand(): Promise<void> {
     }
 
     await runGmodControlCommand('runCommand', { command });
+}
+
+function normalizeWorkspaceIgnoreDirEntry(entry: string): string {
+    return entry.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+}
+
+async function addDirectoryToIgnoreList(targetUri?: vscode.Uri): Promise<void> {
+    if (!targetUri) {
+        vscode.window.showWarningMessage('No directory selected.');
+        return;
+    }
+
+    let stats: vscode.FileStat;
+    try {
+        stats = await vscode.workspace.fs.stat(targetUri);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to inspect selected directory: ${message}`);
+        return;
+    }
+
+    if ((stats.type & vscode.FileType.Directory) === 0) {
+        vscode.window.showWarningMessage('The selected Explorer item is not a directory.');
+        return;
+    }
+
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(targetUri);
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found. Cannot update .gluarc.json.');
+        return;
+    }
+
+    const relativeDirectory = normalizeWorkspaceIgnoreDirEntry(
+        path.relative(workspaceFolder.uri.fsPath, targetUri.fsPath)
+    );
+    if (!relativeDirectory) {
+        vscode.window.showWarningMessage('The workspace root cannot be added to workspace.ignoreDir.');
+        return;
+    }
+
+    try {
+        const exists = await ensureGluarcExists(workspaceFolder);
+        if (!exists) {
+            return;
+        }
+
+        const config = await readGluarcConfig(workspaceFolder);
+        const currentIgnoreDir = getNestedValue(config, ['workspace', 'ignoreDir']);
+        const currentEntries = Array.isArray(currentIgnoreDir) ? [...currentIgnoreDir] : [];
+        const alreadyIgnored = currentEntries.some((entry) =>
+            typeof entry === 'string' && normalizeWorkspaceIgnoreDirEntry(entry) === relativeDirectory
+        );
+
+        if (alreadyIgnored) {
+            vscode.window.showInformationMessage(`'${relativeDirectory}' is already in workspace.ignoreDir.`);
+            return;
+        }
+
+        currentEntries.push(relativeDirectory);
+        setNestedValue(config, ['workspace', 'ignoreDir'], currentEntries);
+
+        const writeSucceeded = await writeGluarcConfig(workspaceFolder, config);
+        if (!writeSucceeded) {
+            return;
+        }
+
+        vscode.window.showInformationMessage(`Added '${relativeDirectory}' to workspace.ignoreDir.`);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to add directory to workspace.ignoreDir: ${message}`);
+    }
 }
 
 async function setGmodRealm(realm?: string): Promise<void> {
