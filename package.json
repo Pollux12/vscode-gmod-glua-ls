@@ -839,6 +839,13 @@
                     "group": "gluals@1"
                 }
             ],
+            "problem/context": [
+                {
+                    "command": "gluals.addUndefinedGlobalToGlobals",
+                    "when": "problemCode == 'undefined-global'",
+                    "group": "gluals@1"
+                }
+            ],
             "view/title": [
                 {
                     "command": "gluals.gmod.configureDebugger",

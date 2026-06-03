@@ -126,32 +126,84 @@ function getVariableNameFromDiagnostic(editor: vscode.TextEditor, diagnostic: vs
     return editor.document.getText(diagnostic.range);
 }
 
-/**
- * Handle the command to add the undefined global at cursor to diagnostics.globals
- */
-async function handleAddUndefinedGlobalToGlobals(): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        return;
+interface ProblemsPanelContextArg {
+    readonly resource: vscode.Uri;
+    readonly marker?: {
+        readonly code?: string | number;
+        readonly startLineNumber: number;
+        readonly startColumn: number;
+        readonly endLineNumber: number;
+        readonly endColumn: number;
+    };
+}
+
+function isProblemsPanelContextArg(arg: unknown): arg is ProblemsPanelContextArg {
+    return (
+        typeof arg === 'object' &&
+        arg !== null &&
+        'resource' in arg &&
+        (arg as ProblemsPanelContextArg).resource instanceof vscode.Uri
+    );
+}
+
+function findDiagnosticByRange(
+    uri: vscode.Uri,
+    range: vscode.Range
+): vscode.Diagnostic | undefined {
+    return vscode.languages.getDiagnostics(uri).find(
+        d =>
+            d.code === UNDEFINED_GLOBAL_CODE &&
+            d.range.isEqual(range)
+    );
+}
+
+async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
+    let documentUri: vscode.Uri | undefined;
+    let variableName: string | undefined;
+
+    if (isProblemsPanelContextArg(arg) && arg.marker) {
+        const marker = arg.marker;
+        documentUri = arg.resource;
+
+        if (marker.code !== undefined && String(marker.code) !== UNDEFINED_GLOBAL_CODE) {
+            vscode.window.showWarningMessage('This action only applies to undefined-global diagnostics.');
+            return;
+        }
+
+        const markerRange = new vscode.Range(
+            new vscode.Position(marker.startLineNumber - 1, marker.startColumn - 1),
+            new vscode.Position(marker.endLineNumber - 1, marker.endColumn - 1)
+        );
+
+        const diagnostic = findDiagnosticByRange(documentUri, markerRange);
+        if (!diagnostic) {
+            vscode.window.showWarningMessage('Could not find the matching diagnostic for this problem.');
+            return;
+        }
+        const doc = await vscode.workspace.openTextDocument(documentUri);
+        variableName = doc.getText(diagnostic.range);
+    } else {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        documentUri = editor.document.uri;
+
+        const position = editor.selection.active;
+        const diagnostic = getUndefinedGlobalDiagnostic(editor, position);
+        if (!diagnostic) {
+            vscode.window.showWarningMessage('No undefined-global diagnostic found at the cursor position.');
+            return;
+        }
+        variableName = getVariableNameFromDiagnostic(editor, diagnostic);
     }
 
-    // Get the workspace folder
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('No workspace folder found. Cannot update .gluarc.json.');
         return;
     }
 
-    // Get the undefined-global diagnostic at the cursor
-    const position = editor.selection.active;
-    const diagnostic = getUndefinedGlobalDiagnostic(editor, position);
-    if (!diagnostic) {
-        vscode.window.showWarningMessage('No undefined-global diagnostic found at the cursor position.');
-        return;
-    }
-
-    // Extract the variable name from the diagnostic range
-    const variableName = getVariableNameFromDiagnostic(editor, diagnostic);
     if (!variableName) {
         vscode.window.showErrorMessage('Could not determine the variable name from the diagnostic.');
         return;
