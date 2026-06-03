@@ -2103,10 +2103,14 @@
                         "string.lua"
                     ],
                     "string.deprecated": [
-                        "invalid.illegal.character.escape.lua"
+                        "invalid.illegal.character.escape.lua",
+                        "invalid.illegal.character.escape",
+                        "string.regexp"
                     ],
                     "string.modification": [
-                        "constant.character.escape.lua"
+                        "constant.character.escape.lua",
+                        "constant.character.escape",
+                        "string.regexp"
                     ],
                     "struct": [
                         "string.tag.lua"
