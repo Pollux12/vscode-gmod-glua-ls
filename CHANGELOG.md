@@ -2,14 +2,32 @@
 
 ---
 
+## [1.0.25] [Pre-Release (RC6)] - 2026-06-03
+>
+> Release candidate for 1.1.0
+
+## VS Code Extension
+
+- Add context menu option to ignore directory (right click on explorer view on directory)
+- Add context menu option to add global variable (right click on problems view on undefined-global diagnostic - relevant file must be open as well)
+
+## Language Server
+
+- Fix a bug where tables which were constantly overwritten would stop binding after first overwrite (issue seen mostly with panels, where multiple panels are defined in same file).
+- Various performance and stability improvements.
+
+---
+
 ## [1.0.24] [Pre-Release (RC5)] - 2026-06-02
 >
 > Release candidate for 1.1.0
 
 ## VS Code Extension
+
 - Add support for rich color previews in autocomplete and hover.
 
 ## Language Server
+
 - Add rich color previews in autocomplete and hover.
 - Add better type information in autocomplete for many known types.
 - Various performance and stability improvements.
@@ -21,6 +39,7 @@
 > Release candidate for 1.1.0
 
 ## Language Server
+
 - Speculative fixes for more potential table index nil false positives (refactored table indexing with new merge system).
 - Various performance and stability improvements.
 
@@ -31,6 +50,7 @@
 > Release candidate for 1.1.0
 
 ## Language Server
+
 - Fix functions definition signature binding to local variables rather than actual definition.
 - Fix "goto definition" going to variable definition rather than function definition.
 - Fix usages count showing all references rather than just function usages.
