@@ -2262,7 +2262,7 @@
         "@vscode/vsce": "^3.9.1",
         "decompress": "4.2.1",
         "decompress-targz": "4.1.1",
-        "eslint": "^10.4.0",
+        "eslint": "^10.4.1",
         "globals": "^17.6.0",
         "mocha": "^11.7.6",
         "typescript": "^6.0.3",
