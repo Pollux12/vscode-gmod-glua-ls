@@ -57,6 +57,15 @@ import {
     enableCompletionColorPreviewHtml,
     enableCompletionColorPreviewHtmlForResult,
 } from './completionColorPreview';
+import { getServerLogDirectory, withServerLogPathArgument } from './serverLogPath';
+import {
+    STARTUP_DIAGNOSE_PROGRESS_TOKEN,
+    applyServerStartupState,
+    applyStartupProgressEvent,
+    createStartupReadinessState,
+    isStartupProgressToken,
+    StartupServerState,
+} from './startupProgress';
 
 /**
  * Command registration entry
@@ -113,12 +122,10 @@ const DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES = 6;
 const DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS = 250;
 const SERVER_STATUS_NOTIFICATION = 'gluals/serverStatus';
 const LSP_PROGRESS_NOTIFICATION = '$/progress';
-const STARTUP_LOAD_PROGRESS_TOKEN = 0;
-const STARTUP_DIAGNOSE_PROGRESS_TOKEN = 1;
 const STARTUP_COMPLETE_TIMEOUT_MS = 60000;
 
 interface ServerStatusNotificationParams {
-    readonly state: 'startupComplete';
+    readonly state: StartupServerState;
 }
 
 interface ProgressNotificationParams {
@@ -131,6 +138,7 @@ interface ProgressNotificationParams {
 
 interface StartupStateHandlerRegistration {
     readonly completion: Promise<void>;
+    isDiagnosticsInProgress(): boolean;
     dispose(error?: Error): void;
 }
 
@@ -578,8 +586,12 @@ async function startServer(): Promise<void> {
     serverStartPromise = (async () => {
         try {
             extensionContext.setServerStarting();
-            await doStartServer(startupRunId);
-            extensionContext.setServerRunning();
+            const startupStateHandlers = await doStartServer(startupRunId);
+            if (startupStateHandlers.isDiagnosticsInProgress()) {
+                extensionContext.setServerDiagnosing();
+            } else {
+                extensionContext.setServerRunning();
+            }
             void warmupOpenDocumentSymbols();
             onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
         } catch (reason) {
@@ -611,7 +623,7 @@ async function startServer(): Promise<void> {
                 if (action === 'Retry') {
                     restartServer();
                 } else if (action === 'Show Logs') {
-                    extensionContext.client?.outputChannel?.show();
+                    void showServerLogs(extensionContext.vscodeContext);
                 }
             });
         } finally {
@@ -629,19 +641,22 @@ async function startServer(): Promise<void> {
 
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
     let startupSettled = false;
-    let startupComplete = false;
+    let readinessState = createStartupReadinessState();
     let notificationDisposable: vscode.Disposable | undefined;
     let progressDisposable: vscode.Disposable | undefined;
     let startupTimeout: NodeJS.Timeout | undefined;
     let resolveStartupPromise!: () => void;
     let rejectStartupPromise!: (error: Error) => void;
-    const completedStartupTasks = new Set<number>();
 
-    const cleanup = (): void => {
+    const clearStartupTimeout = (): void => {
         if (startupTimeout) {
             clearTimeout(startupTimeout);
             startupTimeout = undefined;
         }
+    };
+
+    const cleanup = (): void => {
+        clearStartupTimeout();
         notificationDisposable?.dispose();
         progressDisposable?.dispose();
     };
@@ -652,8 +667,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         }
 
         startupSettled = true;
-        startupComplete = true;
-        cleanup();
+        clearStartupTimeout();
         resolveStartupPromise();
     };
 
@@ -673,10 +687,6 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     });
     void completion.catch(() => undefined);
 
-    const isStartupProgressToken = (token: number | string): token is number => {
-        return token === STARTUP_LOAD_PROGRESS_TOKEN || token === STARTUP_DIAGNOSE_PROGRESS_TOKEN;
-    };
-
     client.onDidChangeState((event) => {
         const isActiveClient = extensionContext.client === client;
 
@@ -687,7 +697,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 }
                 break;
             case State.Running:
-                if (isActiveClient && !startupComplete) {
+                if (isActiveClient && !readinessState.ready) {
                     extensionContext.setServerStarting('Loading workspace and diagnostics...');
                 }
                 break;
@@ -698,7 +708,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                         extensionContext.setServerStopped();
                     }
                 }
-                if (!startupComplete) {
+                if (!readinessState.ready) {
                     rejectStartup(new Error('GLua Language Server stopped before startup completed'));
                 }
                 break;
@@ -710,8 +720,24 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     notificationDisposable = client.onNotification(
         SERVER_STATUS_NOTIFICATION,
         (params: ServerStatusNotificationParams) => {
-            if (params.state === 'startupComplete') {
+            readinessState = applyServerStartupState(readinessState, params.state);
+            if (params.state === 'workspaceLoaded') {
+                logLanguageServerOutput(client, 'Workspace loaded; diagnostics may continue in the background.');
+            } else {
+                logLanguageServerOutput(client, 'Workspace diagnostics completed.');
+            }
+            if (extensionContext.client === client && readinessState.ready) {
                 resolveStartup();
+            }
+            if (
+                params.state === 'startupComplete' &&
+                extensionContext.client === client &&
+                !readinessState.diagnosticsInProgress
+            ) {
+                extensionContext.setServerRunning();
+            }
+            if (params.state === 'startupComplete') {
+                cleanup();
             }
         }
     );
@@ -723,17 +749,32 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 return;
             }
 
-            if (!startupComplete && extensionContext.client === client && params.value.message) {
-                extensionContext.setServerStarting(params.value.message);
+            readinessState = applyStartupProgressEvent(readinessState, {
+                token: params.token,
+                kind: params.value.kind,
+            });
+
+            if (readinessState.ready) {
+                resolveStartup();
+            }
+
+            if (extensionContext.client === client && params.value.message) {
+                if (readinessState.ready && readinessState.diagnosticsInProgress) {
+                    extensionContext.setServerDiagnosing(params.value.message);
+                } else {
+                    extensionContext.setServerStarting(params.value.message);
+                }
             }
 
             if (params.value.kind !== 'end') {
                 return;
             }
 
-            completedStartupTasks.add(params.token);
-            if (completedStartupTasks.size === 2) {
-                resolveStartup();
+            if (extensionContext.client === client && !readinessState.diagnosticsInProgress) {
+                extensionContext.setServerRunning();
+                if (params.token === STARTUP_DIAGNOSE_PROGRESS_TOKEN) {
+                    cleanup();
+                }
             }
         }
     );
@@ -744,6 +785,9 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
 
     return {
         completion,
+        isDiagnosticsInProgress(): boolean {
+            return readinessState.diagnosticsInProgress;
+        },
         dispose(error?: Error): void {
             if (!error) {
                 cleanup();
@@ -771,7 +815,7 @@ async function cleanupExistingClient(): Promise<void> {
 /**
  * Start the language server
  */
-async function doStartServer(startupRunId: number): Promise<void> {
+async function doStartServer(startupRunId: number): Promise<StartupStateHandlerRegistration> {
     await cleanupExistingClient();
     throwIfStartupCancelled(startupRunId);
     const context = extensionContext.vscodeContext;
@@ -865,6 +909,7 @@ async function doStartServer(startupRunId: number): Promise<void> {
     }
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
+    return startupStateHandlers;
 }
 
 function getConfigurationScope(): vscode.ConfigurationScope | undefined {
@@ -906,7 +951,10 @@ function createProcessServerOptions(
     configManager: ConfigurationManager
 ): ServerOptions {
     const executablePath = resolveExecutablePath(context, configManager);
-    const startParameters = configManager.getStartParameters();
+    const startParameters = withServerLogPathArgument(
+        configManager.getStartParameters(),
+        getServerLogDirectory(context)
+    );
     const globalConfigPath = configManager.getGlobalConfigPath();
 
     const serverOptions: ServerOptions = {
@@ -927,6 +975,24 @@ function createProcessServerOptions(
     }
 
     return serverOptions;
+}
+
+async function showServerLogs(context: vscode.ExtensionContext): Promise<void> {
+    const serverLogDirectory = getServerLogDirectory(context);
+
+    try {
+        await vscode.workspace.fs.createDirectory(serverLogDirectory);
+        await vscode.commands.executeCommand('revealFileInOS', serverLogDirectory);
+    } catch {
+        vscode.window.showWarningMessage(
+            `Could not reveal GLuaLS log folder. Log path: ${serverLogDirectory.fsPath}`
+        );
+        extensionContext.client?.outputChannel?.show();
+    }
+}
+
+function logLanguageServerOutput(client: LanguageClient, message: string): void {
+    client.outputChannel?.appendLine(`[GLuaLS] ${message}`);
 }
 
 /**
