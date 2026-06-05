@@ -118,7 +118,7 @@
         "gmod-constants": {
             "patterns": [
                 {
-                    "match": "\\b(?:CLIENT|SERVER|GAMEMODE|EFFECT|GM|SWEP|TOOL|ENT|SANDBOX)\\b",
+                    "match": "\\b(?:CLIENT|SERVER|MENU_DLL|_VERSION|GAMEMODE|EFFECT|GM|SWEP|TOOL|ENT|SANDBOX)\\b",
                     "name": "constant.language.lua"
                 }
             ]
