@@ -2,9 +2,28 @@
 
 ---
 
-## [1.0.25] [Pre-Release (RC6)] - 2026-06-03
->
-> Release candidate for 1.1.0
+## [1.0.26] [Pre-Release] - 2026-06-06
+
+## VS Code Extension
+- Add better startup diagnostic and error handling, with clear progress messages.
+- Add escape string support to semantic highlighting.
+- Refactor existing semantic highlighting to be more standardised for better theme compatibility.
+- Move logging to VSCode logs folder when language server used by extension
+- Fix "open logs" button
+
+## Language Server
+- Add better startup handling and logging.
+- Add escape string support to semantic highlighting.
+- Add better nested table hovers
+- Add support for custom logging directory
+- Refactor literal / known table handling
+  - Support for literal table values in known complex tables rather than collapsing to generic type table
+  - Support for appending to known table with more values, rather than raising diagnostic
+  - Remove concept of "fixed tables" / "tuples" since they don't exist in Lua
+
+---
+
+## [1.0.25] [Pre-Release] - 2026-06-03
 
 ## VS Code Extension
 
@@ -18,9 +37,7 @@
 
 ---
 
-## [1.0.24] [Pre-Release (RC5)] - 2026-06-02
->
-> Release candidate for 1.1.0
+## [1.0.24] [Pre-Release] - 2026-06-02
 
 ## VS Code Extension
 
@@ -34,9 +51,7 @@
 
 ---
 
-## [1.0.23] [Pre-Release (RC4)] - 2026-06-01
->
-> Release candidate for 1.1.0
+## [1.0.23] [Pre-Release] - 2026-06-01
 
 ## Language Server
 
@@ -45,9 +60,7 @@
 
 ---
 
-## [1.0.22] [Pre-Release (RC3)] - 2026-05-31
->
-> Release candidate for 1.1.0
+## [1.0.22] [Pre-Release] - 2026-05-31
 
 ## Language Server
 
@@ -57,9 +70,7 @@
 
 ---
 
-## [1.0.21] [Pre-Release (RC2)] - 2026-05-31
->
-> Release candidate for 1.1.0
+## [1.0.21] [Pre-Release] - 2026-05-31
 
 ## Language Server
 
@@ -79,9 +90,7 @@
 
 ---
 
-## [1.0.20] [Pre-Release (RC1)] - 2026-05-26
->
-> Release candidate for 1.1.0
+## [1.0.20] [Pre-Release] - 2026-05-26
 
 ## VS Code Extension
 
