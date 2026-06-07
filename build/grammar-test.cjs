@@ -264,6 +264,18 @@ function assertManifest(packageJson) {
         ),
         "expected the custom field semantic token type"
     );
+    assert.ok(
+        semanticTokenTypes.some(
+            (tokenType) => tokenType.id === "delimiter" && tokenType.superType === "operator"
+        ),
+        "expected the custom delimiter semantic token type"
+    );
+    assert.ok(
+        semanticTokenTypes.some(
+            (tokenType) => tokenType.id === "label" && tokenType.superType === "variable"
+        ),
+        "expected the custom label semantic token type"
+    );
     const semanticTokenModifiers = packageJson.contributes?.semanticTokenModifiers ?? [];
     assert.ok(
         semanticTokenModifiers.some((modifier) => modifier.id === "global"),
@@ -289,16 +301,23 @@ function assertManifest(packageJson) {
     for (const key of [
         "class",
         "class.declaration",
+        "class.local",
+        "class.readonly",
         "event.static",
         "parameter",
         "parameter.declaration",
+        "parameter.declaration.documentation",
         "variable",
         "variable.local",
+        "variable.local.callable",
+        "variable.local.object",
+        "variable.local.readonly",
         "variable.declaration.readonly",
         "variable.readonly.local",
         "variable.readonly",
         "variable.abstract",
         "variable.defaultLibrary",
+        "variable.documentation",
         "variable.definition",
         "variable.global",
         "variable.declaration",
@@ -307,25 +326,49 @@ function assertManifest(packageJson) {
         "function.defaultLibrary",
         "function.static",
         "field",
+        "field.declaration",
+        "field.declaration.documentation",
+        "field.modification",
+        "field.declaration.callable",
+        "field.declaration.readonly",
+        "field.declaration.readonly.callable",
+        "field.readonly.modification",
+        "field.modification.callable",
+        "field.readonly.modification.callable",
+        "field.callable",
+        "field.readonly",
         "method",
         "method.declaration",
         "namespace",
         "namespace.global",
+        "namespace.local",
+        "namespace.documentation",
+        "namespace.declaration.documentation",
+        "namespace.modification.documentation",
+        "enumMember",
+        "enumMember.declaration.documentation",
+        "enumMember.readonly.defaultLibrary",
         "property",
         "property.declaration",
+        "property.callable",
+        "property.documentation",
+        "property.readonly",
         "comment.documentation",
         "keyword",
         "keyword.async",
         "keyword.declaration",
         "keyword.documentation",
         "keyword.readonly",
+        "label",
         "macro",
+        "delimiter",
         "number",
         "number.static",
         "operator",
         "string",
         "string.deprecated",
         "string.modification",
+        "regexp.documentation",
         "struct",
         "struct.declaration",
         "type",
@@ -338,22 +381,22 @@ function assertManifest(packageJson) {
 
     assert.deepEqual(
         semanticScopes.parameter.slice(0, 1),
-        ["variable.parameter.lua"],
+        ["variable.parameter"],
         "expected parameter mapping"
     );
     assert.deepEqual(
         semanticScopes.variable.slice(0, 1),
-        ["variable.other.lua"],
+        ["variable.other.readwrite"],
         "expected variable mapping"
     );
     assert.deepEqual(
         semanticScopes["variable.readonly"].slice(0, 1),
-        ["variable.other.lua"],
+        ["variable.other.constant"],
         "expected readonly variable mapping"
     );
     assert.deepEqual(
         semanticScopes.property.slice(0, 1),
-        ["entity.other.attribute.lua"],
+        ["variable.other.property"],
         "expected property mapping"
     );
     assert.deepEqual(
@@ -363,8 +406,179 @@ function assertManifest(packageJson) {
     );
     assert.deepEqual(
         semanticScopes["function.defaultLibrary"].slice(0, 1),
-        ["support.function.lua"],
+        ["support.function"],
         "expected default library function mapping"
+    );
+    assert.deepEqual(
+        semanticScopes.field.slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected table fields to preserve the TextMate member color before generic property fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["variable.local.object"].slice(0, 2),
+        ["support.variable", "variable.other.readwrite.local"],
+        "expected object-like locals to have an expressive table/object fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["variable.local.callable"].slice(0, 3),
+        [
+            "entity.name.function",
+            "support.function.any-method.lua",
+            "variable.other.readwrite.local"
+        ],
+        "expected callable local variables to use function-first fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes["namespace.local"].slice(0, 1),
+        ["entity.name.namespace"],
+        "expected local namespace aliases to keep namespace fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["class.local"].slice(0, 1),
+        ["entity.name.type.class"],
+        "expected local class aliases to keep class fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["field.modification"].slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected modified fields to preserve table-member fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["field.callable"].slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected callable fields to preserve table-member fallbacks before function fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes.label.slice(0, 1),
+        ["entity.name.label.lua"],
+        "expected labels to preserve the TextMate label fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["field.declaration.callable"].slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected declared callable fields to preserve table-member fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes["field.modification.callable"].slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected modified callable fields to preserve table-member fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes["field.declaration.documentation"].slice(0, 2),
+        ["entity.other.attribute.lua", "variable.other.property"],
+        "expected documented field payloads to preserve field fallbacks"
+    );
+    assert.ok(
+        semanticScopes["field.declaration.documentation"].includes("comment.line.documentation.lua"),
+        "expected documented field payloads to retain documentation fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["parameter.declaration.documentation"].slice(0, 1),
+        ["variable.parameter"],
+        "expected documented parameters to preserve parameter fallback"
+    );
+    assert.ok(
+        semanticScopes["parameter.declaration.documentation"].includes("comment.line.documentation.lua"),
+        "expected documented parameters to retain documentation fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["namespace.documentation"].slice(0, 1),
+        ["entity.name.namespace"],
+        "expected documented namespace payloads to preserve namespace fallback"
+    );
+    assert.ok(
+        semanticScopes["namespace.documentation"].includes("comment.line.documentation.lua"),
+        "expected documented namespace payloads to retain documentation fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["enumMember.declaration.documentation"].slice(0, 2),
+        ["variable.other.enummember", "entity.name.constant"],
+        "expected documented enum-like payloads to preserve enum-member fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["variable.documentation"].slice(0, 1),
+        ["variable.other.readwrite"],
+        "expected documented return names to preserve variable fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["property.documentation"].slice(0, 1),
+        ["variable.other.property"],
+        "expected documented diagnostic actions to preserve property fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["regexp.documentation"].slice(0, 1),
+        ["string.regexp"],
+        "expected documented diagnostic codes to preserve regexp fallback"
+    );
+    assert.ok(
+        semanticScopes["field.callable"].includes("meta.object.member"),
+        "expected callable fields to retain object-member fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["variable.global"].slice(0, 2),
+        ["variable.other.readwrite.global", "variable.other.readwrite"],
+        "expected globals to use standard variable fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes["enumMember.readonly.defaultLibrary"].slice(0, 2),
+        ["variable.other.enummember", "support.constant"],
+        "expected builtin constants to use enum-member/default-library fallbacks"
+    );
+    assert.deepEqual(
+        semanticScopes["field.readonly"].slice(0, 3),
+        [
+            "entity.other.attribute.lua",
+            "variable.other.property",
+            "meta.property-name"
+        ],
+        "expected readonly table fields to preserve table-member fallback before constant fallback"
+    );
+    assert.ok(
+        semanticScopes["field.readonly"].includes("meta.object.member"),
+        "expected readonly table fields to retain object-member fallback"
+    );
+    assert.ok(
+        semanticScopes["field.readonly"].includes("variable.other.constant.property"),
+        "expected readonly table fields to retain constant fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["field.readonly.modification"].slice(0, 3),
+        [
+            "entity.other.attribute.lua",
+            "variable.other.property",
+            "meta.property-name"
+        ],
+        "expected readonly modified fields to preserve table-member fallback before constant fallback"
+    );
+    assert.ok(
+        semanticScopes["field.readonly.modification"].includes("meta.object.member"),
+        "expected readonly modified fields to retain object-member fallback"
+    );
+    assert.ok(
+        semanticScopes["field.readonly.modification"].includes("variable.other.constant.property"),
+        "expected readonly modified fields to retain constant fallback"
+    );
+    assert.deepEqual(
+        semanticScopes["field.declaration.readonly"].slice(0, 3),
+        [
+            "entity.other.attribute.lua",
+            "variable.other.property",
+            "meta.property-name"
+        ],
+        "expected readonly declared fields to preserve table-member fallback before constant fallback"
+    );
+    assert.ok(
+        semanticScopes["field.declaration.readonly"].includes("meta.object.member"),
+        "expected readonly declared fields to retain object-member fallback"
+    );
+    assert.ok(
+        semanticScopes["field.declaration.readonly"].includes("variable.other.constant.property"),
+        "expected readonly declared fields to retain constant fallback"
+    );
+    assert.deepEqual(
+        semanticScopes.delimiter.slice(0, 2),
+        ["punctuation.section.group.lua", "punctuation.separator.lua"],
+        "expected delimiter fallback scopes"
     );
 
     assert.equal(
@@ -399,6 +613,8 @@ async function main() {
     const grammar = await loadGrammar();
     const lines = [
         "---@param ply Player",
+        "---@field Owner Player",
+        "---@readonly",
         "function ENT:Use(ply)",
         "    self.Owner = ply",
         "    hook.Add(\"Think\", \"id\", function() end) // injected comment",
@@ -406,6 +622,7 @@ async function main() {
         "    local _, legacyAddons = file.Find(\"garrysmod/addons/*\", \"BASE_PATH\")",
         "    if a != b && c || d then continue end",
         "    /* block comment */",
+        "    if MENU_DLL then return CLIENT end",
         "::continue::",
         "goto continue"
     ];
@@ -414,23 +631,29 @@ async function main() {
     assertScope(lines, tokensByLine, 0, "@param", "storage.type.annotation.lua");
     assertScope(lines, tokensByLine, 0, "ply", "variable.parameter.function.lua");
     assertScope(lines, tokensByLine, 0, "Player", "support.type.lua");
-    assertScope(lines, tokensByLine, 1, "function", "storage.type.function.lua");
-    assertScope(lines, tokensByLine, 1, "Use", "entity.name.function.lua");
-    assertScope(lines, tokensByLine, 1, "ply", "variable.parameter.function.lua");
-    assertScope(lines, tokensByLine, 2, "self", "variable.language.self.lua");
-    assertScope(lines, tokensByLine, 2, "Owner", "entity.other.attribute.lua");
-    assertScope(lines, tokensByLine, 3, "hook", "support.function.library.lua");
-    assertScope(lines, tokensByLine, 3, "Add", "support.function.any-method.lua");
-    assertScope(lines, tokensByLine, 4, "hello", "string.quoted.other.multiline.lua");
-    assertScope(lines, tokensByLine, 5, "garrysmod/addons/*", "string.quoted.double.lua");
-    assertScope(lines, tokensByLine, 6, "!=", "keyword.operator.lua");
-    assertScope(lines, tokensByLine, 6, "&&", "keyword.operator.lua");
-    assertScope(lines, tokensByLine, 6, "||", "keyword.operator.lua");
-    assertScope(lines, tokensByLine, 6, "continue", "keyword.control.lua");
-    assertScope(lines, tokensByLine, 7, "block comment", "comment.block.lua");
-    assertScope(lines, tokensByLine, 8, "continue", "entity.name.label.lua");
-    assertScope(lines, tokensByLine, 9, "goto", "keyword.control.lua");
-    assertScope(lines, tokensByLine, 9, "continue", "entity.name.label.lua");
+    assertScope(lines, tokensByLine, 1, "@field", "storage.type.annotation.lua");
+    assertScope(lines, tokensByLine, 1, "Owner", "entity.other.attribute.lua");
+    assertScope(lines, tokensByLine, 1, "Player", "support.type.lua");
+    assertScope(lines, tokensByLine, 2, "@readonly", "storage.type.annotation.lua");
+    assertScope(lines, tokensByLine, 3, "function", "storage.type.function.lua");
+    assertScope(lines, tokensByLine, 3, "Use", "entity.name.function.lua");
+    assertScope(lines, tokensByLine, 3, "ply", "variable.parameter.function.lua");
+    assertScope(lines, tokensByLine, 4, "self", "variable.language.self.lua");
+    assertScope(lines, tokensByLine, 4, "Owner", "entity.other.attribute.lua");
+    assertScope(lines, tokensByLine, 5, "hook", "support.function.library.lua");
+    assertScope(lines, tokensByLine, 5, "Add", "support.function.any-method.lua");
+    assertScope(lines, tokensByLine, 6, "hello", "string.quoted.other.multiline.lua");
+    assertScope(lines, tokensByLine, 7, "garrysmod/addons/*", "string.quoted.double.lua");
+    assertScope(lines, tokensByLine, 8, "!=", "keyword.operator.lua");
+    assertScope(lines, tokensByLine, 8, "&&", "keyword.operator.lua");
+    assertScope(lines, tokensByLine, 8, "||", "keyword.operator.lua");
+    assertScope(lines, tokensByLine, 8, "continue", "keyword.control.lua");
+    assertScope(lines, tokensByLine, 9, "block comment", "comment.block.lua");
+    assertScope(lines, tokensByLine, 10, "MENU_DLL", "constant.language.lua");
+    assertScope(lines, tokensByLine, 10, "CLIENT", "constant.language.lua");
+    assertScope(lines, tokensByLine, 11, "continue", "entity.name.label.lua");
+    assertScope(lines, tokensByLine, 12, "goto", "keyword.control.lua");
+    assertScope(lines, tokensByLine, 12, "continue", "entity.name.label.lua");
 
     console.log("grammar and manifest checks passed");
 }

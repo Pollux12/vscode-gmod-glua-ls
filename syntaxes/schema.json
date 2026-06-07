@@ -2094,17 +2094,6 @@
     },
     "EmmyrcHover": {
       "properties": {
-        "customDetail": {
-          "default": null,
-          "description": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "enable": {
           "default": true,
           "description": "Enable showing documentation on hover.",
@@ -2912,7 +2901,6 @@
     "hover": {
       "$ref": "#/$defs/EmmyrcHover",
       "default": {
-        "customDetail": null,
         "enable": true
       }
     },

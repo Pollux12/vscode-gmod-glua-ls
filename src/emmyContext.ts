@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
+import { getServerStatusPresentation } from './serverStatusPresentation';
+
 /**
  * Server health status
  */
@@ -19,6 +21,8 @@ export enum ServerState {
     Error = 'error',
 }
 
+export const DIAGNOSING_WORKSPACE_MESSAGE = 'Diagnosing';
+
 /**
  * Server status information
  */
@@ -29,6 +33,8 @@ export interface ServerStatus {
     message?: string;
     /** Additional details for tooltip */
     details?: string;
+    /** True when the server is connected but still running workspace diagnostics */
+    diagnosticsInProgress?: boolean;
 }
 
 /**
@@ -103,7 +109,8 @@ export class EmmyContext implements vscode.Disposable {
      * Check if server is running
      */
     get isServerRunning(): boolean {
-        return this._serverStatus.state === ServerState.Running;
+        return this._serverStatus.state === ServerState.Running ||
+            this.isConnectedDiagnosticsState();
     }
 
     /**
@@ -119,7 +126,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStarting(message?: string): void {
         this._serverStatus = {
             state: ServerState.Starting,
-            message: message || 'Starting GLua Language Server...',
+            message: message || 'Starting',
         };
         this.updateStatusBar();
     }
@@ -130,7 +137,16 @@ export class EmmyContext implements vscode.Disposable {
     setServerRunning(message?: string): void {
         this._serverStatus = {
             state: ServerState.Running,
-            message: message || 'GLua Language Server is running',
+            message: message || 'Running',
+        };
+        this.updateStatusBar();
+    }
+
+    setServerDiagnosing(message = DIAGNOSING_WORKSPACE_MESSAGE): void {
+        this._serverStatus = {
+            state: ServerState.Starting,
+            message,
+            diagnosticsInProgress: true,
         };
         this.updateStatusBar();
     }
@@ -141,7 +157,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStopping(message?: string): void {
         this._serverStatus = {
             state: ServerState.Stopping,
-            message: message || 'Stopping GLua Language Server...',
+            message: message || 'Stopping',
         };
         this.updateStatusBar();
     }
@@ -152,7 +168,7 @@ export class EmmyContext implements vscode.Disposable {
     setServerStopped(message?: string): void {
         this._serverStatus = {
             state: ServerState.Stopped,
-            message: message || 'GLua Language Server is stopped',
+            message: message || 'Stopped',
         };
         this.updateStatusBar();
     }
@@ -291,15 +307,14 @@ export class EmmyContext implements vscode.Disposable {
      * Show detailed server information
      */
     private showServerInfo(): void {
+        const presentation = getServerStatusPresentation(this._serverStatus);
         const info: string[] = [
             '# GLua Language Server',
             '',
-            `**Status:** ${this._serverStatus.state}`,
+            `**Status:** ${presentation.statusLabel}`,
         ];
 
-        if (this._serverStatus.message) {
-            info.push(`**Message:** ${this._serverStatus.message}`);
-        }
+        info.push(`**Message:** ${presentation.message}`);
 
         if (this.debugMode) {
             info.push('', `**Debug Mode:** Enabled`);
@@ -328,9 +343,10 @@ export class EmmyContext implements vscode.Disposable {
      * Update status bar display
      */
     private updateStatusBar(): void {
+        const presentation = getServerStatusPresentation(this._serverStatus);
         const config = this.getStatusBarConfig();
 
-        this._statusBar.text = `${config.icon}GLuaLS`;
+        this._statusBar.text = presentation.statusBarText;
         this._statusBar.color = config.color;
         this._statusBar.backgroundColor = config.backgroundColor;
         this._statusBar.tooltip = this.createTooltip();
@@ -341,6 +357,12 @@ export class EmmyContext implements vscode.Disposable {
      * Get status bar configuration based on current state
      */
     private getStatusBarConfig(): StatusBarConfig {
+        if (this.isConnectedDiagnosticsState()) {
+            return {
+                icon: '$(sync~spin) ',
+            };
+        }
+
         const configs: Record<ServerState, StatusBarConfig> = {
             [ServerState.Starting]: {
                 icon: '$(sync~spin) ',
@@ -369,10 +391,16 @@ export class EmmyContext implements vscode.Disposable {
         return configs[this._serverStatus.state];
     }
 
+    private isConnectedDiagnosticsState(): boolean {
+        return this._serverStatus.state === ServerState.Starting &&
+            this._serverStatus.diagnosticsInProgress === true;
+    }
+
     /**
      * Create tooltip content
      */
     private createTooltip(): vscode.MarkdownString {
+        const presentation = getServerStatusPresentation(this._serverStatus);
         const tooltip = new vscode.MarkdownString('', true);
         tooltip.isTrusted = true;
 
@@ -381,7 +409,14 @@ export class EmmyContext implements vscode.Disposable {
         tooltip.appendMarkdown('---\n\n');
 
         // Status
-        tooltip.appendMarkdown(`Status: \`${this._serverStatus.state}\`\n\n`);
+        tooltip.appendMarkdown(`Status: \`${presentation.statusLabel}\`\n\n`);
+        tooltip.appendText(presentation.message);
+        tooltip.appendMarkdown('\n\n');
+
+        if (this._serverStatus.details) {
+            tooltip.appendText(this._serverStatus.details);
+            tooltip.appendMarkdown('\n\n');
+        }
 
         const actions = this.getTooltipActions();
         if (actions.length) {

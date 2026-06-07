@@ -649,9 +649,6 @@
     "EmmyrcGmodScriptedClassDefinition.classNamePrefix": {
         "en": "Optional prefix prepended to class names derived from the folder segment.\nFor example, gamemodes use `\"gamemode_\"` so a folder `sandbox` produces the\nclass name `gamemode_sandbox`, matching the runtime convention."
     },
-    "EmmyrcHover.customDetail": {
-        "en": "The detail number of hover information.\nDefault is `None`, which means using the default detail level.\nYou can set it to a number between `1` and `255` to customize"
-    },
     "EmmyrcHover.enable": {
         "en": "Enable showing documentation on hover.",
         "zh-CN": "是否启用悬浮提示。"

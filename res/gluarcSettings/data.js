@@ -138,8 +138,6 @@ const DESCRIPTION_OVERRIDES = {
         "The path separator used when generating require() paths in auto-import completions. Also used when rewriting require paths on file relocation.",
     "completion.postfix":
         "The trigger character for postfix code snippets.",
-    "hover.customDetail":
-        "Controls the verbosity level of hover documentation (1–255). Leave empty for the default level. Higher values show more detail.",
     "references.fuzzySearch":
         "When an exact symbol search finds no results, falls back to a broader member-key lookup. This is not true fuzzy matching.",
     "references.shortStringSearch":
