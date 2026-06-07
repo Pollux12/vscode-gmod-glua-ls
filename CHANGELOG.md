@@ -5,21 +5,26 @@
 ## [1.0.26] [Pre-Release] - 2026-06-06
 
 ## VS Code Extension
+
 - Add better startup diagnostic and error handling, with clear progress messages.
 - Add escape string support to semantic highlighting.
+- Add hover verbosity controls for shown tables, remove old verbosity setting.
 - Refactor existing semantic highlighting to be more standardised for better theme compatibility.
 - Move logging to VSCode logs folder when language server used by extension
 - Fix "open logs" button
 
 ## Language Server
+
 - Add better startup handling and logging.
 - Add escape string support to semantic highlighting.
-- Add better nested table hovers
-- Add support for custom logging directory
-- Refactor literal / known table handling
-  - Support for literal table values in known complex tables rather than collapsing to generic type table
-  - Support for appending to known table with more values, rather than raising diagnostic
-  - Remove concept of "fixed tables" / "tuples" since they don't exist in Lua
+- Add better nested table hovers.
+- Add support for custom logging directory.
+- Add support for hover verbosity levels, remove old verbosity setting.
+- Refactor literal / known table handling.
+  - Support for literal table values in known complex tables rather than collapsing to generic type table.
+  - Support for appending to known table with more values, rather than raising diagnostic.
+  - Support tables being modified and changed dynamically, rather than assuming static.
+- Fix for loops sometimes giving nil on attempted index
 
 ---
 

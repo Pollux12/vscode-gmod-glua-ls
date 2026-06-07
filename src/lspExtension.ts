@@ -88,3 +88,17 @@ export interface GluaDocItem {
 export interface GluaDocSearchResponse {
     items: GluaDocItem[];
 }
+
+export interface HoverExpandParams {
+    textDocument: { uri: string };
+    position: { line: number; character: number };
+    /** 0 is the compact/default hover level; higher values render more detail. */
+    level?: number;
+}
+
+export interface HoverExpandResponse {
+    content: { kind: string; value: string };
+    range?: { start: { line: number; character: number }; end: { line: number; character: number } };
+    /** 0 means no expansion is available; positive values are inclusive max levels. */
+    maxLevel: number;
+}

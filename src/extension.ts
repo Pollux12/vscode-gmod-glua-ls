@@ -112,6 +112,7 @@ const gmodErrorStores = new Map<string, GmodErrorStore>();
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
 let languageConfigurationDisposable: vscode.Disposable | undefined;
+let hoverProviderRegistration: vscode.Disposable | undefined;
 let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
@@ -194,6 +195,7 @@ export async function deactivate(): Promise<void> {
         gmodMcpHost.dispose();
         gmodMcpHost = undefined;
     }
+    disposeHoverProviderRegistration();
     try {
         await extensionContext?.stopServer();
     } catch {
@@ -704,6 +706,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
             case State.Stopped:
                 if (isActiveClient) {
                     extensionContext.client = undefined;
+                    disposeHoverProviderRegistration();
                     if (extensionContext.serverStatus.state !== ServerState.Error) {
                         extensionContext.setServerStopped();
                     }
@@ -798,8 +801,14 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     };
 }
 
+function disposeHoverProviderRegistration(): void {
+    hoverProviderRegistration?.dispose();
+    hoverProviderRegistration = undefined;
+}
+
 async function cleanupExistingClient(): Promise<void> {
     const existingClient = extensionContext.client;
+    disposeHoverProviderRegistration();
     if (!existingClient) {
         return;
     }
@@ -869,8 +878,10 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
                 return enableCompletionColorPreviewHtml(resolvedItem);
             },
-            async provideHover(document, position, token, next) {
-                return next(document, position, token);
+            async provideHover() {
+                // Suppress the language client's default hover.
+                // Our custom HoverVerbosityProvider handles all hover requests.
+                return undefined;
             },
         },
     };
@@ -909,6 +920,16 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
     }
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
+
+    // Register the custom hover provider with verbosity controls (+/− buttons).
+    const { HoverVerbosityProvider } = await import('./hoverVerbosityProvider.js');
+    const verbosityProvider = new HoverVerbosityProvider(client);
+    disposeHoverProviderRegistration();
+    hoverProviderRegistration = vscode.languages.registerHoverProvider(
+        { language: extensionContext.LANGUAGE_ID, scheme: 'file' },
+        verbosityProvider,
+    );
+
     return startupStateHandlers;
 }
 
@@ -1116,6 +1137,7 @@ async function stopServer(): Promise<void> {
             suppressNextStartupError = true;
             cancelPendingStartupRun();
         }
+        disposeHoverProviderRegistration();
         await extensionContext.stopServer();
         if (pendingStart) {
             await pendingStart.catch(() => {
