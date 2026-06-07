@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 import {
@@ -9,15 +10,23 @@ import {
 
 suite('Server Log Path', () => {
     test('uses VS Code extension log directory for language server logs', () => {
+        const extensionLogPath = path.join(
+            vscode.workspace.workspaceFolders![0].uri.fsPath,
+            '.logs',
+            'session',
+            'window1',
+            'exthost',
+            'Pollux.gmod-glua-ls'
+        );
         const context = {
-            logUri: vscode.Uri.file('C:\\Users\\dev\\AppData\\Roaming\\Code\\logs\\session\\window1\\exthost\\Pollux.gmod-glua-ls'),
+            logUri: vscode.Uri.file(extensionLogPath),
         } as vscode.ExtensionContext;
 
         const logDirectory = getServerLogDirectory(context);
 
         assert.strictEqual(
             logDirectory.fsPath,
-            'c:\\Users\\dev\\AppData\\Roaming\\Code\\logs\\session\\window1\\exthost\\Pollux.gmod-glua-ls\\server'
+            path.join(extensionLogPath, 'server')
         );
     });
 
