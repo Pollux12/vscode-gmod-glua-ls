@@ -2,6 +2,12 @@
 
 ---
 
+## [1.0.27] [Stable] - 2026-06-12
+
+- All changes from 1.0.15 -> 1.0.26
+
+---
+
 ## [1.0.26] [Pre-Release] - 2026-06-06
 
 ## VS Code Extension
