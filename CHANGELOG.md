@@ -2,6 +2,43 @@
 
 ---
 
+## [1.0.28] [Pre-Release] - 2026-06-16
+> Annotation Refactor
+
+## Language Server
+- Add `call_arg` annotation attribute, moving hardcoded call argument logic (e.g. VGUI, color, hooks, net messages) to annotations for better customisation and extensibility.
+- Add inferred default value system, showing default values in hover and autocomplete without inflating union types.
+- Add `require()` now registers unknown modules using the passed string as the name.
+- Add `call_arg` overload support.
+- Fix alias to class not showing the original type name.
+- Fix type guard narrowing persisting after its scope ends.
+- Fix nil checks not preventing undefined global diagnostics in some cases.
+- Fix error or nested halts not preventing nil propagation.
+- Fix table shapes collapsing to `any` due to guarded statements.
+- Fix tables incorrectly binding to unknown keys.
+- Fix code lens becoming unstable after undo.
+- Fix stable std lib by never using cache (always use built-in std lib)
+- Various performance improvements
+
+## Annotations
+
+- Add `call_arg` annotation metadata for `surface.*`, `vgui.*`, `net.*`, `notification.*`, `chat.*`, `timer.*`, `render.*`, `input.*`, `file.*`, `gui.*`, `game.*`, `util.*`, `string.*`, `hook.*`, `ents.*`, `cvars.*`, `PropertyAdd`, `scripted_ents.Register`, `vgui.RegisterTable`, `vgui.CreateFromTable`, `NetworkVarElement`, and hook callbacks.
+- Add `error` annotation.
+- Add `IsHostingGame` menu annotation.
+- Fix `PropertyAdd` optional fields.
+- Fix scripted entity registration table type.
+- Fix `VideoData` optional `lockfps` field.
+- Fix `debug.getmetatable` annotation.
+- Fix annotation generation not including custom overrides by default.
+
+## Debugger
+
+- Fix segfault on map change caused by dangling tier0 logging listener.
+- Unify CI and local builds on pinned `danielga/garrysmod_common` master.
+- Run CI on submodule changes.
+
+---
+
 ## [1.0.27] [Stable] - 2026-06-12
 
 - All changes from 1.0.15 -> 1.0.26
