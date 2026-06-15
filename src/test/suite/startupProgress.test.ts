@@ -6,6 +6,9 @@ import {
     applyServerStartupState,
     applyStartupProgressEvent,
     createStartupReadinessState,
+    describeStartupProgressEvent,
+    describeStartupServerState,
+    formatStartupTimeoutMessage,
 } from '../../startupProgress';
 
 suite('Startup Progress', () => {
@@ -58,6 +61,37 @@ suite('Startup Progress', () => {
         assert.strictEqual(
             complete.completedTasks.has(STARTUP_DIAGNOSE_PROGRESS_TOKEN),
             true
+        );
+    });
+
+    test('describes startup progress messages for timeout diagnostics', () => {
+        assert.strictEqual(
+            describeStartupProgressEvent({
+                token: STARTUP_DIAGNOSE_PROGRESS_TOKEN,
+                kind: 'report',
+                message: 'Indexing addon files',
+            }),
+            'Indexing addon files'
+        );
+
+        assert.strictEqual(
+            describeStartupProgressEvent({
+                token: STARTUP_LOAD_PROGRESS_TOKEN,
+                kind: 'begin',
+            }),
+            'workspace loading started'
+        );
+
+        assert.strictEqual(
+            describeStartupServerState('startupComplete'),
+            'startup complete'
+        );
+    });
+
+    test('formats startup timeout errors with stable code and last phase', () => {
+        assert.strictEqual(
+            formatStartupTimeoutMessage(60_000, 'Indexing addon files'),
+            'LS_STARTUP_TIMEOUT after 60s; last phase: Indexing addon files'
         );
     });
 });

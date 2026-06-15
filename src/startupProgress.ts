@@ -10,6 +10,7 @@ export type StartupServerState = 'workspaceLoaded' | 'startupComplete';
 export interface StartupProgressEvent {
     readonly token: number | string;
     readonly kind: 'begin' | 'report' | 'end';
+    readonly message?: string;
 }
 
 export interface StartupReadinessState {
@@ -87,4 +88,42 @@ export function applyStartupProgressEvent(
                 : state.diagnosticsInProgress,
         completedTasks,
     };
+}
+
+export function describeStartupServerState(serverState: StartupServerState): string {
+    switch (serverState) {
+        case 'workspaceLoaded':
+            return 'workspace loaded';
+        case 'startupComplete':
+            return 'startup complete';
+    }
+}
+
+export function describeStartupProgressEvent(event: StartupProgressEvent): string {
+    const message = event.message?.trim();
+    if (message) {
+        return message;
+    }
+
+    if (!isStartupProgressToken(event.token)) {
+        return 'unknown startup progress';
+    }
+
+    const phase =
+        event.token === STARTUP_LOAD_PROGRESS_TOKEN
+            ? 'workspace loading'
+            : 'workspace diagnostics';
+
+    switch (event.kind) {
+        case 'begin':
+            return `${phase} started`;
+        case 'report':
+            return `${phase} in progress`;
+        case 'end':
+            return `${phase} completed`;
+    }
+}
+
+export function formatStartupTimeoutMessage(timeoutMs: number, lastKnownPhase: string): string {
+    return `LS_STARTUP_TIMEOUT after ${timeoutMs / 1000}s; last phase: ${lastKnownPhase}`;
 }
