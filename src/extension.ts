@@ -64,7 +64,6 @@ import {
     applyStartupProgressEvent,
     createStartupReadinessState,
     describeStartupProgressEvent,
-    describeStartupServerState,
     formatStartupTimeoutMessage,
     isStartupProgressToken,
     StartupServerState,
@@ -705,7 +704,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 break;
             case State.Running:
                 if (isActiveClient && !readinessState.ready) {
-                    lastStartupPhase = 'Loading workspace and diagnostics...';
+                    lastStartupPhase = 'workspace loading and diagnostics in progress';
                     extensionContext.setServerStarting('Loading workspace and diagnostics...');
                 }
                 break;
@@ -729,7 +728,6 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     notificationDisposable = client.onNotification(
         SERVER_STATUS_NOTIFICATION,
         (params: ServerStatusNotificationParams) => {
-            lastStartupPhase = describeStartupServerState(params.state);
             readinessState = applyServerStartupState(readinessState, params.state);
             if (params.state === 'workspaceLoaded') {
                 logLanguageServerOutput(client, 'Workspace loaded; diagnostics may continue in the background.');

@@ -7,7 +7,6 @@ import {
     applyStartupProgressEvent,
     createStartupReadinessState,
     describeStartupProgressEvent,
-    describeStartupServerState,
     formatStartupTimeoutMessage,
 } from '../../startupProgress';
 
@@ -80,11 +79,6 @@ suite('Startup Progress', () => {
                 kind: 'begin',
             }),
             'workspace loading started'
-        );
-
-        assert.strictEqual(
-            describeStartupServerState('startupComplete'),
-            'startup complete'
         );
     });
 

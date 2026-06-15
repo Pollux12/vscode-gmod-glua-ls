@@ -90,15 +90,6 @@ export function applyStartupProgressEvent(
     };
 }
 
-export function describeStartupServerState(serverState: StartupServerState): string {
-    switch (serverState) {
-        case 'workspaceLoaded':
-            return 'workspace loaded';
-        case 'startupComplete':
-            return 'startup complete';
-    }
-}
-
 export function describeStartupProgressEvent(event: StartupProgressEvent): string {
     const message = event.message?.trim();
     if (message) {
