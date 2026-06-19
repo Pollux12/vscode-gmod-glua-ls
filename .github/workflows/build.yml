@@ -55,7 +55,7 @@ jobs:
         SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
 
         BUILD_CHANNEL="prerelease"
-        PUBLISH_CHANNEL="stable"
+        PUBLISH_CHANNEL="prerelease"
         TAG_NAME=""
         TAG_VERSION=""
         IS_PUBLISH_EVENT="false"
@@ -74,31 +74,20 @@ jobs:
             exit 1
           fi
 
-          case "$GH_INPUT_CHANNEL" in
-            stable)
-              BUILD_CHANNEL="stable"
-              PUBLISH_CHANNEL="stable"
-              ;;
-            prerelease)
-              BUILD_CHANNEL="prerelease"
-              PUBLISH_CHANNEL="prerelease"
-              ;;
-            "")
-              IFS='.' read -r _ _ PATCH <<< "$TAG_VERSION"
-              if (( PATCH == 0 )); then
-                BUILD_CHANNEL="stable"
-                PUBLISH_CHANNEL="stable"
-              else
-                BUILD_CHANNEL="prerelease"
-                PUBLISH_CHANNEL="prerelease"
-              fi
-              ;;
-            *)
-              echo "Invalid channel '$GH_INPUT_CHANNEL'." >&2
-              exit 1
-              ;;
-          esac
         fi
+
+        case "$GH_INPUT_CHANNEL" in
+          stable)
+            BUILD_CHANNEL="stable"
+            PUBLISH_CHANNEL="stable"
+            ;;
+          prerelease|"")
+            ;;
+          *)
+            echo "Invalid channel '$GH_INPUT_CHANNEL'." >&2
+            exit 1
+            ;;
+        esac
 
         echo "build_channel=${BUILD_CHANNEL}" >> "$GITHUB_OUTPUT"
         echo "publish_channel=${PUBLISH_CHANNEL}" >> "$GITHUB_OUTPUT"
@@ -134,12 +123,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         MANUAL_LS_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || '' }}
+        TAG_VERSION: ${{ steps.release_meta.outputs.tag_version }}
       run: |
         PREPARE_ARGS=("${{ matrix.file }}" "--channel" "${{ steps.release_meta.outputs.build_channel }}")
         PACKAGE_ARGS=("-o" "vscode-gmod-ls-${{ matrix.target }}.vsix" "--target" "${{ matrix.target }}")
 
-        if [[ -n "${MANUAL_LS_VERSION}" ]]; then
-          PREPARE_ARGS+=("--ls-version" "${MANUAL_LS_VERSION}")
+        LS_VERSION="${TAG_VERSION}"
+
+        if [[ -z "${LS_VERSION}" && -n "${MANUAL_LS_VERSION}" ]]; then
+          LS_VERSION="${MANUAL_LS_VERSION}"
+        fi
+
+        if [[ -n "${LS_VERSION}" ]]; then
+          PREPARE_ARGS+=("--ls-version" "${LS_VERSION}")
         fi
 
         if [[ "${{ steps.release_meta.outputs.publish_channel }}" == "prerelease" ]]; then
