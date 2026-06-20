@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { getExtensionChannel } from '../../extensionChannel';
 import { fetchJson, downloadFile } from '../../netHelpers';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
@@ -10,7 +11,6 @@ const CLIENT_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.clientGarrysmodPath';
 const GMOD_DEBUGGER_TYPE = 'gluals_gmod';
 const GMOD_CLIENT_DEBUGGER_TYPE = 'gluals_gmod_client';
 const GM_RDB_REPO = 'Pollux12/gm_rdb';
-const EXTENSION_ID = 'Pollux.gmod-glua-ls';
 const GITHUB_RELEASE_HEADERS = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -305,22 +305,6 @@ export function detectGmRdbClient(garrysmodPath: string): string | undefined {
     return undefined;
 }
 
-function isPreReleaseExtension(): boolean {
-    const extension = vscode.extensions.getExtension(EXTENSION_ID);
-    if (!extension) {
-        return false;
-    }
-
-    const version = String(extension.packageJSON?.version ?? '');
-    const patchPart = version.split('.')[2];
-    const patch = parseInt(patchPart, 10);
-    if (!Number.isFinite(patch)) {
-        return false;
-    }
-
-    return patch > 0;
-}
-
 function normalizeClientInstallInput(rawPath: string): ResolvedClientInstallPath {
     const resolved = path.resolve(rawPath.trim());
     const baseName = path.basename(resolved).toLowerCase();
@@ -591,7 +575,7 @@ async function fetchLatestReleaseIncludingPreReleases(): Promise<GmRdbRelease | 
 }
 
 export async function fetchReleaseForCurrentExtensionChannel(): Promise<GmRdbRelease | null> {
-    if (isPreReleaseExtension()) {
+    if (getExtensionChannel() === 'prerelease') {
         const latest = await fetchLatestReleaseIncludingPreReleases();
         if (latest) {
             return latest;

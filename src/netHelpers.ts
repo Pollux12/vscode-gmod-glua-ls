@@ -106,12 +106,11 @@ export async function downloadFile(
 }
 
 /**
- * Downloads a zip file to memory/temp and extracts a specific root folder's contents into the destination.
+ * Downloads a zip file to memory/temp and extracts the archive's single top-level directory into the destination.
  */
 export async function downloadAndExtractZip(
     url: string,
     destinationPath: string,
-    innerFolderName: string,
     progress?: vscode.Progress<{ message?: string; increment?: number }>
 ): Promise<void> {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-zip-dl-'));
@@ -138,10 +137,13 @@ export async function downloadAndExtractZip(
         }
         zip.extractAllTo(tempDir, true);
 
-        const extractedFolderPath = path.join(tempDir, innerFolderName);
-        if (!fs.existsSync(extractedFolderPath)) {
-            throw new Error(`Expected folder '${innerFolderName}' not found in the downloaded zip.`);
+        const extractedEntries = fs.readdirSync(tempDir, { withFileTypes: true })
+            .filter((entry) => entry.name !== 'download.zip');
+        const topLevelDirectories = extractedEntries.filter((entry) => entry.isDirectory());
+        if (topLevelDirectories.length !== 1 || extractedEntries.length !== 1) {
+            throw new Error('Expected the downloaded zip to contain a single top-level directory.');
         }
+        const extractedFolderPath = path.join(tempDir, topLevelDirectories[0].name);
 
         // Clean target directory if exists
         if (fs.existsSync(destinationPath)) {

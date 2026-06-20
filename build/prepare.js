@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
+import { execFileSync } from "child_process";
 import { resolve } from "path";
 import decompress from "decompress";
 import decompressTarGz from "decompress-targz";
@@ -383,6 +384,10 @@ async function build() {
 
     const channel = getReleaseChannel();
     console.log(`Using release channel: ${channel}`);
+
+    execFileSync(process.execPath, ["scripts/generate-extension-channel.js", "--channel", channel], {
+        stdio: "inherit",
+    });
 
     if (!existsSync("temp")) {
         mkdirSync("temp");
