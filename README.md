@@ -66,7 +66,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 * **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. NetworkVars, AccessorFuncs and VGUI panels are all registered as well.
 * **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Intellisense filters by realm to only deliver relevant suggestions.
 * **Network Validation:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
-* **Smart Hook Integration:** Intelligent autocomplete and signature resolution for all hooks, `GM:` overrides, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
+* **Smart Hook Integration:** Intelligent autocomplete and signatures for all hooks, `GM:` functions, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
 * **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a configurable template system for easy creation.
 
 ## 🐞 Integrated Server (SRCDS) Debugger
@@ -109,8 +109,4 @@ If you have any advanced configuration (e.g. not using standard Garry's Mod fold
 ---
 
 
-
-This is a hard fork of [EmmyLua Analyzer Rust](https://github.com/CppCXY/emmylua-analyzer-rust), maintained specifically for Garry's Mod GLua.
-The original EmmyLua project does not support plugins, nor does it have any plan for any, making it difficult to fully adapt for Garry's Mod.
-While LuaLS has plugin support, it was annoyingly slow to use. Many features here are based on my [LuaLS plugin](https://github.com/Pollux12/gmod-luals-addon).
-
+This project is based on [EmmyLua Analyzer Rust](https://github.com/CppCXY/emmylua-analyzer-rust) and my previous[LuaLS plugin](https://github.com/Pollux12/gmod-luals-addon).

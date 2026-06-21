@@ -2,41 +2,37 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fetchJson, downloadAndExtractZip } from './netHelpers';
+import { getExtensionChannel } from './extensionChannel';
+import {
+    AnnotationChannel,
+    AnnotationSource,
+    AnnotationSourceConfig,
+    buildAnnotationSourceWarning,
+    describeAnnotationSource,
+    getChannelBranch,
+    normalizeAnnotationChannel,
+    normalizeBranch,
+    normalizeCommit,
+    normalizeGitHubRepository,
+    resolveAnnotationSource,
+} from './gmodAnnotationSource';
 
 const DEFAULT_ANNOTATION_REPOSITORY = 'Pollux12/annotations-gmod-glua-ls';
-const DEFAULT_ANNOTATION_BRANCH = 'gluals-annotations';
-
-type AnnotationSource = {
-    repository: string;
-    branch: string;
-    sourceId: string;
-    zipUrl: string;
-    zipInnerFolder: string;
-    metadataUrl: string;
-};
 
 type AnnotationMetadata = {
     lastUpdate?: string;
     glualsAnnotationSource?: string;
 };
 
-function encodeGitHubRefPath(ref: string): string {
-    return ref.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-}
-
 /**
- * Manages Garry's Mod GLuaLS annotations
- * Handles downloading and updating from the gluals-annotations branch
+ * Manages Garry's Mod GLuaLS annotations.
  */
 export class GmodAnnotationManager implements vscode.Disposable {
     private readonly annotationsPath: string;
+    private warnedAboutAdvancedSource = false;
 
     constructor(context: vscode.ExtensionContext) {
-        // Store annotations in extension's global storage
-        this.annotationsPath = path.join(
-            context.globalStorageUri.fsPath,
-            'gmod-annotations'
-        );
+        this.annotationsPath = path.join(context.globalStorageUri.fsPath, 'gmod-annotations');
     }
 
     private getAnnotationPathOverride(): string | undefined {
@@ -60,56 +56,82 @@ export class GmodAnnotationManager implements vscode.Disposable {
         return normalizedValue.length > 0 ? normalizedValue : defaultValue;
     }
 
-    private getAnnotationRepository(): string {
+    private getExplicitConfiguredString(section: string): string | undefined {
+        const inspect = vscode.workspace.getConfiguration('gluals').inspect<unknown>(section);
+        const value = inspect?.workspaceFolderValue
+            ?? inspect?.workspaceValue
+            ?? inspect?.globalValue
+            ?? inspect?.workspaceFolderLanguageValue
+            ?? inspect?.workspaceLanguageValue
+            ?? inspect?.globalLanguageValue
+            ?? inspect?.defaultLanguageValue;
+
+        if (typeof value !== 'string') {
+            return undefined;
+        }
+
+        const normalized = value.trim();
+        return normalized.length > 0 ? normalized : undefined;
+    }
+
+    private getAnnotationSourceConfig(): AnnotationSourceConfig {
         const configuredRepository = this.getConfiguredString('gmod.annotationsRepository', DEFAULT_ANNOTATION_REPOSITORY);
-        let repository = configuredRepository
-            .replace(/^https?:\/\/github\.com\//i, '')
-            .replace(/^github\.com\//i, '')
-            .replace(/^git@github\.com:/i, '')
-            .replace(/\/tree\/.*$/i, '')
-            .replace(/\/+$/g, '')
-            .replace(/\.git$/i, '');
+        const repository = normalizeGitHubRepository(configuredRepository, DEFAULT_ANNOTATION_REPOSITORY);
 
-        const parts = repository.split('/').filter(Boolean);
-        if (parts.length >= 2) {
-            repository = `${parts[0]}/${parts[1]}`;
+        const buildChannel = getExtensionChannel();
+        const configuredChannel = this.getConfiguredString('gmod.annotationsChannel', 'auto');
+        const channel = normalizeAnnotationChannel(configuredChannel) as AnnotationChannel;
+        if (configuredChannel !== channel) {
+            console.warn(`[GLuaLS] Invalid annotations channel setting '${configuredChannel}', falling back to auto`);
         }
 
-        if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
-            return repository;
+        const defaultBranch = getChannelBranch(channel === 'auto' ? buildChannel : channel);
+
+        const explicitBranch = this.getExplicitConfiguredString('gmod.annotationsBranch');
+        const configuredBranch = explicitBranch ?? this.getConfiguredString('gmod.annotationsBranch', defaultBranch);
+        const branch = normalizeBranch(configuredBranch, defaultBranch);
+        const sanitizedBranchInput = configuredBranch.replace(/^refs\/heads\//i, '').replace(/^\/+|\/+$/g, '');
+        if (configuredBranch.length > 0 && branch === defaultBranch && sanitizedBranchInput !== defaultBranch) {
+            console.warn(`[GLuaLS] Invalid annotations branch setting '${configuredBranch}', falling back to ${defaultBranch}`);
         }
 
-        console.warn(`[GLuaLS] Invalid annotations repository setting '${configuredRepository}', falling back to ${DEFAULT_ANNOTATION_REPOSITORY}`);
-        return DEFAULT_ANNOTATION_REPOSITORY;
-    }
-
-    private getAnnotationBranch(): string {
-        const configuredBranch = this.getConfiguredString('gmod.annotationsBranch', DEFAULT_ANNOTATION_BRANCH);
-        const branch = configuredBranch.replace(/^refs\/heads\//i, '').replace(/^\/+|\/+$/g, '');
-
-        if (branch.length > 0 && /^[^\s\\]+$/.test(branch) && !branch.startsWith('gluals-annotations-plugin-')) {
-            return branch;
+        const configuredCommit = this.getExplicitConfiguredString('gmod.annotationsCommit') ?? '';
+        const commit = normalizeCommit(configuredCommit);
+        if (configuredCommit && !commit) {
+            console.warn(`[GLuaLS] Invalid annotations commit setting '${configuredCommit}', ignoring commit pin`);
         }
-
-        console.warn(`[GLuaLS] Invalid annotations branch setting '${configuredBranch}', falling back to ${DEFAULT_ANNOTATION_BRANCH}`);
-        return DEFAULT_ANNOTATION_BRANCH;
-    }
-
-    private getAnnotationSource(): AnnotationSource {
-        const repository = this.getAnnotationRepository();
-        const branch = this.getAnnotationBranch();
-        const repositoryName = repository.split('/').pop() ?? repository;
-        const branchFolderName = branch.replace(/[\\/]/g, '-');
-        const encodedBranchPath = encodeGitHubRefPath(branch);
 
         return {
             repository,
+            buildChannel,
+            channel,
+            hasExplicitBranch: typeof explicitBranch === 'string' && explicitBranch.length > 0,
             branch,
-            sourceId: `${repository}:${branch}`,
-            zipUrl: `https://github.com/${repository}/archive/refs/heads/${encodedBranchPath}.zip`,
-            zipInnerFolder: `${repositoryName}-${branchFolderName}`,
-            metadataUrl: `https://raw.githubusercontent.com/${repository}/${encodedBranchPath}/__metadata.json`,
+            commit,
         };
+    }
+
+    private getAnnotationSource(): AnnotationSource {
+        return resolveAnnotationSource(this.getAnnotationSourceConfig());
+    }
+
+    private logResolvedSource(context: string, source: AnnotationSource): void {
+        console.log(`[GLuaLS] ${context}: ${describeAnnotationSource(source)}`);
+    }
+
+    private maybeWarnAboutAdvancedSource(source: AnnotationSource): void {
+        if (this.warnedAboutAdvancedSource) {
+            return;
+        }
+
+        const warning = buildAnnotationSourceWarning(this.getAnnotationSourceConfig(), source);
+        if (!warning) {
+            return;
+        }
+
+        this.warnedAboutAdvancedSource = true;
+        console.warn(`[GLuaLS] ${warning}`);
+        void vscode.window.showWarningMessage(warning);
     }
 
     private isAccessibleDirectory(dirPath: string): boolean {
@@ -120,28 +142,19 @@ export class GmodAnnotationManager implements vscode.Disposable {
         }
     }
 
-    /**
-     * Get the path to annotations (only if enabled and available)
-     */
     public getAnnotationsPath(): string | undefined {
         const config = vscode.workspace.getConfiguration('gluals');
-
-        // Check for annotation path override first
         const overridePath = this.getAnnotationPathOverride();
         if (overridePath) {
-            // When override is set, use it directly without checking autoLoadAnnotations
-            // Verify the path exists
             if (this.isAccessibleDirectory(overridePath)) {
                 return overridePath;
             }
+
             console.warn(`[GLuaLS] Configured annotation override path is invalid, inaccessible, or not a directory: ${overridePath}`);
             return undefined;
         }
-        
-        // No override, check built-in annotations
-        const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
 
-        if (!enabled) {
+        if (!config.get<boolean>('gmod.autoLoadAnnotations', true)) {
             return undefined;
         }
 
@@ -149,7 +162,9 @@ export class GmodAnnotationManager implements vscode.Disposable {
             return undefined;
         }
 
-        if (this.isCurrentAnnotationSource(this.readLocalMetadata())) {
+        const source = this.getAnnotationSource();
+        if (this.isCurrentAnnotationSource(this.readLocalMetadata(), source)) {
+            this.logResolvedSource('Using managed annotations source', source);
             return this.annotationsPath;
         }
 
@@ -157,9 +172,6 @@ export class GmodAnnotationManager implements vscode.Disposable {
         return undefined;
     }
 
-    /**
-     * Check if annotations are already downloaded
-     */
     private annotationsExist(): boolean {
         return fs.existsSync(this.annotationsPath) && fs.existsSync(path.join(this.annotationsPath, '__metadata.json'));
     }
@@ -177,8 +189,8 @@ export class GmodAnnotationManager implements vscode.Disposable {
         }
     }
 
-    private isCurrentAnnotationSource(metadata: AnnotationMetadata | undefined): boolean {
-        return metadata?.glualsAnnotationSource === this.getAnnotationSource().sourceId;
+    private isCurrentAnnotationSource(metadata: AnnotationMetadata | undefined, source = this.getAnnotationSource()): boolean {
+        return metadata?.glualsAnnotationSource === source.sourceId;
     }
 
     private markCurrentAnnotationSource(sourceId: string): void {
@@ -194,21 +206,15 @@ export class GmodAnnotationManager implements vscode.Disposable {
         fs.writeFileSync(path.join(this.annotationsPath, '__metadata.json'), JSON.stringify(nextMetadata, null, 2));
     }
 
-    /**
-     * Initialize annotations - download if needed
-     */
     public async initializeAnnotations(): Promise<void> {
         const config = vscode.workspace.getConfiguration('gluals');
         const enabled = config.get<boolean>('gmod.autoLoadAnnotations', true);
         const overridePath = this.getAnnotationPathOverride();
 
-        // If override path is set, skip built-in annotation management entirely
         if (overridePath) {
             console.log(`[GLuaLS] Using custom annotation path override: ${overridePath}`);
             if (!this.isAccessibleDirectory(overridePath)) {
-                vscode.window.showWarningMessage(
-                    `Configured annotation path is invalid, inaccessible, or not a directory: ${overridePath}`
-                );
+                vscode.window.showWarningMessage(`Configured annotation path is invalid, inaccessible, or not a directory: ${overridePath}`);
             }
             return;
         }
@@ -218,27 +224,23 @@ export class GmodAnnotationManager implements vscode.Disposable {
             return;
         }
 
-        if (this.annotationsExist() && this.isCurrentAnnotationSource(this.readLocalMetadata())) {
-            console.log('GMod annotations already exist at', this.annotationsPath);
+        const source = this.getAnnotationSource();
+        this.logResolvedSource('Resolved managed annotations source', source);
+        this.maybeWarnAboutAdvancedSource(source);
+
+        if (this.annotationsExist() && this.isCurrentAnnotationSource(this.readLocalMetadata(), source)) {
+            console.log(`[GLuaLS] GMod annotations already exist at ${this.annotationsPath} (${describeAnnotationSource(source)})`);
             return;
         }
 
-        console.log('GMod annotations not found or from an old source, downloading...');
+        console.log(`[GLuaLS] GMod annotations not found or from a different source, downloading ${describeAnnotationSource(source)}...`);
         await this.downloadAnnotations();
     }
 
-    /**
-     * Dispose of resources
-     */
     public dispose(): void {
     }
 
-    /**
-     * Check if a newer version of annotations is available on the remote branch.
-     * Called by GmodUpdateScheduler on boot and periodically.
-     */
     public async checkForUpdates(): Promise<void> {
-
         try {
             const config = vscode.workspace.getConfiguration('gluals');
             if (this.getAnnotationPathOverride() || !config.get<boolean>('gmod.autoLoadAnnotations', true)) {
@@ -251,12 +253,16 @@ export class GmodAnnotationManager implements vscode.Disposable {
             }
 
             const source = this.getAnnotationSource();
-            const remoteMetadata = await fetchJson<{ lastUpdate?: string }>(source.metadataUrl, { timeoutMs: 10000 });
-            if (!remoteMetadata || !remoteMetadata.lastUpdate) {
+            if (!source.autoUpdates) {
                 return;
             }
 
-            const needsSourceRefresh = !this.isCurrentAnnotationSource(localMetadata);
+            const remoteMetadata = await fetchJson<{ lastUpdate?: string }>(source.metadataUrl, { timeoutMs: 10000 });
+            if (!remoteMetadata?.lastUpdate) {
+                return;
+            }
+
+            const needsSourceRefresh = !this.isCurrentAnnotationSource(localMetadata, source);
             if (!localMetadata.lastUpdate && !needsSourceRefresh) {
                 return;
             }
@@ -267,7 +273,7 @@ export class GmodAnnotationManager implements vscode.Disposable {
 
             if (needsSourceRefresh || hasRemoteUpdate) {
                 const action = await vscode.window.showInformationMessage(
-                    'GMod GLuaLS annotations update available.',
+                    `GMod GLuaLS annotations update available for ${describeAnnotationSource(source)}.`,
                     'Update Now',
                     'Later'
                 );
@@ -276,15 +282,13 @@ export class GmodAnnotationManager implements vscode.Disposable {
                 }
             }
         } catch {
-            // Silently ignore network failures or parse errors — this is best-effort
+            // Silently ignore network failures or parse errors — this is best-effort.
         }
     }
 
-    /**
-     * Download or update annotations by downloading the zip file and extracting it
-     */
     private async downloadAnnotationsZip(): Promise<void> {
         const source = this.getAnnotationSource();
+        this.logResolvedSource('Downloading annotations source', source);
         console.log(`Downloading annotations zip from ${source.zipUrl}...`);
 
         await vscode.window.withProgress(
@@ -294,40 +298,36 @@ export class GmodAnnotationManager implements vscode.Disposable {
                 cancellable: false,
             },
             async (progress) => {
-                await downloadAndExtractZip(source.zipUrl, this.annotationsPath, source.zipInnerFolder, progress);
+                await downloadAndExtractZip(source.zipUrl, this.annotationsPath, progress);
                 this.markCurrentAnnotationSource(source.sourceId);
                 progress.report({ message: 'Download complete!' });
             }
         );
     }
 
-    /**
-     * Download annotations
-     */
     private async downloadAnnotations(): Promise<void> {
         try {
+            const source = this.getAnnotationSource();
             await this.downloadAnnotationsZip();
-            console.log('GMod annotations downloaded successfully');
-            vscode.window.showInformationMessage('GMod GLuaLS annotations downloaded successfully');
+            console.log(`[GLuaLS] GMod annotations downloaded successfully from ${describeAnnotationSource(source)}`);
+            vscode.window.showInformationMessage(`GMod GLuaLS annotations downloaded successfully (${describeAnnotationSource(source)})`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Failed to download GMod annotations:', errorMessage);
             vscode.window.showErrorMessage(
-                `Failed to download GMod annotations: ${errorMessage}. ` +
-                `You can disable auto-loading in settings (gluals.gmod.autoLoadAnnotations).`
+                `Failed to download GMod annotations: ${errorMessage}. `
+                + 'You can disable auto-loading in settings (gluals.gmod.autoLoadAnnotations).'
             );
         }
     }
 
-    /**
-     * Update annotations to latest version
-     */
     public async updateAnnotations(): Promise<void> {
         try {
+            const source = this.getAnnotationSource();
             await this.downloadAnnotationsZip();
-            vscode.window.showInformationMessage('GMod annotations updated successfully');
+            console.log(`[GLuaLS] GMod annotations updated successfully from ${describeAnnotationSource(source)}`);
+            vscode.window.showInformationMessage(`GMod GLuaLS annotations updated successfully (${describeAnnotationSource(source)})`);
 
-            // Suggest restarting the language server
             const action = await vscode.window.showInformationMessage(
                 'Annotations updated. Restart language server to apply changes?',
                 'Restart',
@@ -344,9 +344,6 @@ export class GmodAnnotationManager implements vscode.Disposable {
         }
     }
 
-    /**
-     * Remove annotations
-     */
     public async removeAnnotations(): Promise<void> {
         if (!this.annotationsExist()) {
             vscode.window.showInformationMessage('GMod annotations are not installed');
@@ -367,7 +364,6 @@ export class GmodAnnotationManager implements vscode.Disposable {
             fs.rmSync(this.annotationsPath, { recursive: true, force: true });
             vscode.window.showInformationMessage('GMod annotations removed');
 
-            // Suggest restarting
             const restartAction = await vscode.window.showInformationMessage(
                 'Restart language server to apply changes?',
                 'Restart',
