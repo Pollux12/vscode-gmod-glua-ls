@@ -11,6 +11,7 @@ import { main as syncSettings } from "./settings.js";
 import { main as syncSchemaI18n } from "./schema-i18n.js";
 
 const args = process.argv;
+const SEMVER_REGEX = /^\d+\.\d+\.\d+$/;
 
 async function main() {
     const version = args[2];
@@ -20,7 +21,7 @@ async function main() {
         );
         exit(1);
     }
-    if (!/\d+\.\d+\.\d+/.test(version)) {
+    if (!SEMVER_REGEX.test(version)) {
         console.error(
             `Incorrect version: expected format '1.2.3', got ${version}`
         );
@@ -29,9 +30,9 @@ async function main() {
 
     let languageServerVersion = args[3];
     if (!languageServerVersion) {
-        languageServerVersion = config.newLanguageServerVersion;
+        languageServerVersion = version;
     }
-    if (!/\d+\.\d+\.\d+/.test(languageServerVersion)) {
+    if (!SEMVER_REGEX.test(languageServerVersion)) {
         console.error(
             "Incorrect language-server-version: expected format '1.2.3'"
         );

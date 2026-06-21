@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
+import { execFileSync } from "child_process";
 import { resolve } from "path";
 import decompress from "decompress";
 import decompressTarGz from "decompress-targz";
@@ -12,6 +13,8 @@ const GITHUB_RELEASES_API =
     "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases?per_page=100";
 const GITHUB_RELEASE_BY_TAG_API =
     "https://api.github.com/repos/Pollux12/gmod-glua-ls/releases/tags";
+const RELEASE_LOOKUP_RETRY_DELAY_MS = 5 * 60 * 1000;
+const RELEASE_LOOKUP_MAX_ATTEMPTS = 7;
 const BASE_GITHUB_API_HEADERS = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -49,6 +52,60 @@ function getGitHubApiHeaders() {
         ...BASE_GITHUB_API_HEADERS,
         Authorization: `Bearer ${token}`,
     };
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableHttpStatus(status) {
+    return (
+        status === 403 ||
+        status === 404 ||
+        status === 408 ||
+        status === 425 ||
+        status === 429 ||
+        (status >= 500 && status < 600)
+    );
+}
+
+function getErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
+function createRetryableError(message, kind, cause) {
+    const error = new Error(message);
+    error.kind = kind;
+    error.retryable = true;
+    if (cause) {
+        error.cause = cause;
+    }
+    return error;
+}
+
+function isRetryableReleaseLookupError(error) {
+    return Boolean(error?.retryable);
+}
+
+function logReleaseLookupRetry(versionOrTag, assetName, attempt, error) {
+    const prefix = `Attempt ${attempt}/${RELEASE_LOOKUP_MAX_ATTEMPTS}`;
+    if (error?.kind === "release-not-found") {
+        console.warn(
+            `${prefix}: language server release ${versionOrTag} is not published yet; build may be queued or in progress. Retrying in 5 minutes...`
+        );
+        return;
+    }
+
+    if (error?.kind === "asset-missing") {
+        console.warn(
+            `${prefix}: language server release ${versionOrTag} exists but asset ${assetName} is not attached yet; build may still be in progress. Retrying in 5 minutes...`
+        );
+        return;
+    }
+
+    console.warn(
+        `${prefix}: temporary failure while checking language server release ${versionOrTag}: ${getErrorMessage(error)}. Retrying in 5 minutes...`
+    );
 }
 
 function getReleaseChannel() {
@@ -143,6 +200,29 @@ function getTagCandidates(versionOrTag) {
 
 async function resolveReleaseAssetUrlByTag(versionOrTag, assetName) {
     let lastError;
+
+    for (let attempt = 1; attempt <= RELEASE_LOOKUP_MAX_ATTEMPTS; attempt++) {
+        try {
+            return await resolveReleaseAssetUrlByTagOnce(versionOrTag, assetName);
+        } catch (error) {
+            lastError = error;
+
+            if (!isRetryableReleaseLookupError(error) || attempt === RELEASE_LOOKUP_MAX_ATTEMPTS) {
+                break;
+            }
+
+            logReleaseLookupRetry(versionOrTag, assetName, attempt, error);
+            await sleep(RELEASE_LOOKUP_RETRY_DELAY_MS);
+        }
+    }
+
+    throw new Error(
+        `Unable to resolve language server release '${versionOrTag}' for asset ${assetName} after ${RELEASE_LOOKUP_MAX_ATTEMPTS} attempts (${getErrorMessage(lastError)})`
+    );
+}
+
+async function resolveReleaseAssetUrlByTagOnce(versionOrTag, assetName) {
+    let lastError;
     for (const tagCandidate of getTagCandidates(versionOrTag)) {
         try {
             const release = await fetchReleaseByTag(tagCandidate);
@@ -153,44 +233,72 @@ async function resolveReleaseAssetUrlByTag(versionOrTag, assetName) {
             );
 
             if (!asset) {
-                throw new Error(
-                    `Release ${release.tag_name} does not include asset ${assetName}`
+                throw createRetryableError(
+                    `Release ${release.tag_name} does not include asset ${assetName}`,
+                    "asset-missing"
                 );
             }
 
             console.log(`Using language server release ${release.tag_name}`);
             return asset.browser_download_url;
         } catch (error) {
+            if (!isRetryableReleaseLookupError(error)) {
+                throw error;
+            }
             lastError = error;
         }
     }
 
-    const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
-    throw new Error(
-        `Unable to resolve language server release '${versionOrTag}' for asset ${assetName} (${errorMessage})`
-    );
+    throw lastError;
 }
 
 async function fetchReleaseByTag(tagName) {
-    const response = await fetch(
-        `${GITHUB_RELEASE_BY_TAG_API}/${encodeURIComponent(tagName)}`,
-        { headers: getGitHubApiHeaders() }
-    );
+    let response;
+    try {
+        response = await fetch(
+            `${GITHUB_RELEASE_BY_TAG_API}/${encodeURIComponent(tagName)}`,
+            { headers: getGitHubApiHeaders() }
+        );
+    } catch (error) {
+        throw createRetryableError(
+            `GitHub release lookup for ${tagName} failed: ${getErrorMessage(error)}`,
+            "network",
+            error
+        );
+    }
 
     if (!response.ok) {
-        throw new Error(`GitHub release lookup for ${tagName} returned ${response.status} ${response.statusText}`);
+        const error = new Error(
+            `GitHub release lookup for ${tagName} returned ${response.status} ${response.statusText}`
+        );
+        error.status = response.status;
+        error.retryable = isRetryableHttpStatus(response.status);
+        error.kind = response.status === 404 ? "release-not-found" : "http";
+        throw error;
     }
 
     return response.json();
 }
 
 async function fetchReleases() {
-    const response = await fetch(GITHUB_RELEASES_API, {
-        headers: getGitHubApiHeaders(),
-    });
+    let response;
+    try {
+        response = await fetch(GITHUB_RELEASES_API, {
+            headers: getGitHubApiHeaders(),
+        });
+    } catch (error) {
+        throw createRetryableError(
+            `GitHub API request for releases failed: ${getErrorMessage(error)}`,
+            "network",
+            error
+        );
+    }
 
     if (!response.ok) {
-        throw new Error(`GitHub API returned ${response.status} ${response.statusText}`);
+        const error = new Error(`GitHub API returned ${response.status} ${response.statusText}`);
+        error.status = response.status;
+        error.retryable = isRetryableHttpStatus(response.status);
+        throw error;
     }
 
     const releases = await response.json();
@@ -276,6 +384,10 @@ async function build() {
 
     const channel = getReleaseChannel();
     console.log(`Using release channel: ${channel}`);
+
+    execFileSync(process.execPath, ["scripts/generate-extension-channel.js", "--channel", channel], {
+        stdio: "inherit",
+    });
 
     if (!existsSync("temp")) {
         mkdirSync("temp");

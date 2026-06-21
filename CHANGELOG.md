@@ -2,7 +2,7 @@
 
 ---
 
-## [1.0.28] [Pre-Release] - 2026-06-16
+## [1.1.0] [Pre-Release] - 2026-06-20
 > Annotation Refactor
 
 ## Language Server
@@ -17,7 +17,9 @@
 - Fix table shapes collapsing to `any` due to guarded statements.
 - Fix tables incorrectly binding to unknown keys.
 - Fix code lens becoming unstable after undo.
-- Fix stable std lib by never using cache (always use built-in std lib)
+- Fix stable std lib by never using cache (always use built-in std lib).
+- Fix inferred local assignment could be `unknown` at definition.
+- Fix codelens and inlay hints not loading in files already open on language server load.
 - Various performance improvements
 
 ## Annotations

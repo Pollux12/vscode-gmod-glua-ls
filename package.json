@@ -363,14 +363,14 @@
                 "canBeReferencedInPrompt": true,
                 "toolReferenceName": "gmodRunFile",
                 "icon": "$(terminal)",
-                "userDescription": "Dispatch a Lua file path to be include()'d in Garry's Mod.",
-                "modelDescription": "Dispatches a Lua file path for execution in Garry's Mod via debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/shared realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
+                "userDescription": "Run a Lua file in Garry's Mod.",
+                "modelDescription": "Runs a Lua file in Garry's Mod through debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/shared realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "File path to dispatch for execution in Garry's Mod."
+                            "description": "File path to run in Garry's Mod."
                         },
                         "realm": {
                             "type": "string",
@@ -1818,17 +1818,32 @@
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
                         "default": true,
-                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. By default, annotations are downloaded from the `gluals-annotations` branch of the annotations-gmod-glua-ls repository. Disable this if you want to manage annotations manually or use a custom set."
+                        "markdownDescription": "Automatically download and load Garry's Mod GLuaLS annotations as a core library. By default, `auto` channel selection follows the extension build channel (`gluals-annotations` for stable builds, `gluals-annotations-prerelease` for pre-release builds). Disable this if you want to manage annotations manually or use a custom set."
                     },
                     "gluals.gmod.annotationsRepository": {
                         "type": "string",
                         "default": "Pollux12/annotations-gmod-glua-ls",
                         "markdownDescription": "GitHub repository used for automatic GMod annotation downloads. Accepts `owner/repository` or a GitHub repository URL."
                     },
+                    "gluals.gmod.annotationsChannel": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "stable",
+                            "prerelease"
+                        ],
+                        "default": "auto",
+                        "markdownDescription": "Channel used for automatic GMod annotation downloads when no branch or commit hash is set. `auto` follows the extension build. `stable` uses `gluals-annotations`. `prerelease` uses `gluals-annotations-prerelease`."
+                    },
                     "gluals.gmod.annotationsBranch": {
                         "type": "string",
                         "default": "gluals-annotations",
-                        "markdownDescription": "Git branch used for automatic GMod annotation downloads. The branch must contain the generated annotation files and `__metadata.json` at its root. Plugin artifact branches are not supported here."
+                        "markdownDescription": "Advanced setting. Download GMod annotations from this branch instead of the selected channel. The branch must contain generated annotation files and `__metadata.json` at its root. Plugin branches (`gluals-annotations-plugin-*` and `gluals-annotations-prerelease-plugin-*`) are not supported here."
+                    },
+                    "gluals.gmod.annotationsCommit": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "Advanced setting. Download GMod annotations from this exact 40-character commit hash. This stops automatic annotation update checks and may not match the bundled GLuaLS version."
                     },
                     "gluals.gmod.autoCheckAnnotationUpdates": {
                         "type": "boolean",
@@ -2465,8 +2480,11 @@
     },
     "scripts": {
         "preinstall": "node scripts/require-yarn.js",
-        "vscode:prepublish": "yarn run compile",
-        "compile": "tsc -p ./",
+        "generate:extension-channel": "node scripts/generate-extension-channel.js",
+        "generate:extension-channel:stable": "node scripts/generate-extension-channel.js --channel stable",
+        "generate:extension-channel:prerelease": "node scripts/generate-extension-channel.js --channel prerelease",
+        "vscode:prepublish": "tsc -p ./",
+        "compile": "yarn run generate:extension-channel && tsc -p ./",
         "watch": "tsc -watch -p ./",
         "test:schema": "node scripts/validate-schema.js",
         "test:grammar": "node ./build/grammar-test.cjs",
@@ -2476,20 +2494,20 @@
         "test": "yarn run test:all",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",
         "ls:build:release": "cargo build --manifest-path ../gmod-glua-ls/Cargo.toml -p glua_ls --release",
-        "prepare:dev:win32-x64": "node ./build/prepare.js glua_ls-win32-x64.zip --local-ls ../gmod-glua-ls/target/release/glua_ls.exe",
-        "prepare:release:win32-x64": "node ./build/prepare.js glua_ls-win32-x64.zip --remote-ls",
-        "prepare:dev:darwin-x64": "node ./build/prepare.js glua_ls-darwin-x64-experimental.tar.gz --local-ls ../gmod-glua-ls/target/release/glua_ls",
-        "prepare:release:darwin-x64": "node ./build/prepare.js glua_ls-darwin-x64-experimental.tar.gz --remote-ls",
-        "prepare:dev:darwin-arm64": "node ./build/prepare.js glua_ls-darwin-arm64-experimental.tar.gz --local-ls ../gmod-glua-ls/target/release/glua_ls",
-        "prepare:release:darwin-arm64": "node ./build/prepare.js glua_ls-darwin-arm64-experimental.tar.gz --remote-ls",
+        "prepare:dev:win32-x64": "yarn run generate:extension-channel:prerelease && node ./build/prepare.js glua_ls-win32-x64.zip --channel prerelease --local-ls ../gmod-glua-ls/target/release/glua_ls.exe",
+        "prepare:release:win32-x64": "yarn run generate:extension-channel:stable && node ./build/prepare.js glua_ls-win32-x64.zip --channel stable --remote-ls",
+        "prepare:dev:darwin-x64": "yarn run generate:extension-channel:prerelease && node ./build/prepare.js glua_ls-darwin-x64-experimental.tar.gz --channel prerelease --local-ls ../gmod-glua-ls/target/release/glua_ls",
+        "prepare:release:darwin-x64": "yarn run generate:extension-channel:stable && node ./build/prepare.js glua_ls-darwin-x64-experimental.tar.gz --channel stable --remote-ls",
+        "prepare:dev:darwin-arm64": "yarn run generate:extension-channel:prerelease && node ./build/prepare.js glua_ls-darwin-arm64-experimental.tar.gz --channel prerelease --local-ls ../gmod-glua-ls/target/release/glua_ls",
+        "prepare:release:darwin-arm64": "yarn run generate:extension-channel:stable && node ./build/prepare.js glua_ls-darwin-arm64-experimental.tar.gz --channel stable --remote-ls",
         "package:dev:win32-x64": "yarn run ls:build:release && yarn run prepare:dev:win32-x64 && vsce package -o vscode-gmod-ls-dev-win32-x64.vsix --target win32-x64",
         "package:release:win32-x64": "yarn run prepare:release:win32-x64 && vsce package -o vscode-gmod-ls-win32-x64.vsix --target win32-x64",
         "package:dev:darwin-x64": "yarn run ls:build:release && yarn run prepare:dev:darwin-x64 && vsce package -o vscode-gmod-ls-dev-darwin-x64-experimental.vsix --target darwin-x64",
         "package:release:darwin-x64": "yarn run prepare:release:darwin-x64 && vsce package -o vscode-gmod-ls-darwin-x64-experimental.vsix --target darwin-x64",
         "package:dev:darwin-arm64": "yarn run ls:build:release && yarn run prepare:dev:darwin-arm64 && vsce package -o vscode-gmod-ls-dev-darwin-arm64-experimental.vsix --target darwin-arm64",
         "package:release:darwin-arm64": "yarn run prepare:release:darwin-arm64 && vsce package -o vscode-gmod-ls-dev-darwin-arm64-experimental.vsix --target darwin-arm64",
-        "prepare:dev:linux-x64": "node ./build/prepare.js glua_ls-linux-x64-glibc.2.17.tar.gz --local-ls ../gmod-glua-ls/target/release/glua_ls",
-        "prepare:release:linux-x64": "node ./build/prepare.js glua_ls-linux-x64-glibc.2.17.tar.gz --remote-ls",
+        "prepare:dev:linux-x64": "yarn run generate:extension-channel:prerelease && node ./build/prepare.js glua_ls-linux-x64-glibc.2.17.tar.gz --channel prerelease --local-ls ../gmod-glua-ls/target/release/glua_ls",
+        "prepare:release:linux-x64": "yarn run generate:extension-channel:stable && node ./build/prepare.js glua_ls-linux-x64-glibc.2.17.tar.gz --channel stable --remote-ls",
         "package:dev:linux-x64": "yarn run ls:build:release && yarn run prepare:dev:linux-x64 && vsce package -o vscode-gmod-ls-dev-linux-x64.vsix --target linux-x64",
         "package:release:linux-x64": "yarn run prepare:release:linux-x64 && vsce package -o vscode-gmod-ls-linux-x64.vsix --target linux-x64",
         "package:dev": "node ./build/package-platform.js dev",
