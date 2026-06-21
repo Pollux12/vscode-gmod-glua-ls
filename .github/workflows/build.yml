@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Resolve channel and version metadata
       id: release_meta
       shell: bash
