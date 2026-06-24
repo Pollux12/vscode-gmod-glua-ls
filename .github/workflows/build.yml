@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Resolve channel and version metadata
       id: release_meta
       shell: bash
@@ -95,7 +95,7 @@ jobs:
         echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
         echo "is_publish_event=${IS_PUBLISH_EVENT}" >> "$GITHUB_OUTPUT"
     - name: Set up Node 24.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: 24.x
     - name: Install yarn
@@ -148,7 +148,7 @@ jobs:
       run: |
         node ./build/verify-vsix.js "vscode-gmod-ls-${{ matrix.target }}.vsix" "${{ matrix.target }}"
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: vscode-gmod-ls-${{ matrix.target }}
         path: ${{ github.workspace }}/vscode-gmod-ls*.vsix
@@ -173,7 +173,7 @@ jobs:
           fi
 
       - name: Ensure GitHub release exists for tag
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
           PUBLISH_CHANNEL: ${{ needs.build.outputs.publish_channel }}
@@ -226,7 +226,7 @@ jobs:
               });
               core.info(`Created release ${tag} (prerelease=${prerelease}).`);
             }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - name: Upload VSIX artifacts to GitHub release
         shell: bash
         env:
