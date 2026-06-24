@@ -173,7 +173,7 @@ jobs:
           fi
 
       - name: Ensure GitHub release exists for tag
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
           PUBLISH_CHANNEL: ${{ needs.build.outputs.publish_channel }}
