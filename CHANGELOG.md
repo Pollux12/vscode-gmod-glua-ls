@@ -2,6 +2,54 @@
 
 ---
 
+## [1.1.1] [Pre-Release] - 2026-07-13
+
+## VS Code Extension
+
+- Improve language server startup timeout errors by reporting whether startup stalled while loading the workspace or diagnosing it.
+
+## Language Server
+
+- Add `undefined-method` diagnostics.
+- Add usage-based type inference for otherwise unknown locals and child values, with diagnostics when inferred values may be unreliable.
+- Improve type inference, hovers, completion, and diagnostics for table fields, unions, assignments, callbacks, generic calls, `setmetatable`, and factory-created objects.
+- Add local helper parameter inference from call sites, including callbacks, generic calls, multiple returns, and string-template arguments.
+- Improve inferred collection, table-key, and numeric-range types, including `pairs`, table helpers, and populated numeric tables.
+- Improve flow narrowing for `IsValid`, nil checks, type guards, boolean expressions, early returns, reassignment, and deferred callbacks to reduce false positives.
+- Add annotation support for custom validity, receiver, and member-checking helper functions.
+- Fix validity and nil diagnostics for optional fields, sentinel values, open tables, entities, weapon callbacks, and shadowed or reassigned values.
+- Improve Garry's Mod realm detection from load order, `include`, `AddCSLuaFile`, `IncludeCS`, `require`, `file.Find` loader loops, and annotated wrapper functions.
+- Improve realm-aware completion, navigation, and diagnostics for code shared between client, server, and menu contexts.
+- Improve custom annotation wrappers so table fields and nested calls provide the same string completion, navigation, and diagnostics as built-in APIs.
+- Improve support for VGUI panels, including registered and file-based panels, inheritance, `vgui.Create`, `vgui.Register`, and `vgui.CreateFromTable`.
+- Improve support for scripted entities, registered player classes, NextBots, weapons, tools, gamemodes, `BaseClass`, `AccessorFunc`, `NetworkVar`, and `setmetatable`-based classes.
+- Fix VGUI, entity, and scripted-class types being lost through reassignment, inheritance, local reuse, registration tables, and generated accessors.
+- Improve dynamic field inference for Garry's Mod objects, preserving inferred fields across assignments and reducing undefined-field false positives.
+- Improve network diagnostics for nested read calls and read/write ordering.
+- Improve handling of `ConVar` checks, load-ordered ConVars, numeric table ranges, string templates, and multiple returns.
+- Fix incorrect types in hovers, inherited member overrides, callable field arity, and positional unused-parameter diagnostics.
+- Fix diagnostics being lost or incorrectly reported around guarded calls, recursive and deferred closures, branch conditions, and inferred child members.
+- Fix stale analysis results after edits, duplicate cross-realm declarations, and several scripted-class and VGUI edge cases.
+- Add `gmod.detectRealmFromCalls`, enabled by default, to infer realms from standard and annotated load calls.
+- Add `gmod.inferDynamicFields`, enabled by default, to track dynamically assigned fields on Garry's Mod objects.
+- Add the ability to disable automatically provided annotations in workspace configuration.
+- Fix incomplete Garry's Mod API IntelliSense during startup by resolving annotation settings before analysis starts.
+- Improve annotation library priority so framework types and wrappers resolve correctly.
+- Improve language server startup, edit latency, workspace diagnostics, and large-workspace performance.
+
+## Annotations
+
+- Add and improve API annotations for VGUI controls, panels, callbacks, Derma skins, spawnmenu controls, and panel inheritance.
+- Add and improve annotations for scripted entities, weapons, tools, player classes, NextBots, engine entities, constraints, rendering, materials, networking, hooks, timers, file loading, Steamworks, and common globals.
+- Add annotations for `NetworkVar`, `NetworkVarElement`, `DTVar`, `AccessorFunc`, `DEFINE_BASECLASS`, `DeriveGamemode`, `IncludeCS`, `LoadPresets`, `file.Find`, `Color`, ConVars, and common `vgui`, `scripted_ents`, and `player_manager` registration helpers.
+- Add annotations for Garry's Mod data and helper types including `MatProxyData`, `ServerQueryData`, `VideoData`, `ViewData`, `TextData`, `TextureData`, `ToolObj`, `PlayerClass`, and additional engine and sandbox entity classes.
+- Add annotation metadata for load wrappers, callbacks, VGUI registration, validity guards, member guards, safe calls, and other Garry's Mod helper behavior.
+- Improve API types, overloads, optional fields, nullability, default values, aliases, return values, and callback signatures across generated and custom annotations.
+- Fix VGUI and Derma callbacks, panel values and inheritance, weapon and tool ownership, entity creation, material and render calls, ConVar access, hooks, networking, and file-loading APIs.
+- Fix annotation generation and custom overrides so downloaded annotations provide more complete and accurate IntelliSense.
+
+---
+
 ## [1.1.0] [Pre-Release] - 2026-06-20
 > Annotation Refactor
 
