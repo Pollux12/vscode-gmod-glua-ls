@@ -589,6 +589,7 @@ async function startServer(): Promise<void> {
     currentStartupRunId = startupRunId;
     serverStartPromise = (async () => {
         try {
+            extensionContext.clearServerVersions();
             extensionContext.setServerStarting();
             const startupStateHandlers = await doStartServer(startupRunId);
             if (startupStateHandlers.isDiagnosticsInProgress()) {
@@ -843,10 +844,12 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
     // Prepare initialization options with GMod annotations path if available
     const initOptions: Record<string, any> = {};
+    let annotationVersion: string | undefined;
     if (gmodAnnotationManager) {
         const annotationsPath = gmodAnnotationManager.getAnnotationsPath();
         if (annotationsPath) {
             initOptions.gmodAnnotationsPath = annotationsPath;
+            annotationVersion = gmodAnnotationManager.getAnnotationVersion();
         }
     }
 
@@ -923,6 +926,10 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         throwIfStartupCancelled(startupRunId);
         await client.start();
         throwIfStartupCancelled(startupRunId);
+        extensionContext.setServerVersions({
+            languageServer: client.initializeResult?.serverInfo?.version,
+            annotations: annotationVersion,
+        });
         await startupStateHandlers.completion;
     } catch (error) {
         const startupError = error instanceof Error ? error : new Error(String(error));

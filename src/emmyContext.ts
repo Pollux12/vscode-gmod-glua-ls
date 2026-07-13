@@ -37,6 +37,11 @@ export interface ServerStatus {
     diagnosticsInProgress?: boolean;
 }
 
+export interface ServerVersions {
+    readonly languageServer?: string;
+    readonly annotations?: string;
+}
+
 /**
  * Status bar configuration
  */
@@ -62,6 +67,7 @@ export class EmmyContext implements vscode.Disposable {
 
     private _client?: LanguageClient;
     private _serverStatus: ServerStatus;
+    private _serverVersions: ServerVersions | undefined;
     private readonly _statusBar: vscode.StatusBarItem;
     private readonly _disposables: vscode.Disposable[] = [];
 
@@ -103,6 +109,16 @@ export class EmmyContext implements vscode.Disposable {
      */
     get serverStatus(): Readonly<ServerStatus> {
         return this._serverStatus;
+    }
+
+    setServerVersions(versions: ServerVersions): void {
+        this._serverVersions = versions;
+        this.updateStatusBar();
+    }
+
+    clearServerVersions(): void {
+        this._serverVersions = undefined;
+        this.updateStatusBar();
     }
 
     /**
@@ -316,6 +332,11 @@ export class EmmyContext implements vscode.Disposable {
 
         info.push(`**Message:** ${presentation.message}`);
 
+        const versions = this.getVersionInfoLines();
+        if (versions.length > 0) {
+            info.push('', '## Versions', '', ...versions);
+        }
+
         if (this.debugMode) {
             info.push('', `**Debug Mode:** Enabled`);
         }
@@ -413,6 +434,13 @@ export class EmmyContext implements vscode.Disposable {
         tooltip.appendText(presentation.message);
         tooltip.appendMarkdown('\n\n');
 
+        const versions = this.getVersionInfoLines();
+        if (versions.length > 0) {
+            tooltip.appendMarkdown('---\n\n');
+            tooltip.appendText(versions.join('\n'));
+            tooltip.appendMarkdown('\n\n');
+        }
+
         if (this._serverStatus.details) {
             tooltip.appendText(this._serverStatus.details);
             tooltip.appendMarkdown('\n\n');
@@ -431,6 +459,17 @@ export class EmmyContext implements vscode.Disposable {
         }
 
         return tooltip;
+    }
+
+    private getVersionInfoLines(): string[] {
+        const versions: string[] = [];
+        if (this._serverVersions?.languageServer) {
+            versions.push(`Language Server: ${this._serverVersions.languageServer}`);
+        }
+        if (this._serverVersions?.annotations) {
+            versions.push(`Annotations: ${this._serverVersions.annotations}`);
+        }
+        return versions;
     }
 
     /**

@@ -172,18 +172,31 @@ export class GmodAnnotationManager implements vscode.Disposable {
         return undefined;
     }
 
+    public getAnnotationVersion(): string | undefined {
+        const annotationsPath = this.getAnnotationsPath();
+        if (!annotationsPath) {
+            return undefined;
+        }
+
+        return this.readMetadata(annotationsPath)?.lastUpdate;
+    }
+
     private annotationsExist(): boolean {
         return fs.existsSync(this.annotationsPath) && fs.existsSync(path.join(this.annotationsPath, '__metadata.json'));
     }
 
     private readLocalMetadata(): AnnotationMetadata | undefined {
-        const localMetadataPath = path.join(this.annotationsPath, '__metadata.json');
-        if (!fs.existsSync(localMetadataPath)) {
+        return this.readMetadata(this.annotationsPath);
+    }
+
+    private readMetadata(annotationsPath: string): AnnotationMetadata | undefined {
+        const metadataPath = path.join(annotationsPath, '__metadata.json');
+        if (!fs.existsSync(metadataPath)) {
             return undefined;
         }
 
         try {
-            return JSON.parse(fs.readFileSync(localMetadataPath, 'utf-8')) as AnnotationMetadata;
+            return JSON.parse(fs.readFileSync(metadataPath, 'utf-8')) as AnnotationMetadata;
         } catch {
             return undefined;
         }
