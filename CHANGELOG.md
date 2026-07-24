@@ -9,7 +9,7 @@
 - Improve startup timeout diagnostics by separating workspace-loading stalls from analysis stalls.
 - Improve status bar to show the language server version after startup.
 - Improve status bar to show the annotation library version after startup.
-- Add annotation version loading from local `__metadata.json` using `lastUpdate`.
+- Improve annotation version loading to prevent stale annotations.
 - Improve startup cleanup by clearing stale local annotation metadata on restart.
 - Improve details shown in the status panel and tooltip.
 
@@ -24,7 +24,6 @@
 - Add `gmod.inferDynamicFields` (enabled by default) for runtime field inference on GMod objects.
 - Add schema support and a workspace setting to disable automatic annotation loading.
 - Add an `edit-latency` benchmark.
-
 - Improve load-order handling for `include`, `AddCSLuaFile`, `IncludeCS`, `require`, `file.Find`, and wrappers with `FileDefine` scope.
 - Improve realm checks for client/server/menu code using `BaseClass` inheritance and inherited member visibility.
 - Improve VGUI and scripted-class behavior for panel creation, callbacks, inheritance, and method forwarding.
@@ -39,7 +38,6 @@
 - Improve convar-style API handling and `for`/`pairs` index and numeric range checks.
 - Improve startup order by loading annotation settings before diagnostics.
 - Improve workspace performance by replacing slow sequential phases with faster cache/index updates.
-
 - Fix noisy `inferred-method` warnings and duplicate diagnostics in overloads, callbacks, and call sites.
 - Fix diagnostics from file overwrites and shadowed declarations during load-order checks.
 - Fix cross-file inference instability.
