@@ -63,6 +63,8 @@ import {
     applyServerStartupState,
     applyStartupProgressEvent,
     createStartupReadinessState,
+    describeStartupProgressEvent,
+    formatStartupTimeoutMessage,
     isStartupProgressToken,
     StartupServerState,
 } from './startupProgress';
@@ -587,6 +589,7 @@ async function startServer(): Promise<void> {
     currentStartupRunId = startupRunId;
     serverStartPromise = (async () => {
         try {
+            extensionContext.clearServerVersions();
             extensionContext.setServerStarting();
             const startupStateHandlers = await doStartServer(startupRunId);
             if (startupStateHandlers.isDiagnosticsInProgress()) {
@@ -644,6 +647,7 @@ async function startServer(): Promise<void> {
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
     let startupSettled = false;
     let readinessState = createStartupReadinessState();
+    let lastStartupPhase = 'awaiting startup progress';
     let notificationDisposable: vscode.Disposable | undefined;
     let progressDisposable: vscode.Disposable | undefined;
     let startupTimeout: NodeJS.Timeout | undefined;
@@ -694,12 +698,14 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
 
         switch (event.newState) {
             case State.Starting:
+                lastStartupPhase = 'client starting';
                 if (isActiveClient) {
                     extensionContext.setServerStarting();
                 }
                 break;
             case State.Running:
                 if (isActiveClient && !readinessState.ready) {
+                    lastStartupPhase = 'workspace loading and diagnostics in progress';
                     extensionContext.setServerStarting('Loading workspace and diagnostics...');
                 }
                 break;
@@ -752,6 +758,12 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 return;
             }
 
+            lastStartupPhase = describeStartupProgressEvent({
+                token: params.token,
+                kind: params.value.kind,
+                message: params.value.message,
+            });
+
             readinessState = applyStartupProgressEvent(readinessState, {
                 token: params.token,
                 kind: params.value.kind,
@@ -783,7 +795,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     );
 
     startupTimeout = setTimeout(() => {
-        rejectStartup(new Error(`GLua Language Server did not finish startup within ${STARTUP_COMPLETE_TIMEOUT_MS / 1000} seconds`));
+        rejectStartup(new Error(formatStartupTimeoutMessage(STARTUP_COMPLETE_TIMEOUT_MS, lastStartupPhase)));
     }, STARTUP_COMPLETE_TIMEOUT_MS);
 
     return {
@@ -832,10 +844,12 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
     // Prepare initialization options with GMod annotations path if available
     const initOptions: Record<string, any> = {};
+    let annotationVersion: string | undefined;
     if (gmodAnnotationManager) {
         const annotationsPath = gmodAnnotationManager.getAnnotationsPath();
         if (annotationsPath) {
             initOptions.gmodAnnotationsPath = annotationsPath;
+            annotationVersion = gmodAnnotationManager.getAnnotationVersion();
         }
     }
 
@@ -912,6 +926,10 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         throwIfStartupCancelled(startupRunId);
         await client.start();
         throwIfStartupCancelled(startupRunId);
+        extensionContext.setServerVersions({
+            languageServer: client.initializeResult?.serverInfo?.version,
+            annotations: annotationVersion,
+        });
         await startupStateHandlers.completion;
     } catch (error) {
         const startupError = error instanceof Error ? error : new Error(String(error));

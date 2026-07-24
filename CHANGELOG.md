@@ -2,6 +2,120 @@
 
 ---
 
+## [1.1.1] [Pre-Release] - 2026-07-24
+
+## VS Code Extension
+
+- Improve startup timeout diagnostics by separating workspace-loading stalls from analysis stalls.
+- Improve status bar to show the language server version after startup.
+- Improve status bar to show the annotation library version after startup.
+- Improve annotation version loading to prevent stale annotations.
+- Improve startup cleanup by clearing stale local annotation metadata on restart.
+- Improve details shown in the status panel and tooltip.
+
+## Language Server
+
+- Add diagnostics for `CompileFile` file-loading checks.
+- Add `undefined-method` diagnostics.
+- Add usage-based inference for unknown locals and child fields.
+- Add warnings when usage-based inference is low-confidence.
+- Add helper parameter inference from callbacks, generic calls, multi-return values, and dynamic call names.
+- Add `gmod.detectRealmFromCalls` (enabled by default) for load-order realm inference from standard and annotated calls.
+- Add `gmod.inferDynamicFields` (enabled by default) for runtime field inference on GMod objects.
+- Add schema support and a workspace setting to disable automatic annotation loading.
+- Add an `edit-latency` benchmark.
+- Improve load-order handling for `include`, `AddCSLuaFile`, `IncludeCS`, `require`, `file.Find`, and wrappers with `FileDefine` scope.
+- Improve realm checks for client/server/menu code using `BaseClass` inheritance and inherited member visibility.
+- Improve VGUI and scripted-class behavior for panel creation, callbacks, inheritance, and method forwarding.
+- Improve dynamic field and member tracking so runtime-added members stay after reassignments, local reuse, mixins, and loops.
+- Improve flow narrowing for branches, guards, aliases, predicates, and `or` branches.
+- Add type narrowing for `IsValid` and related checks.
+- Add handling for multi-return tail values.
+- Improve return, alias, and `setmetatable` inference so type narrowing stays stable across paths.
+- Improve completion and navigation data for shared client/server/menu code.
+- Improve table, union, assignment, callback, and factory-object inference and checks with annotation wrappers.
+- Improve network diagnostics for nested reads/writes and message ordering.
+- Improve convar-style API handling and `for`/`pairs` index and numeric range checks.
+- Improve startup order by loading annotation settings before diagnostics.
+- Improve workspace performance by replacing slow sequential phases with faster cache/index updates.
+- Fix noisy `inferred-method` warnings and duplicate diagnostics in overloads, callbacks, and call sites.
+- Fix diagnostics from file overwrites and shadowed declarations during load-order checks.
+- Fix cross-file inference instability.
+- Fix `self` binding on function assignments and method calls.
+- Fix class/type annotation conflicts and class detail drops in VGUI and scripted-class flows.
+- Fix VGUI/scripted-class fields and class data being dropped during reassignments, inheritance, and local reuse.
+- Fix `IsValid` and entity checks that were not narrowing types.
+- Fix `FileDefine` visibility leaking outside file scope.
+- Fix first-run annotation loading and initial startup reliability.
+- Fix unresolved VGUI parent lookups to raise warning-level `undefined-field` instead of `undefined-method`.
+- Fix `assign-type-mismatch` default severity from warning to hint.
+- Fix vararg unpack handling in flow and call inference.
+- Fix return-type narrowing for function calls with overloads and nil returns.
+- Fix false positives from base Lua checks.
+
+## Annotations
+
+- Add `Global.CompileFile`.
+- Add `Global.setfenv`.
+- Add `Global.assert`.
+- Add `Global.pairs`.
+- Add `Global.IsEntity`.
+- Add `Global.FixInvalidPhysicsObject`.
+- Add `Global.IsHostingGame`.
+- Add `Global.Entity`.
+- Add `Global.error`.
+- Add `workshopfilebase.dupes`.
+- Add `debug.sethook`.
+- Add `debug.getlocal`.
+- Add `class.base_anim`.
+- Add `class.base_brush`.
+- Add `class.base_entity`.
+- Add `class.base_filter`.
+- Add `class.base_nextbot`.
+- Add `class.base_point`.
+- Add `class.DCollapsibleCategory`.
+- Add `class.DForm`.
+- Add `class.DHorizontalScroller`.
+- Add `class.GM`.
+- Add `class.SANDBOX`.
+- Add `class.Tool`.
+- Add `class.Weapon`.
+- Add `ContentHeader.GetParent`.
+- Add `ContentIcon.GetParent`.
+- Add `IconEditor.SetIcon`.
+- Add `Entity.GetOwner`.
+- Add `Entity.IsNPC`.
+- Add `Entity.IsVehicle`.
+- Add `GM.AddNotify`.
+- Add `Panel.SetParent`.
+- Add `Panel.SelectAllText`.
+- Add `DForm.ComboBox`.
+- Add `DForm.TextEntry`.
+- Add `DHorizontalScroller.AddPanel`.
+- Add `DPanelList.ScrollToChild`.
+- Add `DPanelList.SortByMember`.
+- Add `DTree.AddNode`.
+- Add `DTree.OnNodeSelected`.
+- Add `DTree_Node.AddNode`.
+- Add `DTree_Node.OnNodeSelected`.
+- Add `duplicator.EntityModifiers`.
+- Add `Player.CheckLimit`.
+- Add `Player.IsListenServerHost`.
+- Add `Weapon.CheckLimit`.
+- Add `Tool.GetSWEP`.
+- Add `Tool.GetWeapon`.
+- Add `vgui.CreateFromTable`.
+- Fix annotation shape for `Global.assert`.
+- Fix annotation shape for `Global.pairs`.
+- Fix `DForm.ComboBox` annotations.
+- Fix `Panel.SelectAllText` annotations.
+- Fix `DTree.OnNodeSelected` signature.
+- Fix `DTree_Node.OnNodeSelected` signature.
+- Fix annotation generation by removing `self` reference output.
+- Fix annotation schema, guard/load-wrapper metadata, overloads, optional fields, and nullability handling.
+
+---
+
 ## [1.1.0] [Pre-Release] - 2026-06-20
 > Annotation Refactor
 
@@ -31,7 +145,7 @@
 - Fix scripted entity registration table type.
 - Fix `VideoData` optional `lockfps` field.
 - Fix `debug.getmetatable` annotation.
-- Fix annotation generation not including custom overrides by default.
+- Fix annotation generation to load annotation files by default.
 
 ## Debugger
 

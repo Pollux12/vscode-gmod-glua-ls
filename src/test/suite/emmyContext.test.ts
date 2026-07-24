@@ -82,4 +82,21 @@ suite('Emmy Context', () => {
             context.dispose();
         }
     });
+
+    test('shows active server and annotation versions in the tooltip', () => {
+        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        try {
+            context.setServerRunning();
+            context.setServerVersions({
+                languageServer: '1.2.3',
+                annotations: '2026-07-13T12:00:00.000Z',
+            });
+
+            const tooltip = getTooltipMarkdown(context);
+            assert.match(tooltip, /Language Server: 1\.2\.3/);
+            assert.match(tooltip, /Annotations: 2026-07-13T12:00:00\.000Z/);
+        } finally {
+            context.dispose();
+        }
+    });
 });
