@@ -969,6 +969,7 @@ export class GmodClientDebugSession extends DebugSession {
             source,
             stackTrace,
             realm: 'client',
+            timestamp: event.params.timestamp,
           }))
 
           if (this._stopOnError) {

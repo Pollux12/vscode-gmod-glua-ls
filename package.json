@@ -161,23 +161,13 @@
                 "category": "GLuaLS"
             },
             {
-                "command": "gluals.gmod.mcp.startHost",
-                "title": "MCP: Start Host",
-                "category": "GLuaLS"
-            },
-            {
-                "command": "gluals.gmod.mcp.stopHost",
-                "title": "MCP: Stop Host",
-                "category": "GLuaLS"
-            },
-            {
                 "command": "gluals.gmod.mcp.restartHost",
-                "title": "MCP: Restart Host",
+                "title": "MCP: Restart Server",
                 "category": "GLuaLS"
             },
             {
-                "command": "gluals.gmod.mcp.healthCheck",
-                "title": "MCP: Health Check",
+                "command": "gluals.gmod.mcp.copyConfiguration",
+                "title": "MCP: Copy Server Configuration",
                 "category": "GLuaLS"
             },
             {
@@ -280,165 +270,10 @@
                 "icon": "$(go-to-file)"
             }
         ],
-        "languageModelTools": [
+        "mcpServerDefinitionProviders": [
             {
-                "name": "search_glua_docs",
-                "displayName": "Search GLua API Documentation",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gluaDocs",
-                "icon": "$(book)",
-                "userDescription": "Search Garry's Mod GLua API documentation for functions, classes, and other symbols.",
-                "modelDescription": "Search the Garry's Mod GLua API documentation and local codebase index for functions, methods, classes, and constants. \n\nQuery syntax:\n- Type:method (e.g. \"Entity:GetPos\", \"Player:GetName\") searches for a specific method on a class\n- type.field (e.g. \"hook.Add\", \"math.max\") searches for global table members or static methods\n- Plain word (e.g. \"Player\", \"GetPos\", \"hook\") searches class names, globals, and all class methods with that name\n\nReturns full documentation including signatures, parameter names and types, return types, and description text - the same information shown when hovering over a symbol in the editor.\n\nUse this tool when: writing or reviewing GLua code and you need to know what arguments a function takes, what it returns, or whether it exists. Always prefer using this tool over guessing API signatures.\n\nDo not use for: general Lua language questions (only for Garry's Mod specific API and the current workspace's code).",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The API symbol or concept to search for. Examples: 'Entity:GetPos', 'hook.Add', 'ents', 'Player:GetName', 'physics'"
-                        },
-                        "limit": {
-                            "type": "number",
-                            "description": "Maximum number of results to return. Default is 10, maximum is 20."
-                        }
-                    },
-                    "required": [
-                        "query"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_lua",
-                "displayName": "Run Lua In GMod",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunLua",
-                "icon": "$(terminal)",
-                "userDescription": "Execute a Lua chunk in the active Garry's Mod debug session.",
-                "modelDescription": "Runs arbitrary Lua code in the currently active Garry's Mod debug session using the selected runtime realm (server, client, or shared). Use this when the user asks to test Lua behavior live in-game, query runtime state, or perform controlled debugger-side execution. This tool requires an active GMod debug session and returns a formatted summary including realm, success status, and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "lua": {
-                            "type": "string",
-                            "description": "Lua source code to execute in Garry's Mod."
-                        },
-                        "realm": {
-                            "type": "string",
-                            "enum": [
-                                "server",
-                                "client",
-                                "shared"
-                            ],
-                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
-                        }
-                    },
-                    "required": [
-                        "lua"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_command",
-                "displayName": "Run GMod Console Command",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunCommand",
-                "icon": "$(terminal)",
-                "userDescription": "Run a Garry's Mod console command in the active debug session.",
-                "modelDescription": "Executes a Garry's Mod console command through the active debugger transport. Use this when the user explicitly asks to run a console command (for example, convars, debug helpers, or command-driven runtime checks). Requires an active GMod debug session and returns a formatted result with realm context, status, and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Console command text to execute in Garry's Mod."
-                        }
-                    },
-                    "required": [
-                        "command"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_file",
-                "displayName": "Run Lua File In GMod",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunFile",
-                "icon": "$(terminal)",
-                "userDescription": "Run a Lua file in Garry's Mod.",
-                "modelDescription": "Runs a Lua file in Garry's Mod through debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/shared realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "File path to run in Garry's Mod."
-                        },
-                        "realm": {
-                            "type": "string",
-                            "enum": [
-                                "server",
-                                "client",
-                                "shared"
-                            ],
-                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
-                        }
-                    },
-                    "required": [
-                        "path"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_get_output",
-                "displayName": "Get GMod Output Log",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetOutput",
-                "icon": "$(output)",
-                "userDescription": "Return recent buffered Garry's Mod output entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod output log entries captured by the extension's debugger event stream, including runtime output and control-command summaries. Use this when the user asks for runtime output or recent command activity. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 200,
-                            "description": "Maximum number of recent output entries to return. Default 50."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gmod_get_errors",
-                "displayName": "Get GMod Error Log",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetErrors",
-                "icon": "$(output)",
-                "userDescription": "Return recent buffered Garry's Mod error entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod error log entries captured by backend/control error handling and command-rejection tracking. Use this when the user asks for failures, backend errors, or rejected control commands. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 200,
-                            "description": "Maximum number of recent error entries to return. Default 50."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gmod_get_debug_state",
-                "displayName": "Get GMod Debug State",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetDebugState",
-                "icon": "$(debug)",
-                "userDescription": "Return the current Garry's Mod debugger state snapshot.",
-                "modelDescription": "Returns the full debugger state snapshot, including active session presence, session metadata, selected realm, language server state, MCP host health, and buffered output/error counts. Use this tool to diagnose debugger connectivity and runtime state before attempting command execution. Does not require an active debug session and returns the state as JSON.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
+                "id": "gluals.gmod.runtime",
+                "label": "GLuaLS Garry's Mod Runtime"
             }
         ],
         "languages": [
@@ -890,7 +725,7 @@
             ],
             "commandPalette": [
                 {
-                    "command": "gluals.gmod.mcp.healthCheck",
+                    "command": "gluals.gmod.mcp.copyConfiguration",
                     "when": "resourceExtname == .lua"
                 },
                 {
@@ -1908,25 +1743,25 @@
                         "type": "boolean",
                         "default": true,
                         "scope": "machine",
-                        "markdownDescription": "Enable the authenticated MCP host for GMod debug tool execution."
+                        "markdownDescription": "Enable the authenticated, loopback-only MCP server for Garry's Mod runtime testing and GLuaLS diagnostics."
                     },
                     "gluals.gmod.mcp.port": {
                         "type": "integer",
-                        "default": 0,
+                        "default": 21113,
                         "minimum": 0,
                         "maximum": 65535,
                         "scope": "machine",
-                        "markdownDescription": "Port for the MCP host (`0` chooses a random ephemeral port)."
+                        "markdownDescription": "Loopback port for the MCP Streamable HTTP server (`0` chooses a random ephemeral port)."
                     },
                     "gluals.gmod.mcp.authToken": {
                         "type": "string",
                         "default": "",
                         "scope": "machine",
-                        "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure token automatically."
+                        "markdownDescription": "Optional MCP bearer token override. Leave empty to generate and securely store a token automatically."
                     },
                     "gluals.gmod.mcp.rateLimitPerMinute": {
                         "type": "integer",
-                        "default": 60,
+                        "default": 120,
                         "minimum": 1,
                         "maximum": 600,
                         "scope": "machine",
@@ -2534,9 +2369,11 @@
         "vscode-textmate": "^9.2.0"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "@vscode/debugadapter": "^1.61.0",
         "@vscode/debugprotocol": "^1.61.0",
         "adm-zip": "^0.5.16",
-        "vscode-languageclient": "10.0.0"
+        "vscode-languageclient": "10.0.0",
+        "zod": "^4.0.0"
     }
 }

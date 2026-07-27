@@ -8,6 +8,7 @@ export interface GmodErrorNotificationParams {
     count: number;
     source: GmodErrorSource;
     stackTrace?: string[];
+    timestamp?: number | string;
 }
 
 export interface GmodError {
@@ -62,14 +63,14 @@ export class GmodErrorStore implements vscode.Disposable {
     readonly onDidChange = this.changeEmitter.event;
 
     addError(params: GmodErrorNotificationParams): void {
-        const now = new Date();
+        const capturedAt = coerceErrorTimestamp(params.timestamp);
         const safeCount = Number.isFinite(params.count) ? Math.max(1, Math.floor(params.count)) : 1;
         const existing = this.errors.get(params.fingerprint);
         if (existing) {
             existing.message = params.message;
             existing.source = params.source;
             existing.count = Math.max(existing.count, safeCount);
-            existing.lastSeen = now;
+            existing.lastSeen = capturedAt;
             this.changeEmitter.fire();
             return;
         }
@@ -80,8 +81,8 @@ export class GmodErrorStore implements vscode.Disposable {
             count: safeCount,
             source: params.source,
             stackTrace: params.stackTrace ?? [],
-            firstSeen: now,
-            lastSeen: now,
+            firstSeen: capturedAt,
+            lastSeen: capturedAt,
         });
         this.changeEmitter.fire();
     }
@@ -101,6 +102,11 @@ export class GmodErrorStore implements vscode.Disposable {
     dispose(): void {
         this.changeEmitter.dispose();
     }
+}
+
+function coerceErrorTimestamp(timestamp: number | string | undefined): Date {
+    const capturedAt = timestamp == null ? new Date() : new Date(timestamp);
+    return Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt;
 }
 
 export class GmodErrorTreeItem extends vscode.TreeItem {

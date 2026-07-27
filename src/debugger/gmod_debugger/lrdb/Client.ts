@@ -396,6 +396,7 @@ export interface GmodErrorNotify extends JsonRpcNotify {
     count: number
     source: 'lua' | 'console'
     raw_message?: string
+    timestamp?: number | string
   }
 }
 

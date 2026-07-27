@@ -79,7 +79,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 ## ✨ Advanced Code Intelligence
 
-* **AI & Copilot Integration:** Supercharge GitHub Copilot Chat with LM tools and MCP integration - allowing it to search documentation, get console output, recent errors and even execute lua to validate its work.
+* **AI Agent Integration:** Connect any MCP-compatible agent to execute Lua, read timestamped console output, and inspect runtime errors or GLuaLS diagnostics.
 * **Self-Updating Wiki Annotations:** The latest annotations, generated from the Garry's Mod wiki, will be automatically downloaded and setup for you.
 * **VGUI & Entity Assistance:** Dynamic CodeLens and inlay hints specifically for VGUI elements - designed to prevent you from getting lost in massive derma files.
 * **Workspace-Wide Refactoring:** Reliable symbol renaming, finding all references, and jumping straight to definitions. Find anything with ease with proper symbol mapping and outline view.
@@ -100,7 +100,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 Make sure you don't have any other potentially conflicting extensions installed, such as EmmyLua, LuaLS, GLua Enhanced - this should be the only Lua Language Server or Lua Debugger you have installed. It is recommended you create a new VSCode profile for GLua/Garry's Mod development to avoid conflict, especially if other Lua extensions are required for non-gmod related projects.
 
-The debugger is only designed to be used on local development servers - please do not install the binary module on production servers. `gm_rdb` only accepts localhost connections by default. If you need remote attach, start Garry's Mod or SRCDS with `-rdb_allow_remote`. `rdb.activate(...)` keeps the server running by default. If you want it to pause on the next hook event instead, add `-rdb_pause_on_activate`. This extension has only been tested with VSCode and may not work with forks. AI features have only been tested with GitHub Copilot Chat and may not work with other providers.
+The debugger is only designed to be used on local development servers - please do not install the binary module on production servers. `gm_rdb` only accepts localhost connections by default. If you need remote attach, start Garry's Mod or SRCDS with `-rdb_allow_remote`. `rdb.activate(...)` keeps the server running by default. If you want it to pause on the next hook event instead, add `-rdb_pause_on_activate`. This extension has only been tested with VSCode and may not work with forks. The MCP server uses standard Streamable HTTP and can be connected to other compatible local agents while VS Code and the extension are running.
 
 This extension is primarily designed and tested for addon and/or gamemode development setup within an SRCDS server. If you're doing something outside of this structure, some features may not work or may require manual configuration. The extension currently expects each added workspace folder root to be within either `garrysmod/addons` or `garrysmod/gamemodes`. If you need to edit multiple folders at the same time (such as gamemode alongside addons), I'd recommend adding each individual gamemode or addon as a folder within a [multi-root workspace,](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces) rather than opening the entire garrysmod folder within VSCode.
 

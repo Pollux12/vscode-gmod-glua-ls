@@ -1305,7 +1305,7 @@ export class GmodDebugSession extends DebugSession {
             source: event.params.source ?? event.params.group ?? 'console',
             severity: event.params.severity,
             timestamp: event.params.timestamp,
-            realm: this._controlService?.getRealm() ?? 'server',
+            realm: 'server',
           }))
           break
 
@@ -1328,6 +1328,7 @@ export class GmodDebugSession extends DebugSession {
             count,
             source,
             stackTrace,
+            timestamp: event.params.timestamp,
           }))
 
           if (this._stopOnError) {

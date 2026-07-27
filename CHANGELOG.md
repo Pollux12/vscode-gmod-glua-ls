@@ -6,6 +6,9 @@
 
 ## VS Code Extension
 
+- Replace Copilot-specific AI tools and the custom MCP dialect with a standards-compliant Streamable HTTP MCP server for any compatible agent.
+- Reduce the MCP surface to `execute_lua`, `read_console`, and `read_issues`, with runtime timestamps, console cursors, and GLuaLS diagnostics.
+- Add automatic VS Code MCP discovery and a command to copy authenticated configuration for external agents.
 - Improve startup timeout diagnostics by separating workspace-loading stalls from analysis stalls.
 - Improve status bar to show the language server version after startup.
 - Improve status bar to show the annotation library version after startup.
