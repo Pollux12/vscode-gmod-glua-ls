@@ -79,7 +79,7 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 ## ✨ Advanced Code Intelligence
 
-* **AI Agent Integration:** Connect any MCP-compatible agent to execute Lua, read timestamped console output, and inspect runtime errors or GLuaLS diagnostics.
+* **AI Agent Integration:** Connect any MCP-compatible agent to evaluate Lua, run server console commands, read timestamped console output, and inspect runtime errors or GLuaLS diagnostics.
 * **Self-Updating Wiki Annotations:** The latest annotations, generated from the Garry's Mod wiki, will be automatically downloaded and setup for you.
 * **VGUI & Entity Assistance:** Dynamic CodeLens and inlay hints specifically for VGUI elements - designed to prevent you from getting lost in massive derma files.
 * **Workspace-Wide Refactoring:** Reliable symbol renaming, finding all references, and jumping straight to definitions. Find anything with ease with proper symbol mapping and outline view.

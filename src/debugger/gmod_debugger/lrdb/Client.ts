@@ -508,6 +508,18 @@ export interface RunLuaRequest extends JsonRpcRequest {
   }
 }
 
+export interface RunLuaResult {
+  executedAt: string
+  serverExecuted: boolean
+  clientDispatched: boolean
+  returnsTruncated: boolean
+  returns: Array<{
+    index: number
+    type: string
+    value: unknown
+  }>
+}
+
 export interface RunFileRequest extends JsonRpcRequest {
   method: 'run_file'
   params: {
@@ -670,7 +682,7 @@ type ResponseResultType = {
   clear_breakpoints: never
   set_var: boolean
   command: never
-  run_lua: never
+  run_lua: RunLuaResult | null
   run_file: never
   refresh_file: never
   get_entities: GetEntitiesResult

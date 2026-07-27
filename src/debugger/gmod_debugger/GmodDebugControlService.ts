@@ -37,6 +37,7 @@ export interface GmodControlResult {
   realm: GmodRealm
   correlationId: string
   request?: string
+  result?: unknown
   diagnostics: GmodControlDiagnostic[]
 }
 
@@ -112,6 +113,7 @@ export class GmodDebugControlService {
     const diagnostics: GmodControlDiagnostic[] = []
     let realm = this.resolveRealm(args.realm)
     let request: string | undefined
+    let result: unknown
 
     switch (command) {
       case 'pauseSoft':
@@ -158,8 +160,8 @@ export class GmodDebugControlService {
           diagnostics.push({ level: 'error', message: 'Lua chunk is empty.' })
           return { ok: false, command, realm, correlationId, diagnostics }
         }
-        request = `run_lua(${realm}) bytes=${lua.length}`
-        await this.transport.runLua(lua, realm)
+        request = `run_lua(${realm}) bytes=${Buffer.byteLength(lua, 'utf8')}`
+        result = await this.transport.runLua(lua, realm)
         diagnostics.push({ level: 'info', message: 'Lua chunk dispatched.' })
         break
       }
@@ -246,6 +248,7 @@ export class GmodDebugControlService {
       realm,
       correlationId,
       request,
+      result,
       diagnostics,
     }
   }

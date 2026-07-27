@@ -1811,7 +1811,6 @@ function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
         secretStorage: context.secrets,
         serverVersion: String(context.extension.packageJSON.version ?? '0.0.0'),
         executeControlCommand: executeGmodControlCommand,
-        getCurrentRealm: getPersistedGmodRealm,
         getLanguageIssues: getGmodLanguageIssues,
     });
     context.subscriptions.push(gmodMcpHost);
@@ -1926,12 +1925,19 @@ async function copyGmodMcpConfiguration(): Promise<void> {
 }
 
 function getGmodLanguageIssues(): GmodLanguageIssue[] {
-    const workspaceUris = vscode.workspace.workspaceFolders?.map((folder) => folder.uri) ?? [];
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
     const issues: GmodLanguageIssue[] = [];
     for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
-        if (uri.scheme !== 'file' || !workspaceUris.some((root) => isUriWithinRoot(uri, root))) {
+        const workspaceFolder = uri.scheme === 'file'
+            ? workspaceFolders.find((folder) => isUriWithinRoot(uri, folder.uri))
+            : undefined;
+        if (!workspaceFolder) {
             continue;
         }
+        const relativeFile = path.relative(workspaceFolder.uri.fsPath, uri.fsPath).replace(/\\/g, '/');
+        const displayFile = workspaceFolders.length > 1
+            ? `${workspaceFolder.name}/${relativeFile}`
+            : relativeFile;
         for (const diagnostic of diagnostics) {
             if (diagnostic.source !== 'GLuaLS') {
                 continue;
@@ -1946,7 +1952,7 @@ function getGmodLanguageIssues(): GmodLanguageIssue[] {
             }
             const code = typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
             issues.push({
-                file: uri.fsPath,
+                file: displayFile,
                 line: diagnostic.range.start.line + 1,
                 column: diagnostic.range.start.character + 1,
                 endLine: diagnostic.range.end.line + 1,

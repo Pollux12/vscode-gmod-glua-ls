@@ -163,7 +163,12 @@ export class TcpAdapter implements DebugClientAdapter {
     if (!this._connection || !this._connected) {
       return false
     }
-    return this._connection.write(`${JSON.stringify(request)}\n`)
+    try {
+      this._connection.write(`${JSON.stringify(request)}\n`)
+      return true
+    } catch {
+      return false
+    }
   }
 
   end(): void {

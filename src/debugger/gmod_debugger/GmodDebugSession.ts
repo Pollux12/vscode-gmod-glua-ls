@@ -1726,7 +1726,7 @@ export class GmodDebugSession extends DebugSession {
     return this._debug_client.command(command).then(() => undefined)
   }
 
-  private sendRunLua(lua: string, realm: GmodRealm): Promise<void> {
+  private sendRunLua(lua: string, realm: GmodRealm): Promise<unknown> {
     const commandReadinessError = this.getConsoleCommandReadinessError()
     if (commandReadinessError) {
       return Promise.reject(new Error(commandReadinessError))
@@ -1736,7 +1736,7 @@ export class GmodDebugSession extends DebugSession {
       return Promise.reject(new Error('Debugger is not connected.'))
     }
 
-    return this._debug_client.runLua({ lua, realm }).then(() => undefined)
+    return this._debug_client.runLua({ lua, realm }).then((response) => response.result)
   }
 
   private sendRunFile(filePath: string, realm: GmodRealm): Promise<void> {

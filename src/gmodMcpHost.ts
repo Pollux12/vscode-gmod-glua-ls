@@ -11,8 +11,10 @@ const MCP_HOST = '127.0.0.1';
 const MCP_PATH = '/mcp';
 const MCP_SECRET_KEY = 'gluals.gmod.mcp.generatedAuthToken';
 const MCP_SERVER_NAME = 'gluals-gmod';
-const MAX_REQUEST_BYTES = 512 * 1024;
+const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_LUA_BYTES = 256 * 1024;
+const MAX_LUA_FILE_PATH_BYTES = 1024;
+const MAX_CONSOLE_COMMAND_BYTES = 2048;
 const MAX_CONSOLE_LINES = 1000;
 const MAX_RUNTIME_ISSUES = 200;
 const MAX_ENTRY_TEXT_BYTES = 8 * 1024;
@@ -38,8 +40,10 @@ export interface GmodLanguageIssue {
 interface GmodMcpHostOptions {
     readonly secretStorage: vscode.SecretStorage;
     readonly serverVersion: string;
-    readonly executeControlCommand: (command: 'runLua', args: Record<string, unknown>) => Promise<GmodControlResult>;
-    readonly getCurrentRealm: () => GmodRealm;
+    readonly executeControlCommand: (
+        command: 'runLua' | 'runFile' | 'refreshFile' | 'runCommand',
+        args: Record<string, unknown>
+    ) => Promise<GmodControlResult>;
     readonly getLanguageIssues: () => GmodLanguageIssue[];
     readonly config?: Partial<HostConfig>;
 }
@@ -105,6 +109,8 @@ export class GmodMcpHost implements vscode.Disposable {
     private startedAt?: Date;
     private rateLimitPerMinute = 120;
     private cursor = 0;
+    private consoleDroppedThroughCursor = 0;
+    private runtimeDroppedThroughCursor = 0;
     private executeQueue: Promise<void> = Promise.resolve();
 
     public readonly onDidChangeConnection = this.connectionChangedEmitter.event;
@@ -252,7 +258,12 @@ export class GmodMcpHost implements vscode.Disposable {
                     || sessionName !== rawSessionName,
             });
         }
-        trimFront(this.consoleLines, MAX_CONSOLE_LINES);
+        if (this.consoleLines.length > MAX_CONSOLE_LINES) {
+            const removed = this.consoleLines.splice(0, this.consoleLines.length - MAX_CONSOLE_LINES);
+            for (const line of removed) {
+                this.consoleDroppedThroughCursor = Math.max(this.consoleDroppedThroughCursor, line.cursor);
+            }
+        }
     }
 
     public recordRuntimeError(
@@ -293,6 +304,7 @@ export class GmodMcpHost implements vscode.Disposable {
     public clearRuntimeErrors(sessionId: string): void {
         for (const [key, issue] of this.runtimeIssues) {
             if (issue.sessionId === sessionId) {
+                this.runtimeDroppedThroughCursor = Math.max(this.runtimeDroppedThroughCursor, issue.cursor);
                 this.runtimeIssues.delete(key);
             }
         }
@@ -339,17 +351,29 @@ export class GmodMcpHost implements vscode.Disposable {
         const server = new McpServer({
             name: MCP_SERVER_NAME,
             version: this.options.serverVersion,
+        }, {
+            instructions: [
+                'Use execute_lua for either a small inline chunk or a file under a workspace lua/ directory, and always choose its execution realm explicitly.',
+                'Garry\'s Mod automatically refreshes eligible Lua files when they are saved, so do not execute a file again merely because you edited it.',
+                'Auto-refresh primarily covers files automatically loaded by gamemodes, autorun, effects, entities, and weapons; dynamic include/AddCSLuaFile patterns may not refresh.',
+                'Use execute_lua with action=refresh only when auto-refresh did not apply or did not trigger. Use action=execute for an explicit first run or rerun.',
+                'Use run_console_command only for one server console command; it does not run commands on clients.',
+                'After runtime activity, use read_console for output, get_errors for in-game runtime failures, and get_issues for GLuaLS static diagnostics.',
+                'Start with small limits and narrow filters. Request stack traces only when the runtime error summary is insufficient.',
+            ].join(' '),
         });
 
         server.registerTool(
             'execute_lua',
             {
                 title: 'Execute Lua in Garry\'s Mod',
-                description: 'Execute a queued Lua chunk in the active Garry\'s Mod debugger session. Use print to inspect values, pass the returned cursor to read_console, and call read_issues separately for runtime failures. Client/shared execution broadcasts to every connected player and requires confirmClientBroadcast=true.',
+                description: 'REPL-style Lua evaluation for quick testing and active debugging, plus workspace file execution and manual refresh. Inline server/shared evaluation returns a bounded summary of server return values and best-effort console/error context observed immediately after dispatch. Client execution is asynchronous, so later output must be read with the returned cursor. For execute actions, realm=server runs only on the server, realm=client runs on every connected client only, and realm=shared runs on the server and every connected client. Do not rerun an eligible file merely because it was saved: Garry\'s Mod normally auto-refreshes it.',
                 inputSchema: {
-                    code: z.string().min(1).max(MAX_LUA_BYTES).describe('Lua source code to execute, limited to 256 KiB in UTF-8.'),
-                    realm: z.enum(['server', 'client', 'shared']).optional().describe('Execution realm. Defaults to the currently selected debugger realm.'),
-                    confirmClientBroadcast: z.literal(true).optional().describe('Required for client/shared realms because the code is broadcast to every connected player.'),
+                    code: z.string().min(1).max(MAX_LUA_BYTES).optional().describe('Inline Lua source, limited to 256 KiB in UTF-8. Supply exactly one of code or file.'),
+                    file: z.string().min(1).max(MAX_LUA_FILE_PATH_BYTES).optional().describe('Workspace-relative or absolute file path under a lua/ directory, limited to 1024 UTF-8 bytes. Supply exactly one of code or file.'),
+                    action: z.enum(['execute', 'refresh']).optional().describe('File action. Defaults to execute. Refresh invokes Garry\'s Mod lua_refresh_file and is invalid with inline code.'),
+                    realm: z.enum(['server', 'client', 'shared']).optional().describe('Required for execute actions. server runs only on the server; client runs on every connected client; shared runs on the server and every connected client. Omit for refresh.'),
+                    confirmClientBroadcast: z.literal(true).optional().describe('Required for realm=client or realm=shared. Setting this to true explicitly confirms that the Lua will run clientside on every connected player; individual client targeting is not supported.'),
                 },
                 annotations: {
                     destructiveHint: true,
@@ -358,22 +382,84 @@ export class GmodMcpHost implements vscode.Disposable {
                     readOnlyHint: false,
                 },
             },
-            async ({ code, realm, confirmClientBroadcast }) => {
+            async ({ code, file, action = 'execute', realm, confirmClientBroadcast }) => {
                 return this.executeExclusive(async () => {
-                    const executionRealm = realm ?? this.options.getCurrentRealm();
-                    if (executionRealm !== 'server' && confirmClientBroadcast !== true) {
+                    const hasCode = typeof code === 'string' && code.trim().length > 0;
+                    const hasFile = typeof file === 'string' && file.trim().length > 0;
+                    if (hasCode === hasFile) {
                         return toolResult({
                             ok: false,
+                            status: 'rejected',
+                            error: 'Supply exactly one of code or file.',
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (hasCode && action === 'refresh') {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: 'The refresh action requires a file path.',
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (action === 'refresh' && (realm != null || confirmClientBroadcast != null)) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: 'Refresh uses Garry\'s Mod lua_refresh_file realm handling; omit realm and confirmClientBroadcast.',
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (action === 'execute' && realm == null) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: 'The realm is required for execute actions: server, client, or shared.',
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    const executionRealm: GmodRealm = action === 'refresh' ? 'server' : realm ?? 'server';
+                    const filePathBytes = hasFile ? Buffer.byteLength(file, 'utf8') : 0;
+                    if (hasFile && file.includes('\0')) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: 'File path cannot contain a null byte.',
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (hasFile && filePathBytes > MAX_LUA_FILE_PATH_BYTES) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: `File path is ${filePathBytes} bytes; the maximum is ${MAX_LUA_FILE_PATH_BYTES} bytes.`,
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (action === 'execute' && executionRealm !== 'server' && confirmClientBroadcast !== true) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
                             error: `${executionRealm} execution broadcasts Lua to every connected player. Retry with confirmClientBroadcast=true to allow it.`,
                             realm: executionRealm,
                             cursor: this.cursor,
                         }, true, false);
                     }
 
-                    const codeBytes = Buffer.byteLength(code, 'utf8');
-                    if (codeBytes > MAX_LUA_BYTES) {
+                    const codeBytes = hasCode ? Buffer.byteLength(code, 'utf8') : 0;
+                    if (hasCode && code.includes('\0')) {
                         return toolResult({
                             ok: false,
+                            status: 'rejected',
+                            error: 'Lua source cannot contain a null byte.',
+                            realm: executionRealm,
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+                    if (hasCode && codeBytes > MAX_LUA_BYTES) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
                             error: `Lua source is ${codeBytes} bytes; the maximum is ${MAX_LUA_BYTES} bytes.`,
                             realm: executionRealm,
                             cursor: this.cursor,
@@ -382,21 +468,37 @@ export class GmodMcpHost implements vscode.Disposable {
 
                     const observationCursor = this.cursor;
                     try {
-                        const result = await this.options.executeControlCommand('runLua', {
-                            lua: code,
-                            realm: executionRealm,
-                        });
+                        const command = hasCode ? 'runLua' : action === 'refresh' ? 'refreshFile' : 'runFile';
+                        const args = hasCode
+                            ? { lua: code, realm: executionRealm }
+                            : { path: file, realm: executionRealm };
+                        const result = await this.options.executeControlCommand(command, args);
+                        const observed = action === 'execute' && result.ok
+                            ? await this.observeRuntimeAfter(observationCursor)
+                            : undefined;
                         const data = {
                             ok: result.ok,
+                            status: result.ok ? 'ok' : 'failed',
+                            input: hasCode ? 'inline' : 'file',
+                            action,
+                            file: hasFile ? file : undefined,
                             realm: result.realm,
                             correlationId: result.correlationId,
-                            cursor: observationCursor,
+                            result: hasCode ? result.result : undefined,
+                            observed,
+                            observationCursor,
+                            cursor: observed?.cursor ?? observationCursor,
+                            autoRefresh: hasFile
+                                ? 'Saved eligible Garry\'s Mod Lua files normally refresh automatically; avoid duplicate execution after ordinary edits.'
+                                : undefined,
                         };
-                        return toolResult(data, !result.ok, false);
+                        return toolResult(data, !result.ok, observed != null || result.result != null);
                     } catch (error) {
                         const data = {
                             ok: false,
+                            status: 'failed',
                             error: truncateUtf8(errorMessage(error), MAX_ENTRY_TEXT_BYTES),
+                            observationCursor,
                             cursor: observationCursor,
                         };
                         return toolResult(data, true, false);
@@ -406,13 +508,72 @@ export class GmodMcpHost implements vscode.Disposable {
         );
 
         server.registerTool(
+            'run_console_command',
+            {
+                title: 'Run a Garry\'s Mod Server Console Command',
+                description: 'Run exactly one command in the Garry\'s Mod server console through the active server debugger. This never runs a command on clients. Command chaining with semicolons or control characters is rejected by gm_rdb. The command can mutate or stop the development server; pass the returned cursor to read_console to inspect output.',
+                inputSchema: {
+                    command: z.string().min(1).max(MAX_CONSOLE_COMMAND_BYTES).describe('One server console command with arguments, without a trailing newline or semicolon-chained commands. Limited to 2048 UTF-8 bytes.'),
+                },
+                annotations: {
+                    destructiveHint: true,
+                    idempotentHint: false,
+                    openWorldHint: true,
+                    readOnlyHint: false,
+                },
+            },
+            async ({ command }) => {
+                return this.executeExclusive(async () => {
+                    const commandBytes = Buffer.byteLength(command, 'utf8');
+                    if (commandBytes > MAX_CONSOLE_COMMAND_BYTES) {
+                        return toolResult({
+                            ok: false,
+                            status: 'rejected',
+                            error: `Console command is ${commandBytes} bytes; the maximum is ${MAX_CONSOLE_COMMAND_BYTES} bytes.`,
+                            cursor: this.cursor,
+                        }, true, false);
+                    }
+
+                    const observationCursor = this.cursor;
+                    try {
+                        const result = await this.options.executeControlCommand('runCommand', { command });
+                        const observed = result.ok
+                            ? await this.observeRuntimeAfter(observationCursor)
+                            : undefined;
+                        return toolResult({
+                            ok: result.ok,
+                            status: result.ok ? 'ok' : 'failed',
+                            realm: 'server',
+                            correlationId: result.correlationId,
+                            observed,
+                            observationCursor,
+                            cursor: observed?.cursor ?? observationCursor,
+                        }, !result.ok, observed != null);
+                    } catch (error) {
+                        return toolResult({
+                            ok: false,
+                            status: 'failed',
+                            realm: 'server',
+                            error: truncateUtf8(errorMessage(error), MAX_ENTRY_TEXT_BYTES),
+                            observationCursor,
+                            cursor: observationCursor,
+                        }, true, false);
+                    }
+                });
+            }
+        );
+
+        server.registerTool(
             'read_console',
             {
                 title: 'Read Garry\'s Mod Console',
-                description: 'Read captured Garry\'s Mod console lines in chronological order. Omit cursor to get the latest lines; pass the previous response cursor to get only newer lines.',
+                description: 'Read a bounded, filterable page of captured Garry\'s Mod console lines. Omit cursor for the latest lines; pass a previous cursor to page forward chronologically without skipping buffered output.',
                 inputSchema: {
-                    lines: z.number().int().min(1).max(200).optional().describe('Maximum lines to return. Defaults to 100.'),
+                    lines: z.number().int().min(1).max(200).optional().describe('Maximum lines to return. Defaults to 50.'),
                     cursor: z.number().int().nonnegative().optional().describe('Return only lines captured after this cursor.'),
+                    realm: z.enum(['server', 'client', 'shared']).optional().describe('Only return lines from this realm.'),
+                    source: z.string().min(1).max(256).optional().describe('Case-insensitive source substring filter.'),
+                    contains: z.string().min(1).max(256).optional().describe('Case-insensitive message substring filter.'),
                 },
                 annotations: {
                     readOnlyHint: true,
@@ -421,27 +582,43 @@ export class GmodMcpHost implements vscode.Disposable {
                     openWorldHint: false,
                 },
             },
-            ({ lines = 100, cursor }) => {
-                const candidates = cursor == null
+            ({ lines = 50, cursor, realm, source, contains }) => {
+                const candidates = (cursor == null
                     ? this.consoleLines
-                    : this.consoleLines.filter((line) => line.cursor > cursor);
-                const selected = takeNewestWithinBudget(candidates, lines, MAX_TOOL_DATA_BYTES);
+                    : this.consoleLines.filter((line) => line.cursor > cursor))
+                    .filter((line) => realm == null || line.realm === realm)
+                    .filter((line) => matchesText(line.source, source))
+                    .filter((line) => matchesText(line.message, contains));
+                const selected = cursor == null
+                    ? takeNewestWithinBudget(candidates, lines, MAX_TOOL_DATA_BYTES)
+                    : takeFirstWithinBudget(candidates, lines, MAX_TOOL_DATA_BYTES);
+                const nextCursor = selected.items.length > 0
+                    ? selected.items[selected.items.length - 1].cursor
+                    : cursor ?? this.cursor;
                 return toolResult({
                     lines: selected.items,
-                    cursor: this.cursor,
+                    cursor: nextCursor,
+                    latestCursor: this.cursor,
+                    matched: candidates.length,
+                    dropped: cursor != null && cursor < this.consoleDroppedThroughCursor,
                     truncated: selected.truncated || selected.items.some((line) => line.truncated),
                 }, false, true);
             }
         );
 
         server.registerTool(
-            'read_issues',
+            'get_errors',
             {
-                title: 'Read GLua Issues',
-                description: 'Read Garry\'s Mod runtime Lua errors and GLuaLS language-server errors/warnings. Runtime issues include first/last occurrence timestamps and repeat counts.',
+                title: 'Get Garry\'s Mod Runtime Errors',
+                description: 'Read only in-game runtime errors captured by the debugger. Defaults to Lua errors without stack traces; narrow by realm, source, cursor, repeat count, or text to minimize context.',
                 inputSchema: {
-                    source: z.enum(['all', 'runtime', 'language']).optional().describe('Issue source to include. Defaults to all.'),
-                    limit: z.number().int().min(1).max(500).optional().describe('Maximum issues to return per source. Defaults to 100.'),
+                    source: z.enum(['lua', 'console', 'debugger', 'all']).optional().describe('Runtime error source. Defaults to lua.'),
+                    realm: z.enum(['server', 'client', 'shared']).optional().describe('Only return errors from this realm.'),
+                    cursor: z.number().int().nonnegative().optional().describe('Return errors first observed or updated after this cursor.'),
+                    minCount: z.number().int().min(1).optional().describe('Only return errors seen at least this many times.'),
+                    contains: z.string().min(1).max(256).optional().describe('Case-insensitive message or fingerprint substring filter.'),
+                    includeStackTrace: z.boolean().optional().describe('Include stack traces. Defaults to false to reduce context.'),
+                    limit: z.number().int().min(1).max(100).optional().describe('Maximum errors to return. Defaults to 25.'),
                 },
                 annotations: {
                     readOnlyHint: true,
@@ -450,35 +627,74 @@ export class GmodMcpHost implements vscode.Disposable {
                     openWorldHint: false,
                 },
             },
-            ({ source = 'all', limit = 100 }) => {
-                const runtime = source === 'language'
-                    ? []
-                    : [...this.runtimeIssues.values()].sort((left, right) => right.lastSeen.localeCompare(left.lastSeen));
-                const language = source === 'runtime' ? [] : this.options.getLanguageIssues();
-                const sanitizedLanguage = language.slice(0, limit).map((issue) => ({
-                    ...issue,
-                    file: truncateUtf8(issue.file, MAX_ENTRY_TEXT_BYTES),
-                    message: truncateUtf8(issue.message, MAX_ENTRY_TEXT_BYTES),
-                    code: typeof issue.code === 'string'
-                        ? truncateUtf8(issue.code, MAX_METADATA_BYTES)
-                        : issue.code,
-                    source: issue.source == null ? undefined : truncateUtf8(issue.source, MAX_METADATA_BYTES),
-                    truncated: truncateUtf8(issue.file, MAX_ENTRY_TEXT_BYTES) !== issue.file
-                        || truncateUtf8(issue.message, MAX_ENTRY_TEXT_BYTES) !== issue.message
-                        || (typeof issue.code === 'string' && truncateUtf8(issue.code, MAX_METADATA_BYTES) !== issue.code)
-                        || (issue.source != null && truncateUtf8(issue.source, MAX_METADATA_BYTES) !== issue.source),
+            ({ source = 'lua', realm, cursor, minCount = 1, contains, includeStackTrace = false, limit = 25 }) => {
+                const runtime = [...this.runtimeIssues.values()]
+                    .filter((error) => source === 'all' || error.source === source)
+                    .filter((error) => realm == null || error.realm === realm)
+                    .filter((error) => cursor == null || error.cursor > cursor)
+                    .filter((error) => error.count >= minCount)
+                    .filter((error) => matchesText(`${error.message}\n${error.fingerprint}`, contains))
+                    .sort((left, right) => cursor == null
+                        ? right.lastSeen.localeCompare(left.lastSeen)
+                        : left.cursor - right.cursor);
+                const projected = runtime.map((error) => ({
+                    ...error,
+                    stackTrace: includeStackTrace ? error.stackTrace : undefined,
+                    hasStackTrace: error.stackTrace.length > 0,
                 }));
-                const selectedRuntime = takeFirstWithinBudget(runtime, limit, MAX_TOOL_DATA_BYTES / 2);
-                const selectedLanguage = takeFirstWithinBudget(sanitizedLanguage, limit, MAX_TOOL_DATA_BYTES / 2);
+                const selected = takeFirstWithinBudget(projected, limit, MAX_TOOL_DATA_BYTES);
+                const nextCursor = selected.items.length > 0
+                    ? selected.items[selected.items.length - 1].cursor
+                    : cursor ?? this.cursor;
                 return toolResult({
-                    runtimeIssues: selectedRuntime.items,
-                    languageIssues: selectedLanguage.items,
-                    runtimeTotal: runtime.length,
-                    languageTotal: language.length,
-                    truncated: selectedRuntime.truncated
-                        || selectedRuntime.items.some((issue) => issue.truncated)
-                        || selectedLanguage.items.length < language.length
-                        || selectedLanguage.items.some((issue) => issue.truncated),
+                    errors: selected.items,
+                    cursor: nextCursor,
+                    latestCursor: this.cursor,
+                    matched: runtime.length,
+                    dropped: cursor != null && cursor < this.runtimeDroppedThroughCursor,
+                    truncated: selected.truncated || selected.items.some((error) => error.truncated),
+                    observedAt: new Date().toISOString(),
+                }, false, true);
+            }
+        );
+
+        server.registerTool(
+            'get_issues',
+            {
+                title: 'Get GLuaLS Issues',
+                description: 'Read only current GLuaLS language-server errors and warnings. Filter by severity, workspace path, diagnostic code, or message and page with offset/limit.',
+                inputSchema: {
+                    severity: z.enum(['error', 'warning', 'all']).optional().describe('Diagnostic severity. Defaults to all.'),
+                    path: z.string().min(1).max(MAX_ENTRY_TEXT_BYTES).optional().describe('Case-insensitive file path substring filter.'),
+                    code: z.string().min(1).max(256).optional().describe('Exact diagnostic code filter.'),
+                    contains: z.string().min(1).max(256).optional().describe('Case-insensitive message substring filter.'),
+                    offset: z.number().int().nonnegative().optional().describe('Number of matching issues to skip. Defaults to 0.'),
+                    limit: z.number().int().min(1).max(200).optional().describe('Maximum issues to return. Defaults to 50.'),
+                },
+                annotations: {
+                    readOnlyHint: true,
+                    destructiveHint: false,
+                    idempotentHint: true,
+                    openWorldHint: false,
+                },
+            },
+            ({ severity = 'all', path, code, contains, offset = 0, limit = 50 }) => {
+                const language = this.options.getLanguageIssues()
+                    .filter((issue) => severity === 'all' || issue.severity === severity)
+                    .filter((issue) => matchesText(issue.file, path))
+                    .filter((issue) => code == null || String(issue.code) === code)
+                    .filter((issue) => matchesText(issue.message, contains));
+                const sanitized = language.slice(offset, offset + limit).map(sanitizeLanguageIssue);
+                const selected = takeFirstWithinBudget(sanitized, limit, MAX_TOOL_DATA_BYTES);
+                const nextOffset = offset + selected.items.length;
+                return toolResult({
+                    issues: selected.items,
+                    offset,
+                    nextOffset: nextOffset < language.length ? nextOffset : undefined,
+                    matched: language.length,
+                    truncated: selected.truncated
+                        || nextOffset < language.length
+                        || selected.items.some((issue) => issue.truncated),
                     observedAt: new Date().toISOString(),
                 }, false, true);
             }
@@ -656,6 +872,10 @@ export class GmodMcpHost implements vscode.Disposable {
             if (oldest == null) {
                 return;
             }
+            const issue = this.runtimeIssues.get(oldest);
+            if (issue) {
+                this.runtimeDroppedThroughCursor = Math.max(this.runtimeDroppedThroughCursor, issue.cursor);
+            }
             this.runtimeIssues.delete(oldest);
         }
     }
@@ -672,6 +892,36 @@ export class GmodMcpHost implements vscode.Disposable {
         } finally {
             release();
         }
+    }
+
+    private async observeRuntimeAfter(cursor: number) {
+        await delay(100);
+        const console = takeFirstWithinBudget(
+            this.consoleLines.filter((line) => line.cursor > cursor),
+            20,
+            MAX_TOOL_DATA_BYTES / 2
+        );
+        const errors = takeFirstWithinBudget(
+            [...this.runtimeIssues.values()]
+                .filter((error) => error.cursor > cursor)
+                .sort((left, right) => left.cursor - right.cursor)
+                .map((error) => ({
+                    ...error,
+                    stackTrace: undefined,
+                    hasStackTrace: error.stackTrace.length > 0,
+                })),
+            10,
+            MAX_TOOL_DATA_BYTES / 2
+        );
+        return {
+            console: console.items,
+            errors: errors.items,
+            cursor: this.cursor,
+            dropped: cursor < this.consoleDroppedThroughCursor || cursor < this.runtimeDroppedThroughCursor,
+            truncated: console.truncated || errors.truncated,
+            attribution: 'best-effort',
+            note: 'These events were observed immediately after dispatch and can include unrelated game activity. Use read_console and get_errors with the returned cursor for later or paged results.',
+        };
     }
 }
 
@@ -732,10 +982,30 @@ function coerceTimestamp(value: unknown): string {
     return new Date().toISOString();
 }
 
-function trimFront<T>(items: T[], maximum: number): void {
-    if (items.length > maximum) {
-        items.splice(0, items.length - maximum);
-    }
+function matchesText(value: string, query: string | undefined): boolean {
+    return query == null || value.toLowerCase().includes(query.toLowerCase());
+}
+
+function sanitizeLanguageIssue(issue: GmodLanguageIssue) {
+    const file = truncateUtf8(issue.file, MAX_ENTRY_TEXT_BYTES);
+    const message = truncateUtf8(issue.message, MAX_ENTRY_TEXT_BYTES);
+    const code = typeof issue.code === 'string'
+        ? truncateUtf8(issue.code, MAX_METADATA_BYTES)
+        : issue.code;
+    const source = issue.source == null
+        ? undefined
+        : truncateUtf8(issue.source, MAX_METADATA_BYTES);
+    return {
+        ...issue,
+        file,
+        message,
+        code,
+        source,
+        truncated: file !== issue.file
+            || message !== issue.message
+            || code !== issue.code
+            || source !== issue.source,
+    };
 }
 
 function takeNewestWithinBudget<T>(items: T[], maximum: number, byteBudget: number): { items: T[]; truncated: boolean } {
@@ -800,4 +1070,8 @@ function errorMessage(error: unknown): string {
 
 function hashString(value: string): string {
     return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
