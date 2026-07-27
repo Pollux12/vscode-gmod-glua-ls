@@ -40,6 +40,7 @@ export type DebugRequest =
 export interface DebugClientAdapter {
   onMessage: TypedEventTarget<JsonRpcMessage>
   onOpen: TypedEventTarget<void>
+  onDisconnect: TypedEventTarget<Error>
   onClose: TypedEventTarget<void>
   onError: TypedEventTarget<Error>
   send(request: DebugRequest): boolean
@@ -61,6 +62,7 @@ export class Client {
 
     this.onClose = adapter.onClose
     this.onOpen = adapter.onOpen
+    this.onDisconnect = adapter.onDisconnect
     this.onTransportError = adapter.onError
   }
   get currentStatus(): RunningStatus | undefined {
@@ -353,6 +355,7 @@ export class Client {
   onNotify: TypedEventEmitter<DebuggerNotify> = new TypedEventEmitter<DebuggerNotify>()
   onClose: TypedEventTarget<void>
   onOpen: TypedEventTarget<void>
+  onDisconnect: TypedEventTarget<Error>
   onTransportError: TypedEventTarget<Error>
 }
 

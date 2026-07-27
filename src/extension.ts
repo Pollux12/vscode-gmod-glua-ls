@@ -19,7 +19,8 @@ import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
-import { GmodLanguageIssue, GmodMcpHost } from './gmodMcpHost';
+import { GmodLanguageIssue, GmodMcpControlCommand, GmodMcpHost } from './gmodMcpHost';
+import { GmodMcpSessionRegistry } from './gmodMcpSessions';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
@@ -101,6 +102,7 @@ let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodRdbUpdater: GmodRdbUpdater | undefined;
 let gmodClientRdbUpdater: GmodClientRdbUpdater | undefined;
 let gmodMcpHost: GmodMcpHost | undefined;
+const gmodMcpSessionRegistry = new GmodMcpSessionRegistry();
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
 const gmodErrorStores = new Map<string, GmodErrorStore>();
@@ -1254,6 +1256,21 @@ async function executeGmodControlCommand(command: GmodControlCommand, args: Reco
     return response as GmodControlResult;
 }
 
+async function executeGmodMcpControlCommand(
+    command: GmodMcpControlCommand,
+    args: Record<string, unknown>,
+    sessionId: string
+): Promise<GmodControlResult> {
+    // Re-resolve the pinned ID at dispatch time so queued MCP work cannot fall back to another session.
+    const { session } = gmodMcpSessionRegistry.resolveServerControlTarget(sessionId);
+    const realmAwareCommands: GmodMcpControlCommand[] = ['runLua', 'runFile', 'refreshFile'];
+    const payload = realmAwareCommands.includes(command)
+        ? { realm: getPersistedGmodRealm(session), ...args }
+        : args;
+    const response = await session.customRequest('gmod.control', { command, ...payload });
+    return response as GmodControlResult;
+}
+
 async function runGmodRunLua(): Promise<void> {
     const lua = await vscode.window.showInputBox({
         title: 'Run Lua in Garry\'s Mod',
@@ -1423,6 +1440,8 @@ async function setGmodRealm(realm?: string): Promise<void> {
 }
 
 function onDidStartDebugSession(session: vscode.DebugSession): void {
+    gmodMcpSessionRegistry.register(session);
+
     if (session.type === 'gluals_gmod') {
         void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
         gmodErrorStores.set(session.id, new GmodErrorStore());
@@ -1441,6 +1460,8 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
 }
 
 function onDidTerminateDebugSession(session: vscode.DebugSession): void {
+    gmodMcpSessionRegistry.markTerminated(session.id);
+
     const store = gmodErrorStores.get(session.id);
     if (store) {
         store.dispose();
@@ -1810,7 +1831,9 @@ function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
     gmodMcpHost = new GmodMcpHost({
         secretStorage: context.secrets,
         serverVersion: String(context.extension.packageJSON.version ?? '0.0.0'),
-        executeControlCommand: executeGmodControlCommand,
+        resolveControlSession: (sessionId) => gmodMcpSessionRegistry.resolveServerControlTarget(sessionId).descriptor,
+        executeControlCommand: executeGmodMcpControlCommand,
+        getRuntimeSessions: () => gmodMcpSessionRegistry.getDescriptors(),
         getLanguageIssues: getGmodLanguageIssues,
     });
     context.subscriptions.push(gmodMcpHost);
@@ -2011,6 +2034,7 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.connected') {
+        gmodMcpSessionRegistry.markConnected(event.session.id);
         if (event.body && typeof event.body === 'object' && gmodRdbUpdater) {
             const body = event.body as GmodConnectedBody;
             if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
@@ -2022,12 +2046,18 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.client.connected') {
+        gmodMcpSessionRegistry.markConnected(event.session.id);
         if (event.body && typeof event.body === 'object' && gmodClientRdbUpdater) {
             const body = event.body as GmodConnectedBody;
             if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
                 void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);
             }
         }
+        return;
+    }
+
+    if (event.event === 'gmod.disconnected' || event.event === 'gmod.client.disconnected') {
+        gmodMcpSessionRegistry.markDisconnected(event.session.id);
         return;
     }
 

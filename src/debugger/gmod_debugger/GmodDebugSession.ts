@@ -366,8 +366,13 @@ export class GmodDebugSession extends DebugSession {
       })
 
       this._debug_client.onTransportError.on((err) => {
+        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}\n`))
+      })
+
+      this._debug_client.onDisconnect.on((err) => {
         this._serverInitCompleted = false
-        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}. Waiting for server to reconnect...\n`))
+        this.sendEvent(new DebugEvent('gmod.disconnected', { reason: err.message.slice(0, 256) }))
+        this.sendEvent(new OutputEvent(`Debugger disconnected. Waiting for server to reconnect...\n`))
       })
 
       this._debug_server_process.stdout?.on('data', (chunk: Buffer | string) => {
@@ -466,8 +471,13 @@ export class GmodDebugSession extends DebugSession {
       })
 
       this._debug_client.onTransportError.on((err) => {
+        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}\n`))
+      })
+
+      this._debug_client.onDisconnect.on((err) => {
         this._serverInitCompleted = false
-        this.sendEvent(new OutputEvent(`Debugger transport error: ${err.message}. Waiting for server to reconnect...\n`))
+        this.sendEvent(new DebugEvent('gmod.disconnected', { reason: err.message.slice(0, 256) }))
+        this.sendEvent(new OutputEvent(`Debugger disconnected. Waiting for server to reconnect...\n`))
       })
 
       this.sendResponse(response)

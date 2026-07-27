@@ -76,9 +76,9 @@ export class TcpAdapter implements DebugClientAdapter {
         return
       }
 
-      this.onError.emit(
-        new Error(`Debugger transport closed, reconnecting to ${this._host}:${this._port}`)
-      )
+      const error = new Error(`Debugger transport closed, reconnecting to ${this._host}:${this._port}`)
+      this.onDisconnect.emit(error)
+      this.onError.emit(error)
 
       this.scheduleReconnectForCurrentGeneration(generation)
     })
@@ -192,5 +192,6 @@ export class TcpAdapter implements DebugClientAdapter {
   }
   onClose: TypedEventEmitter<void> = new TypedEventEmitter<void>()
   onOpen: TypedEventEmitter<void> = new TypedEventEmitter<void>()
+  onDisconnect: TypedEventEmitter<Error> = new TypedEventEmitter<Error>()
   onError: TypedEventEmitter<Error> = new TypedEventEmitter<Error>()
 }

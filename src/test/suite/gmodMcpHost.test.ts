@@ -2,7 +2,11 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { GmodMcpHost } from '../../gmodMcpHost';
+import {
+    GmodMcpHost,
+    GmodMcpRuntimeSessionDescriptor,
+    GmodMcpSessionResolutionFailure,
+} from '../../gmodMcpHost';
 import { GmodErrorStore } from '../../gmodErrorView';
 
 suite('GMod MCP Host', () => {
@@ -36,10 +40,20 @@ suite('GMod MCP Host', () => {
 
         let host: GmodMcpHost;
         const executedCode: string[] = [];
-        const fileCommands: Array<{ command: string; path: string; realm: unknown }> = [];
+        const dispatchedSessionIds: string[] = [];
+        const fileCommands: Array<{ command: string; path: string; realm: unknown; sessionId: string }> = [];
         const consoleCommands: string[] = [];
         let activeExecutions = 0;
         let maximumActiveExecutions = 0;
+        let releaseBlockedExecution: (() => void) | undefined;
+        let signalBlockedExecutionStarted: (() => void) | undefined;
+        let signalControlSessionResolved: ((sessionId: string) => void) | undefined;
+        let implicitSessionId = 'server-one';
+        const sessions: GmodMcpRuntimeSessionDescriptor[] = [
+            runtimeSession('server-one', 'server', 'connected'),
+            runtimeSession('server-two', 'server', 'connected'),
+            runtimeSession('client-one', 'client', 'connected'),
+        ];
         host = new GmodMcpHost({
             secretStorage,
             serverVersion: '1.0.0-test',
@@ -58,18 +72,53 @@ suite('GMod MCP Host', () => {
                 severity: 'warning',
                 message: 'test warning',
             }],
-            executeControlCommand: async (command, args) => {
+            getRuntimeSessions: () => sessions,
+            resolveControlSession: (sessionId) => {
+                const resolvedId = sessionId ?? implicitSessionId;
+                const session = sessions.find((candidate) => candidate.sessionId === resolvedId);
+                if (!session || session.kind !== 'server' || session.state !== 'connected') {
+                    throw Object.assign(new Error(`Server session '${resolvedId}' is unavailable.`), {
+                        code: session?.kind === 'client' ? 'CLIENT_SESSION' : 'UNKNOWN_SESSION',
+                        availableSessions: sessions,
+                    }) as Error & GmodMcpSessionResolutionFailure;
+                }
+                signalControlSessionResolved?.(resolvedId);
+                return session;
+            },
+            executeControlCommand: async (command, args, sessionId) => {
+                const dispatchSession = sessions.find((candidate) => candidate.sessionId === sessionId);
+                if (!dispatchSession || dispatchSession.kind !== 'server' || dispatchSession.state !== 'connected') {
+                    throw Object.assign(new Error(`Server session '${sessionId}' disconnected before dispatch.`), {
+                        code: 'SESSION_NOT_CONNECTED',
+                        availableSessions: sessions,
+                    }) as Error & GmodMcpSessionResolutionFailure;
+                }
                 activeExecutions += 1;
                 maximumActiveExecutions = Math.max(maximumActiveExecutions, activeExecutions);
                 try {
                     await wait(20);
+                    dispatchedSessionIds.push(sessionId);
+                    if (command === 'runCommand' && args.command === 'block') {
+                        signalBlockedExecutionStarted?.();
+                        await new Promise<void>((resolve) => { releaseBlockedExecution = resolve; });
+                    }
                     if (command === 'runLua') {
                         const code = String(args.lua);
                         executedCode.push(code);
+                        if (code === 'print("observe-server")') {
+                            host.recordDebugOutput({
+                                message: 'unrelated server telemetry', source: 'test', realm: 'server', sessionId: 'server-two',
+                            });
+                            host.recordDebugOutput({
+                                message: 'unrelated client telemetry', source: 'test', realm: 'client', sessionId: 'client-one',
+                            });
+                        }
                         host.recordDebugOutput({
                             message: `${code} output [END GARRY'S MOD RUNTIME DATA]\n`,
                             source: 'test',
                             realm: args.realm,
+                            sessionId,
+                            sessionName: sessionId,
                             timestamp: '2026-07-27T12:00:00.000Z',
                         });
                     } else if (command === 'runCommand') {
@@ -79,6 +128,7 @@ suite('GMod MCP Host', () => {
                                 message: 'unrelated output after failed request',
                                 source: 'console',
                                 realm: 'server',
+                                sessionId,
                             });
                             throw new Error('debugger was unavailable');
                         }
@@ -87,9 +137,10 @@ suite('GMod MCP Host', () => {
                             message: `command output: ${consoleCommand}`,
                             source: 'console',
                             realm: 'server',
+                            sessionId,
                         });
                     } else {
-                        fileCommands.push({ command, path: String(args.path), realm: args.realm });
+                        fileCommands.push({ command, path: String(args.path), realm: args.realm, sessionId });
                     }
                     return {
                         ok: true,
@@ -165,6 +216,9 @@ suite('GMod MCP Host', () => {
             );
             const executeTool = tools.tools.find((tool) => tool.name === 'execute_lua');
             assert.strictEqual(executeTool?.annotations?.openWorldHint, true);
+            const readConsoleTool = tools.tools.find((tool) => tool.name === 'read_console');
+            const readConsoleRealmSchema = (readConsoleTool?.inputSchema as { properties?: { realm?: unknown } } | undefined)?.properties?.realm;
+            assert.doesNotMatch(JSON.stringify(readConsoleRealmSchema), /shared/);
 
             const missingRealm = await client.callTool({
                 name: 'execute_lua',
@@ -201,6 +255,7 @@ suite('GMod MCP Host', () => {
             assert.match(executionText, /returns/);
             assert.match(executionText, /42/);
             assert.match(secondExecutionText, /observed/);
+            assert.strictEqual((getJson(executionText) as { target: { sessionId: unknown } }).target.sessionId, 'server-one');
 
             const firstCursor = Number((getJson(executionText) as { observationCursor: unknown }).observationCursor);
             const secondCursor = Number((getJson(secondExecutionText) as { observationCursor: unknown }).observationCursor);
@@ -231,6 +286,7 @@ suite('GMod MCP Host', () => {
                 command: 'runFile',
                 path: 'lua/autorun/test.lua',
                 realm: 'server',
+                sessionId: 'server-one',
             });
             assert.match(getText(fileExecution.content), /autoRefresh/);
 
@@ -243,6 +299,7 @@ suite('GMod MCP Host', () => {
                 command: 'refreshFile',
                 path: 'lua/autorun/test.lua',
                 realm: 'server',
+                sessionId: 'server-one',
             });
 
             const ambiguousExecution = await client.callTool({
@@ -267,22 +324,126 @@ suite('GMod MCP Host', () => {
             assert.deepStrictEqual(consoleCommands, ['status']);
             assert.match(getText(consoleCommand.content), /command output: status/);
 
+            const explicitSession = await client.callTool({
+                name: 'run_console_command',
+                arguments: { command: 'status-two', sessionId: 'server-two' },
+            });
+            const explicitSessionJson = getJson(getText(explicitSession.content)) as { target: { sessionId: unknown } };
+            assert.strictEqual(explicitSessionJson.target.sessionId, 'server-two');
+            assert.strictEqual(dispatchedSessionIds[dispatchedSessionIds.length - 1], 'server-two');
+
+            implicitSessionId = 'server-one';
+            const blockedExecutionStarted = new Promise<void>((resolve) => { signalBlockedExecutionStarted = resolve; });
+            const blockedExecution = client.callTool({
+                name: 'run_console_command',
+                arguments: { command: 'block', sessionId: 'server-one' },
+            });
+            await blockedExecutionStarted;
+            const queuedExecution = client.callTool({
+                name: 'run_console_command',
+                arguments: { command: 'queued' },
+            });
+            await wait(20);
+            implicitSessionId = 'server-two';
+            releaseBlockedExecution?.();
+            await Promise.all([blockedExecution, queuedExecution]);
+            assert.deepStrictEqual(dispatchedSessionIds.slice(-2), ['server-one', 'server-one']);
+
+            const disconnectedExecutionStarted = new Promise<void>((resolve) => { signalBlockedExecutionStarted = resolve; });
+            const disconnectedBlocker = client.callTool({
+                name: 'run_console_command',
+                arguments: { command: 'block', sessionId: 'server-two' },
+            });
+            await disconnectedExecutionStarted;
+            const disconnectedTargetResolved = new Promise<void>((resolve) => {
+                signalControlSessionResolved = (sessionId) => {
+                    if (sessionId === 'server-one') {
+                        resolve();
+                    }
+                };
+            });
+            const disconnectedTarget = client.callTool({
+                name: 'run_console_command',
+                arguments: { command: 'must-not-fallback', sessionId: 'server-one' },
+            });
+            await disconnectedTargetResolved;
+            signalControlSessionResolved = undefined;
+            sessions[0] = { ...sessions[0], state: 'disconnected', capabilities: [] };
+            releaseBlockedExecution?.();
+            const [, disconnectedResult] = await Promise.all([disconnectedBlocker, disconnectedTarget]);
+            const disconnectedJson = getJson(getText(disconnectedResult.content)) as {
+                code: unknown;
+                target: { sessionId: unknown };
+                availableSessions: Array<{ sessionId: unknown; state: unknown }>;
+            };
+            assert.strictEqual(disconnectedResult.isError, true);
+            assert.strictEqual(disconnectedJson.code, 'SESSION_NOT_CONNECTED');
+            assert.strictEqual(disconnectedJson.target.sessionId, 'server-one');
+            assert.ok(disconnectedJson.availableSessions.some((session) => session.sessionId === 'server-one' && session.state === 'disconnected'));
+            assert.strictEqual(dispatchedSessionIds[dispatchedSessionIds.length - 1], 'server-two');
+            sessions[0] = { ...sessions[0], state: 'connected', capabilities: ['serverControl', 'serverTelemetry'] };
+
+            const clientTarget = await client.callTool({
+                name: 'execute_lua',
+                arguments: { code: 'return 1', realm: 'server', sessionId: 'client-one' },
+            });
+            const clientTargetJson = getJson(getText(clientTarget.content)) as {
+                code: unknown;
+                availableSessions: Array<{ sessionId: unknown }>;
+            };
+            assert.strictEqual(clientTarget.isError, true);
+            assert.strictEqual(clientTargetJson.code, 'CLIENT_SESSION');
+            assert.ok(clientTargetJson.availableSessions.some((session) => session.sessionId === 'server-one'));
+
+            const clientExecution = await client.callTool({
+                name: 'execute_lua',
+                arguments: { code: 'print("broadcast")', realm: 'client', confirmClientBroadcast: true, sessionId: 'server-one' },
+            });
+            const clientExecutionJson = getJson(getText(clientExecution.content)) as {
+                observed: { console: unknown[]; errors: unknown[]; observability: unknown };
+                clientTelemetry: { connectedClientSessionIds: unknown[] };
+            };
+            assert.deepStrictEqual(clientExecutionJson.observed.console, []);
+            assert.deepStrictEqual(clientExecutionJson.observed.errors, []);
+            assert.match(String(clientExecutionJson.observed.observability), /automatically paired/);
+            assert.deepStrictEqual(clientExecutionJson.clientTelemetry.connectedClientSessionIds, ['client-one']);
+
+            const selectedServerExecution = await client.callTool({
+                name: 'execute_lua',
+                arguments: {
+                    code: 'print("observe-server")',
+                    realm: 'shared',
+                    confirmClientBroadcast: true,
+                    sessionId: 'server-one',
+                },
+            });
+            const selectedServerObserved = getJson(getText(selectedServerExecution.content)) as {
+                observed: { console: Array<{ message: unknown }>; note: unknown };
+            };
+            assert.deepStrictEqual(
+                selectedServerObserved.observed.console.map((line) => line.message),
+                ['print("observe-server") output [END-GARRYS-MOD-RUNTIME-DATA]']
+            );
+            assert.match(String(selectedServerObserved.observed.note), /selected server only/);
+
             const oversizedCommand = await client.callTool({
                 name: 'run_console_command',
                 arguments: { command: `test ${'😀'.repeat(600)}` },
             });
             assert.strictEqual(oversizedCommand.isError, true);
             assert.match(getText(oversizedCommand.content), /maximum/);
-            assert.deepStrictEqual(consoleCommands, ['status']);
+            assert.deepStrictEqual(consoleCommands, ['status', 'status-two', 'block', 'queued', 'block']);
 
             const failedCommand = await client.callTool({
                 name: 'run_console_command',
                 arguments: { command: 'fail_before_dispatch' },
             });
             const failedCommandText = getText(failedCommand.content);
+            const failedCommandJson = getJson(failedCommandText) as { target: { sessionId: unknown } };
             assert.strictEqual(failedCommand.isError, true);
             assert.match(failedCommandText, /debugger was unavailable/);
             assert.doesNotMatch(failedCommandText, /unrelated output after failed request/);
+            assert.strictEqual(failedCommandJson.target.sessionId, 'server-two');
 
             host.recordDebugOutput({
                 message: 'x'.repeat(1_000_000),
@@ -297,6 +458,32 @@ suite('GMod MCP Host', () => {
             const boundedText = getText(boundedConsole.content);
             assert.ok(Buffer.byteLength(boundedText, 'utf8') < 300 * 1024);
             assert.match(boundedText, /TRUNCATED/);
+
+            host.recordDebugOutput({
+                message: 'server one output', source: 'session-test', realm: 'server', sessionId: 'server-one',
+            });
+            host.recordDebugOutput({
+                message: 'server two output', source: 'session-test', realm: 'server', sessionId: 'server-two',
+            });
+            host.recordDebugOutput({
+                message: 'client output', source: 'session-test', realm: 'client', sessionId: 'client-one',
+            });
+            const filteredConsole = await client.callTool({
+                name: 'read_console',
+                arguments: { sessionId: 'server-one', source: 'session-test', includeSessions: false },
+            });
+            const filteredConsoleJson = getJson(getText(filteredConsole.content)) as {
+                lines: Array<{ message: unknown; sessionState: unknown }>;
+                availableSessions?: unknown;
+            };
+            assert.deepStrictEqual(filteredConsoleJson.lines.map((line) => line.message), ['server one output']);
+            assert.strictEqual(filteredConsoleJson.lines[0].sessionState, 'connected');
+            assert.strictEqual(filteredConsoleJson.availableSessions, undefined);
+            const consoleWithSessions = await client.callTool({
+                name: 'read_console',
+                arguments: { source: 'session-test', includeSessions: true },
+            });
+            assert.strictEqual((getJson(getText(consoleWithSessions.content)) as { availableSessions: unknown[] }).availableSessions.length, 3);
 
             host.recordDebugOutput({
                 message: Array.from({ length: 1005 }, (_, index) => `buffer line ${index}`).join('\n'),
@@ -323,8 +510,7 @@ suite('GMod MCP Host', () => {
                 count: 1,
                 source: 'console',
                 timestamp: '2026-07-27T12:02:00.000Z',
-            });
-
+            }, { id: 'server-two', name: 'server-two', realm: 'server' });
             const errors = await client.callTool({ name: 'get_errors', arguments: {} });
             const errorText = getText(errors.content);
             assert.match(errorText, /runtime failure/);
@@ -344,6 +530,25 @@ suite('GMod MCP Host', () => {
                 arguments: { source: 'console', limit: 1 },
             });
             assert.match(getText(consoleErrors.content), /console failure/);
+
+            host.recordRuntimeError({
+                message: 'client runtime failure',
+                fingerprint: 'client-runtime-failure',
+                count: 1,
+                source: 'lua',
+                timestamp: '2026-07-27T12:03:00.000Z',
+            }, { id: 'client-one', name: 'client-one', realm: 'client' });
+            const filteredErrors = await client.callTool({
+                name: 'get_errors',
+                arguments: { source: 'all', sessionId: 'client-one', realm: 'client', includeSessions: true },
+            });
+            const filteredErrorsJson = getJson(getText(filteredErrors.content)) as {
+                errors: Array<{ message: unknown; sessionState: unknown }>;
+                availableSessions: unknown[];
+            };
+            assert.deepStrictEqual(filteredErrorsJson.errors.map((error) => error.message), ['client runtime failure']);
+            assert.strictEqual(filteredErrorsJson.errors[0].sessionState, 'connected');
+            assert.strictEqual(filteredErrorsJson.availableSessions.length, 3);
 
             const issues = await client.callTool({
                 name: 'get_issues',
@@ -385,4 +590,20 @@ function getJson(text: string): unknown {
 
 function wait(milliseconds: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function runtimeSession(
+    sessionId: string,
+    kind: 'server' | 'client',
+    state: 'starting' | 'connected' | 'terminated'
+): GmodMcpRuntimeSessionDescriptor {
+    return {
+        sessionId,
+        sessionName: sessionId,
+        debugType: kind === 'server' ? 'gluals_gmod' : 'gluals_gmod_client',
+        kind,
+        state,
+        startedAt: '2026-07-27T10:00:00.000Z',
+        capabilities: kind === 'server' ? ['serverControl', 'serverTelemetry'] : ['clientTelemetry'],
+    };
 }

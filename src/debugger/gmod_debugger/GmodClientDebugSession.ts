@@ -275,7 +275,12 @@ export class GmodClientDebugSession extends DebugSession {
       })
 
       this._debug_client.onTransportError.on((err) => {
-        this.sendEvent(new OutputEvent(`[Client] Debugger transport error: ${err.message}. Waiting for client to reconnect...\n`))
+        this.sendEvent(new OutputEvent(`[Client] Debugger transport error: ${err.message}\n`))
+      })
+
+      this._debug_client.onDisconnect.on((err) => {
+        this.sendEvent(new DebugEvent('gmod.client.disconnected', { reason: err.message.slice(0, 256) }))
+        this.sendEvent(new OutputEvent(`[Client] Debugger disconnected. Waiting for client to reconnect...\n`))
       })
 
       this.sendResponse(response)
