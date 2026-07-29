@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { LanguageClient } from 'vscode-languageclient/node';
 
 import {
     enableCompletionColorPreviewHtml,
@@ -14,6 +15,7 @@ import {
     onDidStartDebugSession,
     onDidTerminateDebugSession,
 } from '../../extension';
+import { GmodAnnotationManager } from '../../gmodAnnotationManager';
 import { activateExtension, getFixtureUri } from './helper';
 
 const COLOR_COMPLETION_DOCUMENTATION = '`Color(255, 255, 255)`';
@@ -41,6 +43,142 @@ async function countFailedStartupAttempts(command: string): Promise<number> {
         extensionContext.clearServerVersions = originalClearServerVersions;
     }
     return startupAttempts;
+}
+
+async function assertStopCancelsLazyInitialization(): Promise<void> {
+    const originalInitializeAnnotations = GmodAnnotationManager.prototype.initializeAnnotations;
+    const originalClearServerVersions = extensionContext.clearServerVersions;
+    const originalStopServer = extensionContext.stopServer;
+    let initializationStarted = false;
+    let stopObserved = false;
+    let startupAttempts = 0;
+    let releaseInitialization!: () => void;
+    const initializationGate = new Promise<void>((resolve) => {
+        releaseInitialization = resolve;
+    });
+    let startCommand: Thenable<unknown> | undefined;
+    let stopCommand: Thenable<unknown> | undefined;
+
+    GmodAnnotationManager.prototype.initializeAnnotations = async () => {
+        initializationStarted = true;
+        await initializationGate;
+    };
+    extensionContext.clearServerVersions = () => {
+        startupAttempts += 1;
+        originalClearServerVersions.call(extensionContext);
+    };
+    extensionContext.stopServer = async () => {
+        stopObserved = true;
+        await originalStopServer.call(extensionContext);
+    };
+
+    try {
+        startCommand = vscode.commands.executeCommand('gluals.startServer');
+        await waitForCondition(
+            () => initializationStarted,
+            'Expected lazy extension initialization to begin.'
+        );
+
+        stopCommand = vscode.commands.executeCommand('gluals.stopServer');
+        await waitForCondition(
+            () => stopObserved,
+            'Expected Stop Server to run while initialization was pending.'
+        );
+
+        releaseInitialization();
+        await Promise.all([startCommand, stopCommand]);
+
+        assert.strictEqual(
+            startupAttempts,
+            0,
+            'Stopping during lazy initialization must prevent language-server startup.'
+        );
+        assert.strictEqual(extensionContext.client, undefined);
+        assert.strictEqual(extensionContext.serverStatus.state, ServerState.Stopped);
+    } finally {
+        releaseInitialization();
+        if (startCommand) {
+            try {
+                await startCommand;
+            } catch {
+                // Preserve the original test failure while allowing cleanup to finish.
+            }
+        }
+        if (stopCommand) {
+            try {
+                await stopCommand;
+            } catch {
+                // Preserve the original test failure while allowing cleanup to finish.
+            }
+        }
+        GmodAnnotationManager.prototype.initializeAnnotations = originalInitializeAnnotations;
+        extensionContext.clearServerVersions = originalClearServerVersions;
+        extensionContext.stopServer = originalStopServer;
+    }
+}
+
+async function assertStopCancelsRestartCleanup(): Promise<void> {
+    const originalClearServerVersions = extensionContext.clearServerVersions;
+    let cleanupStarted = false;
+    let startupAttempts = 0;
+    let releaseCleanup!: () => void;
+    const cleanupGate = new Promise<void>((resolve) => {
+        releaseCleanup = resolve;
+    });
+    let restartCommand: Thenable<unknown> | undefined;
+    let stopCommand: Thenable<unknown> | undefined;
+
+    extensionContext.client = {
+        stop: async () => {
+            cleanupStarted = true;
+            await cleanupGate;
+        },
+    } as unknown as LanguageClient;
+    extensionContext.clearServerVersions = () => {
+        startupAttempts += 1;
+        originalClearServerVersions.call(extensionContext);
+    };
+
+    try {
+        restartCommand = vscode.commands.executeCommand('gluals.restartServer');
+        await waitForCondition(
+            () => cleanupStarted,
+            'Expected Restart Server to begin cleaning up the existing client.'
+        );
+
+        stopCommand = vscode.commands.executeCommand('gluals.stopServer');
+        await stopCommand;
+
+        releaseCleanup();
+        await restartCommand;
+
+        assert.strictEqual(
+            startupAttempts,
+            0,
+            'Stopping during restart cleanup must prevent the replacement server from starting.'
+        );
+        assert.strictEqual(extensionContext.client, undefined);
+        assert.strictEqual(extensionContext.serverStatus.state, ServerState.Stopped);
+    } finally {
+        releaseCleanup();
+        if (!stopCommand) {
+            stopCommand = vscode.commands.executeCommand('gluals.stopServer');
+        }
+        try {
+            await stopCommand;
+        } catch {
+            // Preserve the original test failure while allowing cleanup to finish.
+        }
+        if (restartCommand) {
+            try {
+                await restartCommand;
+            } catch {
+                // Preserve the original test failure while allowing cleanup to finish.
+            }
+        }
+        extensionContext.client = undefined;
+        extensionContext.clearServerVersions = originalClearServerVersions;
+    }
 }
 
 suite('Extension Integration', () => {
@@ -111,6 +249,30 @@ suite('Extension Integration', () => {
         );
         await glualsConfig.update('ls.debugPort', null, vscode.ConfigurationTarget.Workspace);
         try {
+            await assertStopCancelsLazyInitialization();
+            await assertStopCancelsRestartCleanup();
+
+            let toolFailureMessage = '';
+            await assert.rejects(
+                async () => await vscode.lm.invokeTool(
+                    'search_glua_docs',
+                    {
+                        toolInvocationToken: undefined,
+                        input: { query: 'Entity:GetPos' },
+                    }
+                ),
+                (error: unknown) => {
+                    toolFailureMessage = error instanceof Error ? error.message : String(error);
+                    return true;
+                }
+            );
+            const startupFailureDetails = extensionContext.serverStatus.details;
+            assert.ok(startupFailureDetails, 'Expected the failed tool startup to record its reason.');
+            assert.ok(
+                toolFailureMessage.includes(startupFailureDetails),
+                `Expected the tool caller to receive "${startupFailureDetails}", got "${toolFailureMessage}".`
+            );
+
             assert.strictEqual(
                 await countFailedStartupAttempts('gluals.startServer'),
                 1,

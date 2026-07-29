@@ -83,10 +83,11 @@ export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
 let extensionInitializationPromise: Promise<void> | undefined;
 let serverStartPromise: Promise<void> | undefined;
-let suppressNextStartupError = false;
 let startupRunCounter = 0;
 let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
+// Lets Stop invalidate a Restart that is still cleaning up before its replacement start is published.
+let serverStopGeneration = 0;
 
 class StartupCancelledError extends Error {
     constructor() {
@@ -276,7 +277,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
     // Register all commands
     const commands = commandEntries.map(({ id, handler }) =>
         vscode.commands.registerCommand(id, async (...args: any[]) => {
-            if (id !== 'gluals.stopServer') {
+            if (
+                id !== 'gluals.startServer'
+                && id !== 'gluals.stopServer'
+                && id !== 'gluals.restartServer'
+            ) {
                 await ensureExtensionInitialized();
             }
             return handler(...args);
@@ -459,7 +464,7 @@ function registerNonLanguageFeatures(context: vscode.ExtensionContext): void {
                 'search_glua_docs',
                 new GluaDocSearchTool(
                     () => extensionContext.client,
-                    startServer
+                    ensureServerStarted
                 )
             ),
             vscode.lm.registerTool(
@@ -593,76 +598,87 @@ function delay(ms: number): Promise<void> {
 }
 
 
-async function startServer(): Promise<void> {
-    await ensureExtensionInitialized();
-
+function ensureServerStarted(): Promise<void> {
     if (serverStartPromise) {
-        await serverStartPromise;
-        return;
+        return serverStartPromise;
     }
 
     if (extensionContext.client?.isRunning()) {
         extensionContext.setServerRunning();
-        return;
+        return Promise.resolve();
     }
 
     const startupRunId = ++startupRunCounter;
     currentStartupRunId = startupRunId;
-    serverStartPromise = (async () => {
-        try {
-            extensionContext.clearServerVersions();
-            extensionContext.setServerStarting();
-            const startupStateHandlers = await doStartServer(startupRunId);
-            if (startupStateHandlers.isDiagnosticsInProgress()) {
-                extensionContext.setServerDiagnosing();
-            } else {
-                extensionContext.setServerRunning();
-            }
-            void warmupOpenDocumentSymbols();
-            onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
-        } catch (reason) {
-            const errorMessage = reason instanceof Error ? reason.message : String(reason);
-            const client = extensionContext.client;
-            extensionContext.client = undefined;
-            if (client) {
-                try {
-                    await client.stop();
-                } catch {
-                    // Ignore cleanup failures after startup errors.
-                }
-            }
+    serverStartPromise = Promise.resolve().then(() => runServerStart(startupRunId));
+    return serverStartPromise;
+}
 
-            if (suppressNextStartupError || reason instanceof StartupCancelledError) {
-                extensionContext.setServerStopped();
-                return;
-            }
+async function startServer(): Promise<void> {
+    try {
+        await ensureServerStarted();
+    } catch {
+        // Startup failures are presented once by runServerStart.
+    }
+}
 
-            extensionContext.setServerError(
-                'Failed to start GLua Language Server',
-                errorMessage
-            );
-            vscode.window.showErrorMessage(
-                `Failed to start GLua Language Server: ${errorMessage}`,
-                'Retry',
-                'Show Logs'
-            ).then(action => {
-                if (action === 'Retry') {
-                    restartServer();
-                } else if (action === 'Show Logs') {
-                    void showServerLogs(extensionContext.vscodeContext);
-                }
-            });
-        } finally {
-            cancelledStartupRuns.delete(startupRunId);
-            if (currentStartupRunId === startupRunId) {
-                currentStartupRunId = undefined;
-            }
-            suppressNextStartupError = false;
-            serverStartPromise = undefined;
+async function runServerStart(startupRunId: number): Promise<void> {
+    try {
+        throwIfStartupCancelled(startupRunId);
+        extensionContext.setServerStarting();
+        await ensureExtensionInitialized();
+        throwIfStartupCancelled(startupRunId);
+
+        extensionContext.clearServerVersions();
+        const startupStateHandlers = await doStartServer(startupRunId);
+        throwIfStartupCancelled(startupRunId);
+        if (startupStateHandlers.isDiagnosticsInProgress()) {
+            extensionContext.setServerDiagnosing();
+        } else {
+            extensionContext.setServerRunning();
         }
-    })();
+        void warmupOpenDocumentSymbols();
+        onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
+    } catch (reason) {
+        const errorMessage = reason instanceof Error ? reason.message : String(reason);
+        const client = extensionContext.client;
+        extensionContext.client = undefined;
+        if (client) {
+            try {
+                await client.stop();
+            } catch {
+                // Ignore cleanup failures after startup errors.
+            }
+        }
 
-    await serverStartPromise;
+        if (cancelledStartupRuns.has(startupRunId) || reason instanceof StartupCancelledError) {
+            extensionContext.setServerStopped();
+            throw reason instanceof StartupCancelledError ? reason : new StartupCancelledError();
+        }
+
+        extensionContext.setServerError(
+            'Failed to start GLua Language Server',
+            errorMessage
+        );
+        vscode.window.showErrorMessage(
+            `Failed to start GLua Language Server: ${errorMessage}`,
+            'Retry',
+            'Show Logs'
+        ).then(action => {
+            if (action === 'Retry') {
+                restartServer();
+            } else if (action === 'Show Logs') {
+                void showServerLogs(extensionContext.vscodeContext);
+            }
+        });
+        throw reason;
+    } finally {
+        cancelledStartupRuns.delete(startupRunId);
+        if (currentStartupRunId === startupRunId) {
+            currentStartupRunId = undefined;
+        }
+        serverStartPromise = undefined;
+    }
 }
 
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
@@ -963,6 +979,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
     // Register the custom hover provider with verbosity controls (+/− buttons).
     const { HoverVerbosityProvider } = await import('./hoverVerbosityProvider.js');
+    throwIfStartupCancelled(startupRunId);
     const verbosityProvider = new HoverVerbosityProvider(client);
     disposeHoverProviderRegistration();
     hoverProviderRegistration = vscode.languages.registerHoverProvider(
@@ -1125,11 +1142,11 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
 }
 
 async function restartServer(): Promise<void> {
+    const stopGeneration = serverStopGeneration;
     extensionContext.setServerStopping('Restarting server...');
     const pendingStart = serverStartPromise;
     if (pendingStart) {
         // Restart during startup should cancel the in-flight start without surfacing a failure toast.
-        suppressNextStartupError = true;
         cancelPendingStartupRun();
     }
 
@@ -1139,6 +1156,9 @@ async function restartServer(): Promise<void> {
             await pendingStart.catch(() => {
                 // Intentional cancellation during restart.
             });
+        }
+        if (stopGeneration !== serverStopGeneration) {
+            return;
         }
         await startServer();
     } catch (error) {
@@ -1170,11 +1190,11 @@ async function startServerCommand(): Promise<void> {
 }
 
 async function stopServer(): Promise<void> {
+    serverStopGeneration += 1;
     const pendingStart = serverStartPromise;
     try {
         if (pendingStart) {
             // Stopping while startup is in-flight is intentional, so suppress startup-failed toast.
-            suppressNextStartupError = true;
             cancelPendingStartupRun();
         }
         disposeHoverProviderRegistration();
