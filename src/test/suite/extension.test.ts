@@ -6,8 +6,14 @@ import {
     enableCompletionColorPreviewHtml,
     enableCompletionColorPreviewHtmlForResult,
 } from '../../completionColorPreview';
+import { GmodClientRdbUpdater } from '../../debugger/gmod_debugger/GmodClientRdbUpdater';
+import { GmodRdbUpdater } from '../../debugger/gmod_debugger/GmodRdbUpdater';
 import { ServerState } from '../../emmyContext';
-import { extensionContext } from '../../extension';
+import {
+    extensionContext,
+    onDidStartDebugSession,
+    onDidTerminateDebugSession,
+} from '../../extension';
 import { activateExtension, getFixtureUri } from './helper';
 
 const COLOR_COMPLETION_DOCUMENTATION = '`Color(255, 255, 255)`';
@@ -20,6 +26,21 @@ async function waitForCondition(condition: () => boolean, message: string): Prom
         }
         await new Promise((resolve) => setTimeout(resolve, 25));
     }
+}
+
+async function countFailedStartupAttempts(command: string): Promise<number> {
+    const originalClearServerVersions = extensionContext.clearServerVersions;
+    let startupAttempts = 0;
+    extensionContext.clearServerVersions = () => {
+        startupAttempts += 1;
+        originalClearServerVersions.call(extensionContext);
+    };
+    try {
+        await vscode.commands.executeCommand(command);
+    } finally {
+        extensionContext.clearServerVersions = originalClearServerVersions;
+    }
+    return startupAttempts;
 }
 
 suite('Extension Integration', () => {
@@ -50,6 +71,68 @@ suite('Extension Integration', () => {
             vscode.lm.tools.some((tool) => tool.name === 'search_glua_docs'),
             'Non-language providers must register during lightweight activation.'
         );
+
+        const originalServerRuntimeSync = GmodRdbUpdater.prototype.ensureRuntimeFilesUpToDate;
+        const originalClientRuntimeSync = GmodClientRdbUpdater.prototype.ensureRuntimeFilesUpToDate;
+        const serverRuntimeSyncSessions: Array<vscode.DebugSession | undefined> = [];
+        const clientRuntimeSyncSessions: Array<vscode.DebugSession | undefined> = [];
+        GmodRdbUpdater.prototype.ensureRuntimeFilesUpToDate = async (session) => {
+            serverRuntimeSyncSessions.push(session);
+        };
+        GmodClientRdbUpdater.prototype.ensureRuntimeFilesUpToDate = async (session) => {
+            clientRuntimeSyncSessions.push(session);
+        };
+        const serverDebugSession = { id: 'test-server', type: 'gluals_gmod' } as vscode.DebugSession;
+        const clientDebugSession = { id: 'test-client', type: 'gluals_gmod_client' } as vscode.DebugSession;
+        try {
+            onDidStartDebugSession(serverDebugSession);
+            onDidStartDebugSession(clientDebugSession);
+        } finally {
+            onDidTerminateDebugSession(serverDebugSession);
+            onDidTerminateDebugSession(clientDebugSession);
+            GmodRdbUpdater.prototype.ensureRuntimeFilesUpToDate = originalServerRuntimeSync;
+            GmodClientRdbUpdater.prototype.ensureRuntimeFilesUpToDate = originalClientRuntimeSync;
+        }
+        assert.deepStrictEqual(serverRuntimeSyncSessions, [serverDebugSession]);
+        assert.deepStrictEqual(clientRuntimeSyncSessions, [clientDebugSession]);
+        assert.strictEqual(
+            extensionContext.client,
+            undefined,
+            'Debug runtime setup must not start the language server.'
+        );
+
+        const glualsConfig = vscode.workspace.getConfiguration('gluals');
+        const executablePathWorkspaceValue = glualsConfig.inspect<string>('ls.executablePath')?.workspaceValue;
+        const debugPortWorkspaceValue = glualsConfig.inspect<number | null>('ls.debugPort')?.workspaceValue;
+        await glualsConfig.update(
+            'ls.executablePath',
+            getFixtureUri('__missing-glua-ls.exe').fsPath,
+            vscode.ConfigurationTarget.Workspace
+        );
+        await glualsConfig.update('ls.debugPort', null, vscode.ConfigurationTarget.Workspace);
+        try {
+            assert.strictEqual(
+                await countFailedStartupAttempts('gluals.startServer'),
+                1,
+                'A failed start command must make exactly one language-server startup attempt.'
+            );
+            assert.strictEqual(
+                await countFailedStartupAttempts('gluals.restartServer'),
+                1,
+                'A failed restart command must make exactly one language-server startup attempt.'
+            );
+        } finally {
+            await glualsConfig.update(
+                'ls.executablePath',
+                executablePathWorkspaceValue,
+                vscode.ConfigurationTarget.Workspace
+            );
+            await glualsConfig.update(
+                'ls.debugPort',
+                debugPortWorkspaceValue,
+                vscode.ConfigurationTarget.Workspace
+            );
+        }
 
         await vscode.commands.executeCommand('gluals.useGluaLanguageMode', docUri);
         await Promise.all([
