@@ -1,18 +1,80 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 import {
     enableCompletionColorPreviewHtml,
     enableCompletionColorPreviewHtmlForResult,
 } from '../../completionColorPreview';
+import { ServerState } from '../../emmyContext';
+import { extensionContext } from '../../extension';
 import { activateExtension, getFixtureUri } from './helper';
 
 const COLOR_COMPLETION_DOCUMENTATION = '`Color(255, 255, 255)`';
 
+async function waitForCondition(condition: () => boolean, message: string): Promise<void> {
+    const timeoutAt = Date.now() + 5_000;
+    while (!condition()) {
+        if (Date.now() >= timeoutAt) {
+            assert.fail(message);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+}
+
 suite('Extension Integration', () => {
-    test('activates and registers core commands', async () => {
-        const extension = await activateExtension(getFixtureUri('sample.lua'));
+    test('activates lightweight guidance for a likely GMod file opened as standard Lua', async () => {
+        const extension = vscode.extensions.getExtension('Pollux.gmod-glua-ls');
+        assert.ok(extension, 'Expected the GLuaLS extension to be installed in the test host.');
+        assert.strictEqual(extension.isActive, false, 'This test must exercise cold-start activation.');
+
+        const docUri = getFixtureUri('cold-start-gamemode/gamemode/init.lua');
+        const document = await vscode.workspace.openTextDocument(docUri);
+        await vscode.window.showTextDocument(document);
+        await waitForCondition(
+            () => extension.isActive,
+            'Expected standard Lua activation to start the lightweight GLuaLS client.'
+        );
+
+        assert.strictEqual(document.languageId, 'lua');
         assert.strictEqual(extension.isActive, true);
+        assert.strictEqual(
+            extensionContext.client,
+            undefined,
+            'Opening a standard Lua document must not start GLuaLS.'
+        );
+
+        const registeredCommands = await vscode.commands.getCommands(true);
+        assert.ok(registeredCommands.includes('gluals.useGluaLanguageMode'));
+        assert.ok(
+            vscode.lm.tools.some((tool) => tool.name === 'search_glua_docs'),
+            'Non-language providers must register during lightweight activation.'
+        );
+
+        await vscode.commands.executeCommand('gluals.useGluaLanguageMode', docUri);
+        await Promise.all([
+            vscode.commands.executeCommand('gluals.startServer'),
+            vscode.commands.executeCommand('gluals.startServer'),
+        ]);
+        const switchedDocument = vscode.workspace.textDocuments.find(
+            (candidate) => candidate.uri.toString() === docUri.toString()
+        );
+        assert.strictEqual(switchedDocument?.languageId, 'glua');
+        assert.notStrictEqual(
+            extensionContext.serverStatus.state,
+            ServerState.Stopped,
+            'Selecting GLua must attempt full language-server startup.'
+        );
+    });
+
+    test('activates and registers core commands', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        const extension = await activateExtension(docUri);
+        assert.strictEqual(extension.isActive, true);
+        assert.strictEqual(
+            vscode.workspace.textDocuments.find((document) => document.uri.toString() === docUri.toString())?.languageId,
+            'glua'
+        );
 
         const registeredCommands = await vscode.commands.getCommands(true);
         const expectedCommands = [
@@ -21,11 +83,16 @@ suite('Extension Integration', () => {
             'gluals.restartServer',
             'gluals.showSyntaxTree',
             'gluals.gmod.runLua',
+            'gluals.useGluaLanguageMode',
         ];
 
         for (const commandId of expectedCommands) {
             assert.ok(registeredCommands.includes(commandId), `Expected command to be registered: ${commandId}`);
         }
+
+        const registeredLanguages = await vscode.languages.getLanguages();
+        assert.ok(registeredLanguages.includes('glua'));
+        assert.ok(registeredLanguages.includes('lua'));
     });
 
     test('executes completion provider command for fixture document', async () => {
@@ -39,6 +106,72 @@ suite('Extension Integration', () => {
         );
 
         assert.ok(completionList, 'Expected completion provider command to return a completion list.');
+    });
+
+    test('does not apply GLua quick fixes to standard Lua documents', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        const gluarcPath = getFixtureUri('.gluarc.json').fsPath;
+        if (fs.existsSync(gluarcPath)) {
+            fs.unlinkSync(gluarcPath);
+        }
+
+        await activateExtension(docUri);
+        const openedDocument = await vscode.workspace.openTextDocument(docUri);
+        const luaDocument = await vscode.languages.setTextDocumentLanguage(openedDocument, 'lua');
+        const editor = await vscode.window.showTextDocument(luaDocument);
+        editor.selection = new vscode.Selection(0, 7, 0, 7);
+
+        const diagnostics = vscode.languages.createDiagnosticCollection('gluals-language-isolation-test');
+        const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(0, 6, 0, 11),
+            'Undefined global value',
+            vscode.DiagnosticSeverity.Warning
+        );
+        diagnostic.code = 'undefined-global';
+        diagnostics.set(docUri, [diagnostic]);
+
+        try {
+            await vscode.commands.executeCommand('gluals.addUndefinedGlobalToGlobals');
+            assert.strictEqual(
+                fs.existsSync(gluarcPath),
+                false,
+                'Standard Lua diagnostics must not update .gluarc.json'
+            );
+        } finally {
+            diagnostics.dispose();
+            if (fs.existsSync(gluarcPath)) {
+                fs.unlinkSync(gluarcPath);
+            }
+            const restoredDocument = await vscode.languages.setTextDocumentLanguage(luaDocument, 'glua');
+            await vscode.window.showTextDocument(restoredDocument);
+        }
+    });
+
+    test('uses GLua for conventional Garry’s Mod paths outside the game directory', async () => {
+        const fixturePaths = [
+            'standalone-addon/lua/autorun/server/example.lua',
+            'standalone-gamemode/gamemode/init.lua',
+            'standalone-script/sh_config.lua',
+        ];
+
+        for (const fixturePath of fixturePaths) {
+            const document = await vscode.workspace.openTextDocument(getFixtureUri(fixturePath));
+            assert.strictEqual(document.languageId, 'glua', fixturePath);
+        }
+    });
+
+    test('switches a likely Garry’s Mod file from Lua to GLua on request', async () => {
+        const docUri = getFixtureUri('standalone-gamemode/gamemode/init.lua');
+        const openedDocument = await vscode.workspace.openTextDocument(docUri);
+        const luaDocument = await vscode.languages.setTextDocumentLanguage(openedDocument, 'lua');
+        assert.strictEqual(luaDocument.languageId, 'lua');
+
+        await vscode.commands.executeCommand('gluals.useGluaLanguageMode', docUri);
+
+        const switchedDocument = vscode.workspace.textDocuments.find(
+            (document) => document.uri.toString() === docUri.toString()
+        );
+        assert.strictEqual(switchedDocument?.languageId, 'glua');
     });
 
     test('sets parseable detail for color completion previews', () => {

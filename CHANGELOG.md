@@ -2,6 +2,17 @@
 
 ---
 
+## [Unreleased]
+
+## VS Code Extension
+
+- Register a dedicated `glua` language mode instead of relabeling VS Code's `lua` mode.
+- Prefer `glua` for documented Garry's Mod Lua folders, entrypoint filenames, and realm-prefixed scripts even in standalone repositories.
+- Warn when a likely Garry's Mod file is using standard Lua mode and offer to switch that file to `glua`.
+- Allow standard Lua language servers to run alongside GLuaLS by using per-file language modes or `files.associations`.
+- Restrict GLua syntax, snippets, settings, semantic-token scopes, debugger support, and editor actions to `glua` documents.
+- Block GLuaLS startup with a conflict error when GLua Enhanced is enabled because it can break language-server features.
+
 ## [1.1.1] [Pre-Release] - 2026-07-24
 
 ## VS Code Extension

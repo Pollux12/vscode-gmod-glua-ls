@@ -39,6 +39,9 @@
     "qna": false,
     "markdown": "github",
     "main": "./out/extension",
+    "activationEvents": [
+        "onLanguage:lua"
+    ],
     "contributes": {
         "commands": [
             {
@@ -56,7 +59,8 @@
             {
                 "command": "gluals.showSyntaxTree",
                 "title": "Show Syntax Tree",
-                "icon": "$(symbol-structure)"
+                "icon": "$(symbol-structure)",
+                "enablement": "resourceLangId == glua"
             },
             {
                 "command": "gluals.gmod.updateAnnotations",
@@ -95,7 +99,8 @@
             {
                 "command": "gluals.addUndefinedGlobalToGlobals",
                 "title": "Add unknown variable to Global Table (config)",
-                "category": "GLuaLS"
+                "category": "GLuaLS",
+                "enablement": "resourceLangId == glua"
             },
             {
                 "command": "gluals.gmod.pauseSoft",
@@ -131,19 +136,22 @@
                 "command": "gluals.gmod.runFile",
                 "title": "Run GLua File",
                 "category": "GLuaLS",
-                "icon": "$(run)"
+                "icon": "$(run)",
+                "enablement": "resourceLangId == glua"
             },
             {
                 "command": "gluals.gmod.refreshFile",
                 "title": "Refresh GLua File",
                 "category": "GLuaLS",
-                "icon": "$(refresh)"
+                "icon": "$(refresh)",
+                "enablement": "resourceLangId == glua"
             },
             {
                 "command": "gluals.gmod.runSelection",
                 "title": "Run Selected GLua",
                 "category": "GLuaLS",
-                "icon": "$(run-all)"
+                "icon": "$(run-all)",
+                "enablement": "resourceLangId == glua"
             },
             {
                 "command": "gluals.gmod.runCommand",
@@ -443,9 +451,34 @@
         ],
         "languages": [
             {
-                "id": "lua",
+                "id": "glua",
                 "extensions": [
                     ".lua"
+                ],
+                "filenamePatterns": [
+                    "**/lua/**/*.lua",
+                    "**/gamemode/**/*.lua",
+                    "**/autorun/**/*.lua",
+                    "**/derma/**/*.lua",
+                    "**/drive/**/*.lua",
+                    "**/effects/**/*.lua",
+                    "**/entities/**/*.lua",
+                    "**/includes/**/*.lua",
+                    "**/matproxy/**/*.lua",
+                    "**/menu/**/*.lua",
+                    "**/postprocess/**/*.lua",
+                    "**/properties/**/*.lua",
+                    "**/skins/**/*.lua",
+                    "**/stools/**/*.lua",
+                    "**/vgui/**/*.lua",
+                    "**/weapons/**/*.lua",
+                    "**/init.lua",
+                    "**/cl_init.lua",
+                    "**/shared.lua",
+                    "**/menu.lua",
+                    "**/cl_*.lua",
+                    "**/sv_*.lua",
+                    "**/sh_*.lua"
                 ],
                 "aliases": [
                     "GLua",
@@ -458,16 +491,14 @@
         ],
         "snippets": [
             {
-                "language": "lua",
+                "language": "glua",
                 "path": "./snippets/lua.json"
             }
         ],
         "grammars": [
             {
-                "scopeName": "gluals.lua.injection",
-                "injectTo": [
-                    "source.lua"
-                ],
+                "language": "glua",
+                "scopeName": "source.glua",
                 "path": "./syntaxes/glua.tmLanguage.json"
             }
         ],
@@ -508,7 +539,7 @@
         ],
         "breakpoints": [
             {
-                "language": "lua"
+                "language": "glua"
             }
         ],
         "jsonValidation": [
@@ -704,7 +735,7 @@
                     }
                 ],
                 "languages": [
-                    "lua"
+                    "glua"
                 ]
             },
             {
@@ -786,7 +817,7 @@
                     }
                 ],
                 "languages": [
-                    "lua"
+                    "glua"
                 ]
             }
         ],
@@ -818,41 +849,41 @@
             "editor/title": [
                 {
                     "command": "gluals.gmod.runFile",
-                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "when": "resourceLangId == glua && inDebugMode && debugType == gluals_gmod",
                     "group": "navigation"
                 },
                 {
                     "command": "gluals.gmod.refreshFile",
-                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "when": "resourceLangId == glua && inDebugMode && debugType == gluals_gmod",
                     "group": "navigation@1"
                 }
             ],
             "editor/context": [
                 {
                     "command": "gluals.gmod.runSelection",
-                    "when": "resourceLangId == lua && editorHasSelection && inDebugMode && debugType == gluals_gmod",
+                    "when": "resourceLangId == glua && editorHasSelection && inDebugMode && debugType == gluals_gmod",
                     "group": "gmod@1"
                 },
                 {
                     "command": "gluals.gmod.runFile",
-                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "when": "resourceLangId == glua && inDebugMode && debugType == gluals_gmod",
                     "group": "gmod@3"
                 },
                 {
                     "command": "gluals.gmod.refreshFile",
-                    "when": "resourceLangId == lua && inDebugMode && debugType == gluals_gmod",
+                    "when": "resourceLangId == glua && inDebugMode && debugType == gluals_gmod",
                     "group": "gmod@4"
                 },
                 {
                     "command": "gluals.addUndefinedGlobalToGlobals",
-                    "when": "resourceLangId == lua && gluals.hasUndefinedGlobalAtCursor",
+                    "when": "resourceLangId == glua && gluals.hasUndefinedGlobalAtCursor",
                     "group": "gluals@1"
                 }
             ],
             "problem/context": [
                 {
                     "command": "gluals.addUndefinedGlobalToGlobals",
-                    "when": "problemCode == 'undefined-global'",
+                    "when": "resourceLangId == glua && problemCode == 'undefined-global'",
                     "group": "gluals@1"
                 }
             ],
@@ -2032,7 +2063,7 @@
             }
         ],
         "configurationDefaults": {
-            "[lua]": {
+            "[glua]": {
                 "editor.quickSuggestions": {
                     "other": true,
                     "comments": true,
@@ -2047,7 +2078,7 @@
         "colors": [],
         "semanticTokenScopes": [
             {
-                "language": "lua",
+                "language": "glua",
                 "scopes": {
                     "namespace": [
                         "entity.name.namespace"

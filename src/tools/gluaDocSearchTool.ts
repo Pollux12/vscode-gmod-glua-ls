@@ -8,7 +8,10 @@ export interface IGluaDocSearchInput {
 }
 
 export class GluaDocSearchTool implements vscode.LanguageModelTool<IGluaDocSearchInput> {
-    constructor(private readonly getClient: () => LanguageClient | undefined) {}
+    constructor(
+        private readonly getClient: () => LanguageClient | undefined,
+        private readonly ensureClient?: () => Promise<void>
+    ) {}
 
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IGluaDocSearchInput>,
@@ -23,6 +26,7 @@ export class GluaDocSearchTool implements vscode.LanguageModelTool<IGluaDocSearc
         options: vscode.LanguageModelToolInvocationOptions<IGluaDocSearchInput>,
         _token: vscode.CancellationToken
     ): Promise<vscode.LanguageModelToolResult> {
+        await this.ensureClient?.();
         const client = this.getClient();
         if (!client) {
             throw new Error('GLua Language Server is not running. Cannot search documentation.');

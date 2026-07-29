@@ -68,6 +68,8 @@ import {
     isStartupProgressToken,
     StartupServerState,
 } from './startupProgress';
+import { throwIfGluaEnhancedIsEnabled } from './extensionConflict';
+import { registerGluaLanguageModeWarning } from './gluaLanguageModeWarning';
 
 /**
  * Command registration entry
@@ -79,6 +81,7 @@ interface CommandEntry {
 // Global state
 export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
+let extensionInitializationPromise: Promise<void> | undefined;
 let serverStartPromise: Promise<void> | undefined;
 let suppressNextStartupError = false;
 let startupRunCounter = 0;
@@ -176,6 +179,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         context
     );
 
+    registerGluaLanguageModeWarning(context);
+
     // Register all components
     registerCommands(context);
     registerEventListeners(context);
@@ -183,9 +188,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
     registerUndefinedGlobalCodeActions(context);
+    registerNonLanguageFeatures(context);
+    await refreshGmodDebugConfigContext();
 
-    // Initialize features
-    await initializeExtension();
+    if (vscode.workspace.textDocuments.some(isLuaDocumentForLanguageServer)) {
+        await ensureExtensionInitialized();
+    }
 }
 
 /**
@@ -265,7 +273,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     // Register all commands
     const commands = commandEntries.map(({ id, handler }) =>
-        vscode.commands.registerCommand(id, handler)
+        vscode.commands.registerCommand(id, async (...args: any[]) => {
+            if (id !== 'gluals.stopServer') {
+                await ensureExtensionInitialized();
+            }
+            return handler(...args);
+        })
     );
 
     // Override the built-in "Evaluate in Debug Console" editor action so that
@@ -383,7 +396,7 @@ function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
 function refreshLanguageConfiguration(): void {
     languageConfigurationDisposable?.dispose();
     languageConfigurationDisposable = vscode.languages.setLanguageConfiguration(
-        'lua',
+        extensionContext.LANGUAGE_ID,
         new LuaLanguageConfiguration()
     );
 }
@@ -434,16 +447,24 @@ async function initializeExtension(): Promise<void> {
     if (vscode.window.activeTextEditor && extensionContext.client) {
         activeEditor = vscode.window.activeTextEditor;
     }
+    initializeGmodMcpHost(extensionContext.vscodeContext);
+    await startGmodMcpHost(false);
+}
+
+function registerNonLanguageFeatures(context: vscode.ExtensionContext): void {
     if (typeof vscode.lm.registerTool === 'function') {
         const controlToolCallbacks = {
             executeControlCommand: executeGmodControlCommand,
             getDebugState: getGmodDebugState,
             getCurrentRealm: getPersistedGmodRealm,
         };
-        extensionContext.vscodeContext.subscriptions.push(
+        context.subscriptions.push(
             vscode.lm.registerTool(
                 'search_glua_docs',
-                new GluaDocSearchTool(() => extensionContext.client)
+                new GluaDocSearchTool(
+                    () => extensionContext.client,
+                    ensureExtensionInitialized
+                )
             ),
             vscode.lm.registerTool(
                 'gmod_run_lua',
@@ -478,13 +499,15 @@ async function initializeExtension(): Promise<void> {
         console.warn('vscode.lm.registerTool is unavailable; skipping GLua docs tool registration.');
     }
     registerDebuggers();
-    initializeGmodExplorer(extensionContext.vscodeContext);
-    initializeGmodRealmView(extensionContext.vscodeContext);
-    initializeGmodErrorView(extensionContext.vscodeContext);
-    initializeGmodEntityExplorerView(extensionContext.vscodeContext);
-    await refreshGmodDebugConfigContext();
-    initializeGmodMcpHost(extensionContext.vscodeContext);
-    await startGmodMcpHost(false);
+    initializeGmodExplorer(context);
+    initializeGmodRealmView(context);
+    initializeGmodErrorView(context);
+    initializeGmodEntityExplorerView(context);
+}
+
+function ensureExtensionInitialized(): Promise<void> {
+    extensionInitializationPromise ??= initializeExtension();
+    return extensionInitializationPromise;
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -505,11 +528,11 @@ function onWorkspaceFoldersChanged(): void {
 }
 
 function onDidOpenTextDocument(document: vscode.TextDocument): void {
-    if (!extensionContext.client || !isLuaDocumentForLanguageServer(document)) {
+    if (!isLuaDocumentForLanguageServer(document)) {
         return;
     }
 
-    void warmupDocumentSymbolsForDocument(document);
+    void ensureExtensionInitialized().then(() => warmupDocumentSymbolsForDocument(document));
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -838,6 +861,7 @@ async function cleanupExistingClient(): Promise<void> {
  */
 async function doStartServer(startupRunId: number): Promise<StartupStateHandlerRegistration> {
     await cleanupExistingClient();
+    throwIfGluaEnhancedIsEnabled();
     throwIfStartupCancelled(startupRunId);
     const context = extensionContext.vscodeContext;
     const configManager = new ConfigurationManager(getConfigurationScope());
@@ -1328,19 +1352,36 @@ async function runGmodRunLua(): Promise<void> {
     await runGmodControlCommand('runLua', { lua });
 }
 
-async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
+async function resolveGluaDocumentUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
     const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
     if (!targetUri?.fsPath) {
-        vscode.window.showWarningMessage('No Lua file selected.');
+        vscode.window.showWarningMessage('No GLua file selected.');
+        return undefined;
+    }
+
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    const document = activeDocument?.uri.toString() === targetUri.toString()
+        ? activeDocument
+        : await vscode.workspace.openTextDocument(targetUri);
+    if (document.languageId !== extensionContext.LANGUAGE_ID) {
+        vscode.window.showWarningMessage('Selected file is not using the GLua language mode.');
+        return undefined;
+    }
+
+    return targetUri;
+}
+
+async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
+    const targetUri = await resolveGluaDocumentUri(uri);
+    if (!targetUri) {
         return;
     }
     await runGmodControlCommand('runFile', { path: targetUri.fsPath });
 }
 
 async function runGmodRefreshFile(uri?: vscode.Uri): Promise<void> {
-    const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
-    if (!targetUri?.fsPath) {
-        vscode.window.showWarningMessage('No Lua file selected.');
+    const targetUri = await resolveGluaDocumentUri(uri);
+    if (!targetUri) {
         return;
     }
     await runGmodControlCommand('refreshFile', { path: targetUri.fsPath });
@@ -1350,6 +1391,10 @@ async function runGmodRunSelection(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showWarningMessage('No active editor.');
+        return;
+    }
+    if (editor.document.languageId !== extensionContext.LANGUAGE_ID) {
+        vscode.window.showWarningMessage('Current file is not using the GLua language mode.');
         return;
     }
     const selection = editor.selection;

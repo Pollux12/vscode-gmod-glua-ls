@@ -13,7 +13,7 @@ suite('Hover Verbosity Provider', () => {
             }),
         } as unknown as LanguageClient;
         const provider = new HoverVerbosityProvider(client);
-        const document = await vscode.workspace.openTextDocument({ language: 'lua', content: 'local value = 1' });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
 
         const hover = await provider.provideHover(
             document,
@@ -38,7 +38,7 @@ suite('Hover Verbosity Provider', () => {
             },
         } as unknown as LanguageClient;
         const provider = new HoverVerbosityProvider(client);
-        const document = await vscode.workspace.openTextDocument({ language: 'lua', content: 'local value = 1' });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
 
         const firstHover = await provider.provideHover(
             document,
@@ -65,7 +65,7 @@ suite('Hover Verbosity Provider', () => {
             }),
         } as unknown as LanguageClient;
         const provider = new HoverVerbosityProvider(client);
-        const document = await vscode.workspace.openTextDocument({ language: 'lua', content: 'local value = 1' });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
 
         const hover = await provider.provideHover(
             document,
@@ -86,7 +86,7 @@ suite('Hover Verbosity Provider', () => {
             }),
         } as unknown as LanguageClient;
         const provider = new HoverVerbosityProvider(client);
-        const document = await vscode.workspace.openTextDocument({ language: 'lua', content: 'local value = 1' });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
 
         const hover = await provider.provideHover(
             document,
@@ -111,7 +111,7 @@ suite('Hover Verbosity Provider', () => {
             },
         } as unknown as LanguageClient;
         const provider = new HoverVerbosityProvider(client);
-        const document = await vscode.workspace.openTextDocument({ language: 'lua', content: 'local value = 1' });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
 
         const firstHover = await provider.provideHover(
             document,
