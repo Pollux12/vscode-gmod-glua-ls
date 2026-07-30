@@ -44,7 +44,10 @@ import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import { GmodUpdateScheduler } from './debugger/gmod_debugger/GmodUpdateScheduler';
-import { detectGamemodeBaseLibraries } from './gmodGamemodeBaseDetector';
+import {
+    getGmodProjectLoadingInitializationOptions,
+    registerGmodProjectLoading,
+} from './gmodProjectLoading';
 import {
     hasAnyGmodDebugConfiguration,
     runGmodDebugSetupWizard,
@@ -88,6 +91,7 @@ let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
 // Lets Stop invalidate a Restart that is still cleaning up before its replacement start is published.
 let serverStopGeneration = 0;
+let projectLoadingRegistration: vscode.Disposable | undefined;
 
 class StartupCancelledError extends Error {
     constructor() {
@@ -858,6 +862,8 @@ function disposeHoverProviderRegistration(): void {
 async function cleanupExistingClient(): Promise<void> {
     const existingClient = extensionContext.client;
     disposeHoverProviderRegistration();
+    projectLoadingRegistration?.dispose();
+    projectLoadingRegistration = undefined;
     if (!existingClient) {
         return;
     }
@@ -890,29 +896,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
             annotationVersion = gmodAnnotationManager.getAnnotationVersion();
         }
     }
-
-    // Detect gamemode base libraries for each workspace folder
-    const gamemodeBaseLibraries: string[] = [];
-    const config = vscode.workspace.getConfiguration('gluals');
-    const autoDetectEnabled = config.get<boolean>('gmod.autoDetectGamemodeBase', true);
-    if (autoDetectEnabled && vscode.workspace.workspaceFolders) {
-        for (const folder of vscode.workspace.workspaceFolders) {
-            try {
-                throwIfStartupCancelled(startupRunId);
-                const detected = await detectGamemodeBaseLibraries(folder);
-                throwIfStartupCancelled(startupRunId);
-                gamemodeBaseLibraries.push(...detected);
-            } catch (error) {
-                if (error instanceof StartupCancelledError) {
-                    throw error;
-                }
-                // Silently skip detection failures
-            }
-        }
-    }
-    if (gamemodeBaseLibraries.length > 0) {
-        initOptions.gamemodeBaseLibraries = gamemodeBaseLibraries;
-    }
+    initOptions.gmodProjectLoading = getGmodProjectLoadingInitializationOptions(context);
 
     const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
@@ -957,6 +941,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         serverOptions,
         clientOptions
     );
+    projectLoadingRegistration = registerGmodProjectLoading(client, context, refreshGmodExplorer);
     const startupStateHandlers = registerLanguageClientStateHandlers(client);
     extensionContext.client = client;
 
