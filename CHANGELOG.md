@@ -2,7 +2,7 @@
 
 ---
 
-## [Unreleased]
+## [1.1.2] [Pre-Release] - 2026-07-30
 
 ## VS Code Extension
 
