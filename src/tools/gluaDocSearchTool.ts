@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
+import { sendRequestWithStartupRetry } from '../languageServerRequests';
 import { GluaDocSearchParams, GluaDocSearchResponse } from '../lspExtension';
 
 export interface IGluaDocSearchInput {
@@ -37,7 +38,11 @@ export class GluaDocSearchTool implements vscode.LanguageModelTool<IGluaDocSearc
             limit: Math.min(options.input.limit ?? 10, 20),
         };
 
-        const response = await client.sendRequest<GluaDocSearchResponse>('gluals/docSearch', params);
+        const response = await sendRequestWithStartupRetry<GluaDocSearchResponse>(
+            client,
+            'gluals/docSearch',
+            params
+        );
 
         if (!response || response.items.length === 0) {
             return createTextResult(`No GLua API documentation found for query: "${params.query}".`);
