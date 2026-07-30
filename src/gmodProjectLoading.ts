@@ -3,6 +3,8 @@ import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 const SELECTED_GAMEMODE_KEY = 'gluals.gmod.selectedGamemodeUri';
+const SELECT_GAMEMODE_COMMAND = 'gluals.gmod.selectGamemode';
+const BUILT_IN_GAMEMODES = new Set(['base', 'sandbox', 'terrortown']);
 
 export interface GmodProjectLoadingInitializationOptions {
     interactiveGamemodeSelection: true;
@@ -26,6 +28,11 @@ interface ChooseGamemodeResult {
     selectedGamemodeId: string | null;
 }
 
+interface ProjectLoadingState {
+    candidates: GamemodeCandidate[];
+    currentGamemodeId?: string;
+}
+
 interface OpenDocumentSnapshot {
     uri: string;
     text: string;
@@ -33,7 +40,8 @@ interface OpenDocumentSnapshot {
 }
 
 interface GamemodeQuickPickItem extends vscode.QuickPickItem {
-    candidate: GamemodeCandidate;
+    candidate?: GamemodeCandidate;
+    showBuiltIns?: true;
 }
 
 export function getGmodProjectLoadingInitializationOptions(
@@ -54,17 +62,43 @@ export function registerGmodProjectLoading(
     let candidates: GamemodeCandidate[] = [];
     let currentGamemodeId: string | undefined;
     let pendingChoice: Promise<ChooseGamemodeResult> | undefined;
+    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
+    statusBar.name = 'GLuaLS Active Gamemode';
+    statusBar.command = SELECT_GAMEMODE_COMMAND;
+
+    const updateStatusBar = (): void => {
+        if (candidates.length === 0) {
+            statusBar.hide();
+            return;
+        }
+        const current = candidates.find(candidate => candidate.id === currentGamemodeId);
+        statusBar.text = current
+            ? `$(server) GLuaLS: ${current.name}`
+            : '$(server) GLuaLS: Select Gamemode';
+        statusBar.tooltip = current
+            ? `Active gamemode: ${current.name}\n\nClick to select another gamemode.`
+            : 'Click to select the gamemode GLuaLS should index.';
+        statusBar.show();
+    };
+
+    const activateGamemode = async (candidate: GamemodeCandidate): Promise<void> => {
+        currentGamemodeId = candidate.id;
+        updateStatusBar();
+        await context.workspaceState.update(SELECTED_GAMEMODE_KEY, candidate.rootUri);
+        await setActiveGamemode(client, candidate);
+    };
 
     const chooseHandler = client.onRequest(
         'gluals/chooseGamemode',
         async (params: ChooseGamemodeParams): Promise<ChooseGamemodeResult> => {
             candidates = normalizeCandidates(params.candidates);
             currentGamemodeId = params.currentGamemodeId;
+            updateStatusBar();
             if (pendingChoice) {
                 return pendingChoice;
             }
 
-            pendingChoice = chooseGamemode(params, candidates, context);
+            pendingChoice = chooseGamemode(params, candidates);
             try {
                 const result = await pendingChoice;
                 if (!result.selectedGamemodeId) {
@@ -76,6 +110,7 @@ export function registerGmodProjectLoading(
                     return { selectedGamemodeId: null };
                 }
                 currentGamemodeId = selected.id;
+                updateStatusBar();
                 await context.workspaceState.update(SELECTED_GAMEMODE_KEY, selected.rootUri);
 
                 if (params.reason === 'documentOpen') {
@@ -107,15 +142,13 @@ export function registerGmodProjectLoading(
             requestedGamemodeId: candidate.id,
             reason: 'documentOpen',
         };
-        pendingChoice = chooseGamemode(params, candidates, context);
+        pendingChoice = chooseGamemode(params, candidates);
         void pendingChoice
             .then(async result => {
                 if (result.selectedGamemodeId !== candidate.id) {
                     return;
                 }
-                currentGamemodeId = candidate.id;
-                await context.workspaceState.update(SELECTED_GAMEMODE_KEY, candidate.rootUri);
-                await setActiveGamemode(client, candidate);
+                await activateGamemode(candidate);
             })
             .catch(error => {
                 console.warn('Failed to activate gamemode in GLuaLS:', error);
@@ -124,21 +157,95 @@ export function registerGmodProjectLoading(
                 pendingChoice = undefined;
             });
     });
-    const projectsChangedHandler = client.onNotification('gluals/projectsChanged', onProjectsChanged);
+    const selectCommandHandler = vscode.commands.registerCommand(
+        SELECT_GAMEMODE_COMMAND,
+        async () => {
+            if (candidates.length === 0 || pendingChoice) {
+                return;
+            }
+            const params: ChooseGamemodeParams = {
+                candidates,
+                currentGamemodeId,
+                reason: 'initial',
+            };
+            pendingChoice = chooseGamemode(params, candidates);
+            try {
+                const result = await pendingChoice;
+                const selected = candidates.find(candidate => candidate.id === result.selectedGamemodeId);
+                if (selected) {
+                    await activateGamemode(selected);
+                }
+            } finally {
+                pendingChoice = undefined;
+            }
+        },
+    );
+    const projectsChangedHandler = client.onNotification(
+        'gluals/projectsChanged',
+        (state: ProjectLoadingState | undefined) => {
+            if (state) {
+                candidates = normalizeCandidates(state.candidates);
+                currentGamemodeId = typeof state.currentGamemodeId === 'string'
+                    ? state.currentGamemodeId
+                    : undefined;
+                updateStatusBar();
+            }
+            onProjectsChanged();
+        },
+    );
 
-    return vscode.Disposable.from(chooseHandler, activeEditorHandler, projectsChangedHandler);
+    return vscode.Disposable.from(
+        chooseHandler,
+        activeEditorHandler,
+        selectCommandHandler,
+        projectsChangedHandler,
+        statusBar,
+    );
 }
 
 async function chooseGamemode(
     params: ChooseGamemodeParams,
     candidates: readonly GamemodeCandidate[],
-    context: vscode.ExtensionContext,
 ): Promise<ChooseGamemodeResult> {
     const requested = params.requestedGamemodeId
         ? candidates.find(candidate => candidate.id === params.requestedGamemodeId)
         : undefined;
-    const visibleCandidates = requested ? [requested] : candidates;
-    const items = visibleCandidates.map<GamemodeQuickPickItem>(candidate => ({
+    if (requested) {
+        const selected = await showGamemodeQuickPick(params, [requested], requested);
+        return { selectedGamemodeId: selected?.id ?? null };
+    }
+
+    const builtIns = candidates.filter(candidate => isBuiltInGamemode(candidate));
+    const custom = candidates.filter(candidate => !isBuiltInGamemode(candidate));
+    if (custom.length === 0) {
+        const selected = await showGamemodeQuickPick(params, builtIns);
+        return { selectedGamemodeId: selected?.id ?? null };
+    }
+
+    const items = createGamemodeQuickPickItems(params, custom);
+    if (builtIns.length > 0) {
+        items.push({
+            label: '$(list-tree) Show built-in gamemodes…',
+            description: 'base, sandbox, terrortown',
+            showBuiltIns: true,
+        });
+    }
+    const selected = await vscode.window.showQuickPick(items, quickPickOptions(params));
+    if (!selected) {
+        return { selectedGamemodeId: null };
+    }
+    if (selected.showBuiltIns) {
+        const builtIn = await showGamemodeQuickPick(params, builtIns);
+        return { selectedGamemodeId: builtIn?.id ?? null };
+    }
+    return { selectedGamemodeId: selected.candidate?.id ?? null };
+}
+
+function createGamemodeQuickPickItems(
+    params: ChooseGamemodeParams,
+    candidates: readonly GamemodeCandidate[],
+): GamemodeQuickPickItem[] {
+    const items = candidates.map<GamemodeQuickPickItem>(candidate => ({
         label: candidate.name,
         description: candidate.id === params.currentGamemodeId
             ? 'Current gamemode'
@@ -149,16 +256,34 @@ async function chooseGamemode(
         candidate,
     }));
     items.sort((left, right) => {
-        if (left.candidate.id === requested?.id) {
+        if (left.candidate?.id === params.requestedGamemodeId) {
             return -1;
         }
-        if (right.candidate.id === requested?.id) {
+        if (right.candidate?.id === params.requestedGamemodeId) {
             return 1;
         }
         return left.label.localeCompare(right.label);
     });
+    return items;
+}
 
-    const selected = await vscode.window.showQuickPick(items, {
+async function showGamemodeQuickPick(
+    params: ChooseGamemodeParams,
+    candidates: readonly GamemodeCandidate[],
+    requested?: GamemodeCandidate,
+): Promise<GamemodeCandidate | undefined> {
+    const selected = await vscode.window.showQuickPick(
+        createGamemodeQuickPickItems(params, candidates),
+        quickPickOptions(params, requested),
+    );
+    return selected?.candidate;
+}
+
+function quickPickOptions(
+    params: ChooseGamemodeParams,
+    requested?: GamemodeCandidate,
+): vscode.QuickPickOptions {
+    return {
         placeHolder: requested
             ? `Switch GLuaLS indexing to ${requested.name}?`
             : 'Select the gamemode for GLuaLS to index',
@@ -166,13 +291,11 @@ async function chooseGamemode(
             ? 'Select active Garry’s Mod gamemode'
             : 'Switch active Garry’s Mod gamemode',
         ignoreFocusOut: true,
-    });
-    if (!selected) {
-        return { selectedGamemodeId: null };
-    }
+    };
+}
 
-    await context.workspaceState.update(SELECTED_GAMEMODE_KEY, selected.candidate.rootUri);
-    return { selectedGamemodeId: selected.candidate.id };
+function isBuiltInGamemode(candidate: GamemodeCandidate): boolean {
+    return BUILT_IN_GAMEMODES.has(candidate.name.toLowerCase());
 }
 
 async function setActiveGamemode(
