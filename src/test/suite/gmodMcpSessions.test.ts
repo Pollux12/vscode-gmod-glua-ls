@@ -100,7 +100,11 @@ suite('GMod MCP Sessions', () => {
         assert.deepStrictEqual(registry.getDescriptor(client.id)?.capabilities, []);
         assert.strictEqual(resolveError(() => registry.resolveServerControlTarget(server.id)).code, 'SESSION_NOT_CONNECTED');
         assert.deepStrictEqual(registry.markConnected(server.id)?.capabilities, ['serverControl', 'serverTelemetry']);
-        assert.deepStrictEqual(registry.markConnected(client.id)?.capabilities, ['clientTelemetry', 'pausedEvaluation']);
+        assert.deepStrictEqual(registry.markConnected(client.id)?.capabilities, ['clientTelemetry', 'clientScreenshot']);
+        assert.strictEqual(registry.resolveClientScreenshotTarget(client.id).session, client);
+        assert.deepStrictEqual(registry.markPaused(client.id)?.capabilities, ['clientTelemetry', 'pausedEvaluation']);
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget(client.id)).code, 'CLIENT_PAUSED');
+        assert.deepStrictEqual(registry.markRunning(client.id)?.capabilities, ['clientTelemetry', 'clientScreenshot']);
 
         assert.strictEqual(registry.resolveServerControlTarget(server.id).session, server);
         assert.deepStrictEqual(registry.markDisconnected(server.id)?.capabilities, []);
@@ -114,6 +118,31 @@ suite('GMod MCP Sessions', () => {
         assert.deepStrictEqual(registry.markTerminated(server.id)?.capabilities, []);
         assert.strictEqual(registry.markConnected(server.id), undefined);
         assert.strictEqual(resolveError(() => registry.resolveServerControlTarget(server.id)).code, 'TERMINATED_SESSION');
+    });
+
+    test('resolves only a sole running client for screenshots', () => {
+        const registry = createRegistry();
+        const first = createSession('client-1', 'gluals_gmod_client');
+        const second = createSession('client-2', 'gluals_gmod_client');
+        const server = createSession('server-1', 'gluals_gmod');
+        for (const session of [first, second, server]) {
+            registry.register(session);
+            registry.markConnected(session.id);
+        }
+
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget()).code, 'AMBIGUOUS_CLIENT');
+        assert.strictEqual(registry.resolveClientScreenshotTarget(first.id).session, first);
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget(server.id)).code, 'SERVER_SESSION');
+
+        registry.markPaused(first.id);
+        assert.strictEqual(registry.resolveClientScreenshotTarget().session, second);
+        registry.markPaused(second.id);
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget()).code, 'CLIENT_PAUSED');
+        registry.markDisconnected(second.id);
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget(second.id)).code, 'SESSION_NOT_CONNECTED');
+        registry.markTerminated(first.id);
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget(first.id)).code, 'TERMINATED_SESSION');
+        assert.strictEqual(resolveError(() => registry.resolveClientScreenshotTarget('missing')).code, 'UNKNOWN_SESSION');
     });
 
     test('returns descriptors in started-at then session-ID order', () => {

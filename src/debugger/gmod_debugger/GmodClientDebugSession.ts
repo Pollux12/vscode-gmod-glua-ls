@@ -120,7 +120,7 @@ function stringify_v2(value: unknown): string {
 export class GmodClientDebugSession extends DebugSession {
   private static THREAD_ID = 1
 
-  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-2'
+  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-3'
 
   private _debug_client?: LRDBClient.Client
 
@@ -726,6 +726,47 @@ export class GmodClientDebugSession extends DebugSession {
     this.sendResponse(response)
   }
 
+  protected customRequest(
+    command: string,
+    response: DebugProtocol.Response,
+    args: any
+  ): void {
+    if (command !== 'gmod.captureScreenshot') {
+      super.customRequest(command, response, args)
+      return
+    }
+    if (!this._debug_client) {
+      response.success = false
+      response.message = 'The client debugger is not connected.'
+      this.sendResponse(response)
+      return
+    }
+    if (this._isPaused) {
+      response.success = false
+      response.message = 'The client debugger is paused and cannot capture a screenshot.'
+      this.sendResponse(response)
+      return
+    }
+    const quality = args?.quality
+    if (!Number.isInteger(quality) || quality < 1 || quality > 100) {
+      response.success = false
+      response.message = 'Screenshot quality must be an integer from 1 through 100.'
+      this.sendResponse(response)
+      return
+    }
+
+    this._debug_client.captureScreenshot({ quality })
+      .then((result) => {
+        response.body = result.result as unknown as Record<string, unknown>
+        this.sendResponse(response)
+      })
+      .catch((error) => {
+        response.success = false
+        response.message = error instanceof Error ? error.message : String(error)
+        this.sendResponse(response)
+      })
+  }
+
   protected evaluateRequest(
     response: DebugProtocol.EvaluateResponse,
     args: DebugProtocol.EvaluateArguments
@@ -908,12 +949,14 @@ export class GmodClientDebugSession extends DebugSession {
             this._debug_client?.continue()
           } else {
             this._isPaused = true
+            this.sendEvent(new DebugEvent('gmod.client.paused'))
             this.sendEvent(new StoppedEvent(event.params.reason, GmodClientDebugSession.THREAD_ID))
           }
           break
 
         case 'running':
           this._isPaused = false
+          this.sendEvent(new DebugEvent('gmod.client.running'))
           this._variableHandles.reset()
           this.sendEvent(new ContinuedEvent(GmodClientDebugSession.THREAD_ID))
           break

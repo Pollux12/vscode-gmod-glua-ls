@@ -162,7 +162,7 @@ export class GmodDebugSession extends DebugSession {
   // Lua
   private static THREAD_ID = 1
 
-  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-2'
+  private static DEBUGGER_PROTOCOL_VERSION = 'gmod-3'
   private static CONTROL_COMMANDS: ReadonlySet<GmodControlCommand> = new Set([
     'pauseSoft',
     'pauseNow',
@@ -505,6 +505,26 @@ export class GmodDebugSession extends DebugSession {
     response: DebugProtocol.Response,
     args: any
   ): void {
+    if (command === 'gmod.runtimeStatus') {
+      if (!this._debug_client) {
+        response.success = false
+        response.message = 'The server debugger is not connected.'
+        this.sendResponse(response)
+        return
+      }
+      this._debug_client.getRuntimeStatus()
+        .then((result) => {
+          response.body = result.result as unknown as Record<string, unknown>
+          this.sendResponse(response)
+        })
+        .catch((error) => {
+          response.success = false
+          response.message = this.toResponseErrorMessage(error)
+          this.sendResponse(response)
+        })
+      return
+    }
+
     const entityRequest = this.resolveEntityRequest(command, args)
     if (entityRequest) {
       entityRequest
@@ -1268,6 +1288,7 @@ export class GmodDebugSession extends DebugSession {
             this._debug_client?.continue()
           } else {
             this._isPaused = true
+            this.sendEvent(new DebugEvent('gmod.paused'))
             this.sendEvent(
               new StoppedEvent(
                 event.params.reason,
@@ -1280,6 +1301,7 @@ export class GmodDebugSession extends DebugSession {
 
         case 'running':
           this._isPaused = false
+          this.sendEvent(new DebugEvent('gmod.running'))
           this._variableHandles.reset()
           this.sendEvent(new ContinuedEvent(GmodDebugSession.THREAD_ID))
           break

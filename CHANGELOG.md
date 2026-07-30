@@ -7,7 +7,9 @@
 ## VS Code Extension
 
 - Replace Copilot-specific AI tools and the custom MCP dialect with a standards-compliant Streamable HTTP MCP server for any compatible agent.
-- Keep the MCP surface focused on `execute_lua`, `run_console_command`, `read_console`, `get_errors`, and `get_issues`, with runtime timestamps, cursors, filtering, and bounded pagination.
+- Keep the MCP surface focused on seven bounded tools: `execute_lua`, `run_console_command`, `read_console`, `get_errors`, `get_issues`, `take_screenshot`, and `get_runtime_status`.
+- Add confirmed, exact-client JPEG screenshot capture with a 1 MiB limit, five-second timeout, temporary-file cleanup, and no client broadcast or arbitrary client command access.
+- Add structured runtime status for map, gamemode, dedicated and single-player state, and player counts without exposing player identities.
 - Allow `read_console` to wait for a bounded observation window when agents need asynchronous output.
 - Add dual-session, multi-server MCP routing: route mutations to a selected `gluals_gmod` server session, retain independent `gluals_gmod_client` telemetry, and filter runtime reads by session and server/client realm.
 - Support workspace file execution and manual `lua_refresh_file` dispatch through `execute_lua`, while guiding agents to rely on Garry's Mod auto-refresh after eligible file saves.

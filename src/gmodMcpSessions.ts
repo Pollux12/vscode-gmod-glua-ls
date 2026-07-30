@@ -8,11 +8,13 @@ const MAX_WORKSPACE_PATH_BYTES = 8 * 1024;
 
 export type GmodMcpSessionKind = 'server' | 'client';
 export type GmodMcpSessionState = 'starting' | 'connected' | 'disconnected' | 'terminated';
+export type GmodMcpExecutionState = 'running' | 'paused';
 export type GmodMcpSessionCapability =
     | 'serverControl'
     | 'serverTelemetry'
     | 'clientTelemetry'
-    | 'pausedEvaluation';
+    | 'pausedEvaluation'
+    | 'clientScreenshot';
 
 export interface GmodMcpWorkspaceFolder {
     readonly name: string;
@@ -29,6 +31,7 @@ export interface GmodMcpSessionDescriptor {
     readonly host?: string;
     readonly port?: number;
     readonly state: GmodMcpSessionState;
+    readonly executionState?: GmodMcpExecutionState;
     readonly startedAt: string;
     readonly endedAt?: string;
     readonly capabilities: readonly GmodMcpSessionCapability[];
@@ -39,13 +42,22 @@ export interface GmodMcpServerControlTarget {
     readonly session: vscode.DebugSession;
 }
 
+export interface GmodMcpClientScreenshotTarget {
+    readonly descriptor: GmodMcpSessionDescriptor;
+    readonly session: vscode.DebugSession;
+}
+
 export type GmodMcpSessionResolutionErrorCode =
     | 'NO_CONNECTED_SERVER'
     | 'AMBIGUOUS_SERVER'
+    | 'NO_CONNECTED_CLIENT'
+    | 'AMBIGUOUS_CLIENT'
     | 'UNKNOWN_SESSION'
     | 'CLIENT_SESSION'
+    | 'SERVER_SESSION'
     | 'TERMINATED_SESSION'
-    | 'SESSION_NOT_CONNECTED';
+    | 'SESSION_NOT_CONNECTED'
+    | 'CLIENT_PAUSED';
 
 export class GmodMcpSessionResolutionError extends Error {
     public constructor(
@@ -113,7 +125,9 @@ export class GmodMcpSessionRegistry {
             return undefined;
         }
 
-        registered.descriptor = this.withState(registered.descriptor, 'connected');
+        registered.descriptor = this.withState(registered.descriptor, 'connected', {
+            executionState: 'running',
+        });
         return copyDescriptor(registered.descriptor);
     }
 
@@ -124,7 +138,9 @@ export class GmodMcpSessionRegistry {
             return undefined;
         }
 
-        registered.descriptor = this.withState(registered.descriptor, 'disconnected');
+        registered.descriptor = this.withState(registered.descriptor, 'disconnected', {
+            executionState: undefined,
+        });
         return copyDescriptor(registered.descriptor);
     }
 
@@ -140,12 +156,21 @@ export class GmodMcpSessionRegistry {
 
         registered.descriptor = this.withState(registered.descriptor, 'terminated', {
             endedAt: this.now().toISOString(),
+            executionState: undefined,
         });
         const descriptor = copyDescriptor(registered.descriptor);
         // Retained history needs metadata, not a live VS Code session object.
         registered.session = undefined;
         this.pruneTerminatedSessions();
         return descriptor;
+    }
+
+    public markPaused(sessionId: string): GmodMcpSessionDescriptor | undefined {
+        return this.markExecutionState(sessionId, 'paused');
+    }
+
+    public markRunning(sessionId: string): GmodMcpSessionDescriptor | undefined {
+        return this.markExecutionState(sessionId, 'running');
     }
 
     public getDescriptor(sessionId: string): GmodMcpSessionDescriptor | undefined {
@@ -185,6 +210,38 @@ export class GmodMcpSessionRegistry {
         }
 
         return this.toServerControlTarget(connectedServers[0]);
+    }
+
+    public resolveClientScreenshotTarget(sessionId?: string): GmodMcpClientScreenshotTarget {
+        if (sessionId !== undefined) {
+            return this.resolveExplicitClientScreenshotTarget(sessionId);
+        }
+
+        const connectedClients = [...this.sessions.values()]
+            .filter(({ descriptor }) => descriptor.kind === 'client' && descriptor.state === 'connected')
+            .sort((left, right) => compareDescriptors(left.descriptor, right.descriptor));
+        const eligibleClients = connectedClients
+            .filter(({ descriptor }) => descriptor.executionState === 'running');
+
+        if (eligibleClients.length === 0) {
+            const pausedClient = connectedClients.find(({ descriptor }) => descriptor.executionState === 'paused');
+            throw new GmodMcpSessionResolutionError(
+                pausedClient ? 'CLIENT_PAUSED' : 'NO_CONNECTED_CLIENT',
+                pausedClient
+                    ? 'Connected Garry\'s Mod client debugger sessions are paused and cannot capture screenshots.'
+                    : 'No connected Garry\'s Mod client debugger session is available for screenshot capture.',
+                this.getDescriptors()
+            );
+        }
+        if (eligibleClients.length > 1) {
+            throw new GmodMcpSessionResolutionError(
+                'AMBIGUOUS_CLIENT',
+                'Multiple connected Garry\'s Mod client debugger sessions are available; specify a session ID.',
+                eligibleClients.map(({ descriptor }) => copyDescriptor(descriptor))
+            );
+        }
+
+        return this.toClientScreenshotTarget(eligibleClients[0]);
     }
 
     private resolveExplicitServerControlTarget(sessionId: string): GmodMcpServerControlTarget {
@@ -228,6 +285,47 @@ export class GmodMcpSessionRegistry {
         return this.toServerControlTarget(registered);
     }
 
+    private resolveExplicitClientScreenshotTarget(sessionId: string): GmodMcpClientScreenshotTarget {
+        const registered = this.sessions.get(truncateUtf8(sessionId, MAX_METADATA_BYTES));
+        if (!registered) {
+            throw new GmodMcpSessionResolutionError(
+                'UNKNOWN_SESSION',
+                `Debugger session '${sessionId}' is not registered.`,
+                this.getDescriptors()
+            );
+        }
+        if (registered.descriptor.kind === 'server') {
+            throw new GmodMcpSessionResolutionError(
+                'SERVER_SESSION',
+                `Debugger session '${sessionId}' is a server session and cannot capture a client screenshot.`,
+                this.getDescriptors()
+            );
+        }
+        if (registered.descriptor.state === 'terminated') {
+            throw new GmodMcpSessionResolutionError(
+                'TERMINATED_SESSION',
+                `Debugger session '${sessionId}' has terminated.`,
+                this.getDescriptors()
+            );
+        }
+        if (registered.descriptor.state !== 'connected') {
+            throw new GmodMcpSessionResolutionError(
+                'SESSION_NOT_CONNECTED',
+                `Debugger session '${sessionId}' is not connected and cannot capture a screenshot.`,
+                this.getDescriptors()
+            );
+        }
+        if (registered.descriptor.executionState === 'paused') {
+            throw new GmodMcpSessionResolutionError(
+                'CLIENT_PAUSED',
+                `Debugger session '${sessionId}' is paused and cannot capture a screenshot.`,
+                this.getDescriptors()
+            );
+        }
+
+        return this.toClientScreenshotTarget(registered);
+    }
+
     private toServerControlTarget(registered: RegisteredSession): GmodMcpServerControlTarget {
         if (registered.descriptor.state !== 'connected' || !registered.session) {
             throw new GmodMcpSessionResolutionError(
@@ -237,6 +335,31 @@ export class GmodMcpSessionRegistry {
             );
         }
         return { descriptor: copyDescriptor(registered.descriptor), session: registered.session };
+    }
+
+    private toClientScreenshotTarget(registered: RegisteredSession): GmodMcpClientScreenshotTarget {
+        if (registered.descriptor.state !== 'connected'
+            || registered.descriptor.executionState !== 'running'
+            || !registered.session) {
+            throw new GmodMcpSessionResolutionError(
+                registered.descriptor.executionState === 'paused' ? 'CLIENT_PAUSED' : 'SESSION_NOT_CONNECTED',
+                `Debugger session '${registered.descriptor.sessionId}' is not available for screenshot capture.`,
+                this.getDescriptors()
+            );
+        }
+        return { descriptor: copyDescriptor(registered.descriptor), session: registered.session };
+    }
+
+    private markExecutionState(
+        sessionId: string,
+        executionState: GmodMcpExecutionState
+    ): GmodMcpSessionDescriptor | undefined {
+        const registered = this.sessions.get(truncateUtf8(sessionId, MAX_METADATA_BYTES));
+        if (!registered || registered.descriptor.state !== 'connected') {
+            return undefined;
+        }
+        registered.descriptor = this.withState(registered.descriptor, 'connected', { executionState });
+        return copyDescriptor(registered.descriptor);
     }
 
     private pruneTerminatedSessions(): void {
@@ -254,12 +377,16 @@ export class GmodMcpSessionRegistry {
         state: GmodMcpSessionState,
         changes: Partial<GmodMcpSessionDescriptor> = {}
     ): GmodMcpSessionDescriptor {
-        return {
+        const next: GmodMcpSessionDescriptor = {
             ...descriptor,
             ...changes,
             state,
-            capabilities: getCapabilities(descriptor.kind, state),
+            capabilities: getCapabilities(descriptor.kind, state, changes.executionState ?? descriptor.executionState),
         };
+        if (state !== 'connected') {
+            delete (next as { executionState?: GmodMcpExecutionState }).executionState;
+        }
+        return next;
     }
 }
 
@@ -296,14 +423,17 @@ function getConfiguredPort(session: vscode.DebugSession): number | undefined {
 
 function getCapabilities(
     kind: GmodMcpSessionKind,
-    state: GmodMcpSessionState
+    state: GmodMcpSessionState,
+    executionState?: GmodMcpExecutionState
 ): readonly GmodMcpSessionCapability[] {
     if (state !== 'connected') {
         return [];
     }
     return kind === 'server'
         ? ['serverControl', 'serverTelemetry']
-        : ['clientTelemetry', 'pausedEvaluation'];
+        : executionState === 'paused'
+            ? ['clientTelemetry', 'pausedEvaluation']
+            : ['clientTelemetry', 'clientScreenshot'];
 }
 
 function compareDescriptors(left: GmodMcpSessionDescriptor, right: GmodMcpSessionDescriptor): number {

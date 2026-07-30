@@ -19,7 +19,13 @@ import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
-import { GmodLanguageIssue, GmodMcpControlCommand, GmodMcpHost } from './gmodMcpHost';
+import {
+    GmodLanguageIssue,
+    GmodMcpControlCommand,
+    GmodMcpHost,
+    GmodMcpRuntimeStatusResult,
+    GmodMcpScreenshotResult,
+} from './gmodMcpHost';
 import { GmodMcpSessionRegistry } from './gmodMcpSessions';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
@@ -1271,6 +1277,21 @@ async function executeGmodMcpControlCommand(
     return response as GmodControlResult;
 }
 
+async function getGmodMcpRuntimeStatus(sessionId: string): Promise<GmodMcpRuntimeStatusResult> {
+    const { session } = gmodMcpSessionRegistry.resolveServerControlTarget(sessionId);
+    const response = await session.customRequest('gmod.runtimeStatus');
+    return response as GmodMcpRuntimeStatusResult;
+}
+
+async function captureGmodMcpScreenshot(
+    quality: number,
+    sessionId: string
+): Promise<GmodMcpScreenshotResult> {
+    const { session } = gmodMcpSessionRegistry.resolveClientScreenshotTarget(sessionId);
+    const response = await session.customRequest('gmod.captureScreenshot', { quality });
+    return response as GmodMcpScreenshotResult;
+}
+
 async function runGmodRunLua(): Promise<void> {
     const lua = await vscode.window.showInputBox({
         title: 'Run Lua in Garry\'s Mod',
@@ -1833,6 +1854,9 @@ function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
         serverVersion: String(context.extension.packageJSON.version ?? '0.0.0'),
         resolveControlSession: (sessionId) => gmodMcpSessionRegistry.resolveServerControlTarget(sessionId).descriptor,
         executeControlCommand: executeGmodMcpControlCommand,
+        resolveScreenshotSession: (sessionId) => gmodMcpSessionRegistry.resolveClientScreenshotTarget(sessionId).descriptor,
+        captureScreenshot: captureGmodMcpScreenshot,
+        getRuntimeStatus: getGmodMcpRuntimeStatus,
         getRuntimeSessions: () => gmodMcpSessionRegistry.getDescriptors(),
         getLanguageIssues: getGmodLanguageIssues,
     });
@@ -2053,6 +2077,16 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
                 void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);
             }
         }
+        return;
+    }
+
+    if (event.event === 'gmod.paused' || event.event === 'gmod.client.paused') {
+        gmodMcpSessionRegistry.markPaused(event.session.id);
+        return;
+    }
+
+    if (event.event === 'gmod.running' || event.event === 'gmod.client.running') {
+        gmodMcpSessionRegistry.markRunning(event.session.id);
         return;
     }
 

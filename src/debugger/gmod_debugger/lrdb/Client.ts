@@ -36,6 +36,8 @@ export type DebugRequest =
   | SetEntityTableValueRequest
   | SetEntityNetworkVarRequest
   | SetEntityPropertyRequest
+  | CaptureScreenshotRequest
+  | GetRuntimeStatusRequest
 
 export interface DebugClientAdapter {
   onMessage: TypedEventTarget<JsonRpcMessage>
@@ -265,6 +267,23 @@ export class Client {
       jsonrpc: '2.0',
       id: this.seqId++,
       params,
+    })
+
+  captureScreenshot = (
+    params: CaptureScreenshotRequest['params']
+  ): Promise<DebugResponseType<CaptureScreenshotRequest>> =>
+    this.send({
+      method: 'capture_screenshot',
+      jsonrpc: '2.0',
+      id: this.seqId++,
+      params,
+    })
+
+  getRuntimeStatus = (): Promise<DebugResponseType<GetRuntimeStatusRequest>> =>
+    this.send({
+      method: 'get_runtime_status',
+      jsonrpc: '2.0',
+      id: this.seqId++,
     })
 
   getEntities = (
@@ -538,6 +557,36 @@ export interface RefreshFileRequest extends JsonRpcRequest {
   }
 }
 
+export interface CaptureScreenshotRequest extends JsonRpcRequest {
+  method: 'capture_screenshot'
+  params: {
+    quality: number
+  }
+}
+
+export interface CaptureScreenshotResult {
+  mimeType: 'image/jpeg'
+  data: string
+  byteCount: number
+  quality: number
+  width?: number
+  height?: number
+}
+
+export interface GetRuntimeStatusRequest extends JsonRpcRequest {
+  method: 'get_runtime_status'
+  params?: never
+}
+
+export interface RuntimeStatusResult {
+  map: string
+  gamemode: string
+  dedicated: boolean
+  singlePlayer: boolean
+  playerCount: number
+  maxPlayers: number
+}
+
 export type Vec3 = [number, number, number]
 
 export interface EntitySummary {
@@ -688,6 +737,8 @@ type ResponseResultType = {
   run_lua: RunLuaResult | null
   run_file: never
   refresh_file: never
+  capture_screenshot: CaptureScreenshotResult
+  get_runtime_status: RuntimeStatusResult
   get_entities: GetEntitiesResult
   get_entity: EntityDetail
   get_entity_network_vars: GetEntityNetworkVarsResult

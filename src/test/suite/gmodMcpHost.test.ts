@@ -84,6 +84,74 @@ suite('GMod MCP Host', () => {
                 signalControlSessionResolved?.(resolvedId);
                 return session;
             },
+            resolveScreenshotSession: (sessionId) => {
+                const connectedClients = sessions.filter((candidate) =>
+                    candidate.kind === 'client'
+                    && candidate.state === 'connected'
+                    && candidate.executionState === 'running');
+                const session = sessionId == null
+                    ? connectedClients.length === 1 ? connectedClients[0] : undefined
+                    : sessions.find((candidate) => candidate.sessionId === sessionId);
+                if (!session || session.kind !== 'client' || session.state !== 'connected'
+                    || session.executionState !== 'running') {
+                    throw Object.assign(new Error(`Client session '${sessionId ?? ''}' is unavailable.`), {
+                        code: session?.kind === 'server'
+                            ? 'SERVER_SESSION'
+                            : session?.executionState === 'paused'
+                                ? 'CLIENT_PAUSED'
+                                : connectedClients.length > 1
+                                    ? 'AMBIGUOUS_CLIENT'
+                                    : 'NO_CONNECTED_CLIENT',
+                        availableSessions: sessions,
+                    }) as Error & GmodMcpSessionResolutionFailure;
+                }
+                return session;
+            },
+            captureScreenshot: async (quality, sessionId) => {
+                const session = sessions.find((candidate) => candidate.sessionId === sessionId);
+                if (!session || session.state !== 'connected' || session.executionState !== 'running') {
+                    throw Object.assign(new Error(`Client session '${sessionId}' disconnected before dispatch.`), {
+                        code: 'SESSION_NOT_CONNECTED',
+                        availableSessions: sessions,
+                    }) as Error & GmodMcpSessionResolutionFailure;
+                }
+                if (quality === 1) {
+                    return { mimeType: 'image/jpeg', data: 'not base64', byteCount: 4, quality };
+                }
+                if (quality === 2) {
+                    return { mimeType: 'image/jpeg', data: '/9j/2Q==', byteCount: 5, quality };
+                }
+                if (quality === 3) {
+                    return { mimeType: 'image/jpeg', data: 'dGVzdA==', byteCount: 4, quality };
+                }
+                if (quality === 4) {
+                    return { mimeType: 'image/jpeg', data: '/9j/2Q==', byteCount: 1024 * 1024 + 1, quality };
+                }
+                const data = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+                return {
+                    mimeType: 'image/jpeg',
+                    data: data.toString('base64'),
+                    byteCount: data.length,
+                    quality,
+                };
+            },
+            getRuntimeStatus: async (sessionId) => {
+                const session = sessions.find((candidate) => candidate.sessionId === sessionId);
+                if (!session || session.kind !== 'server' || session.state !== 'connected') {
+                    throw Object.assign(new Error(`Server session '${sessionId}' disconnected before dispatch.`), {
+                        code: 'SESSION_NOT_CONNECTED',
+                        availableSessions: sessions,
+                    }) as Error & GmodMcpSessionResolutionFailure;
+                }
+                return {
+                    map: 'gm_construct',
+                    gamemode: 'sandbox',
+                    dedicated: true,
+                    singlePlayer: false,
+                    playerCount: 2,
+                    maxPlayers: 16,
+                };
+            },
             executeControlCommand: async (command, args, sessionId) => {
                 const dispatchSession = sessions.find((candidate) => candidate.sessionId === sessionId);
                 if (!dispatchSession || dispatchSession.kind !== 'server' || dispatchSession.state !== 'connected') {
@@ -213,7 +281,7 @@ suite('GMod MCP Host', () => {
             const tools = await client.listTools();
             assert.deepStrictEqual(
                 tools.tools.map((tool) => tool.name).sort(),
-                ['execute_lua', 'get_errors', 'get_issues', 'read_console', 'run_console_command']
+                ['execute_lua', 'get_errors', 'get_issues', 'get_runtime_status', 'read_console', 'run_console_command', 'take_screenshot']
             );
             const executeTool = tools.tools.find((tool) => tool.name === 'execute_lua');
             assert.strictEqual(executeTool?.annotations?.openWorldHint, true);
@@ -224,6 +292,80 @@ suite('GMod MCP Host', () => {
             const readConsoleRealmSchema = readConsoleSchema?.properties?.realm;
             assert.doesNotMatch(JSON.stringify(readConsoleRealmSchema), /shared/);
             assert.strictEqual(readConsoleSchema?.properties?.observeMs?.maximum, 30_000);
+            const screenshotTool = tools.tools.find((tool) => tool.name === 'take_screenshot');
+            assert.strictEqual(screenshotTool?.annotations?.readOnlyHint, false);
+            const screenshotSchema = screenshotTool?.inputSchema as {
+                properties?: { quality?: { minimum?: unknown; maximum?: unknown } };
+            } | undefined;
+            assert.strictEqual(screenshotSchema?.properties?.quality?.minimum, 1);
+            assert.strictEqual(screenshotSchema?.properties?.quality?.maximum, 100);
+            const runtimeStatusTool = tools.tools.find((tool) => tool.name === 'get_runtime_status');
+            assert.strictEqual(runtimeStatusTool?.annotations?.readOnlyHint, true);
+
+            const screenshot = await client.callTool({ name: 'take_screenshot', arguments: {} });
+            assert.strictEqual(screenshot.isError, false);
+            const screenshotContent = screenshot.content as Array<{
+                type: string;
+                data?: string;
+                mimeType?: string;
+            }>;
+            const image = screenshotContent.find((item) => item.type === 'image');
+            assert.ok(image && image.type === 'image');
+            assert.strictEqual(image.mimeType, 'image/jpeg');
+            assert.strictEqual(Buffer.from(image.data ?? '', 'base64').length, 4);
+            assert.match(getText(screenshot.content), /untrusted Garry's Mod runtime data/i);
+
+            for (const [quality, expected] of [
+                [1, /invalid base64/],
+                [2, /byte count does not match/],
+                [3, /not a complete JPEG/],
+                [4, /byte count must be between/],
+            ] as const) {
+                const rejectedScreenshot = await client.callTool({
+                    name: 'take_screenshot',
+                    arguments: { quality },
+                });
+                assert.strictEqual(rejectedScreenshot.isError, true);
+                assert.match(getText(rejectedScreenshot.content), expected);
+            }
+
+            const clientSession = sessions.find((session) => session.sessionId === 'client-one')!;
+            const mutableClientSession = clientSession as unknown as {
+                executionState?: 'running' | 'paused';
+                capabilities: string[];
+            };
+            mutableClientSession.executionState = 'paused';
+            mutableClientSession.capabilities = ['clientTelemetry', 'pausedEvaluation'];
+            const pausedScreenshot = await client.callTool({
+                name: 'take_screenshot',
+                arguments: { sessionId: 'client-one' },
+            });
+            assert.strictEqual(pausedScreenshot.isError, true);
+            assert.match(getText(pausedScreenshot.content), /CLIENT_PAUSED/);
+            mutableClientSession.executionState = 'running';
+            mutableClientSession.capabilities = ['clientTelemetry', 'clientScreenshot'];
+
+            const ambiguousStatus = await client.callTool({ name: 'get_runtime_status', arguments: {} });
+            assert.strictEqual(ambiguousStatus.isError, false);
+            assert.match(getText(ambiguousStatus.content), /"selectionRequired": true/);
+            const runtimeStatus = await client.callTool({
+                name: 'get_runtime_status',
+                arguments: { sessionId: 'server-one' },
+            });
+            assert.strictEqual(runtimeStatus.isError, false);
+            assert.match(getText(runtimeStatus.content), /gm_construct/);
+
+            const serverStates = sessions
+                .filter((session) => session.kind === 'server')
+                .map((session) => session.state);
+            const mutableServers = sessions.filter((session) => session.kind === 'server') as Array<{
+                state: GmodMcpRuntimeSessionDescriptor['state'];
+            }>;
+            mutableServers.forEach((session) => { session.state = 'disconnected'; });
+            const offlineStatus = await client.callTool({ name: 'get_runtime_status', arguments: {} });
+            assert.strictEqual(offlineStatus.isError, false);
+            assert.match(getText(offlineStatus.content), /"liveQueryPerformed": false/);
+            mutableServers.forEach((session, index) => { session.state = serverStates[index]; });
 
             const missingRealm = await client.callTool({
                 name: 'execute_lua',
@@ -628,7 +770,10 @@ function runtimeSession(
         debugType: kind === 'server' ? 'gluals_gmod' : 'gluals_gmod_client',
         kind,
         state,
+        executionState: state === 'connected' ? 'running' : undefined,
         startedAt: '2026-07-27T10:00:00.000Z',
-        capabilities: kind === 'server' ? ['serverControl', 'serverTelemetry'] : ['clientTelemetry'],
+        capabilities: kind === 'server'
+            ? ['serverControl', 'serverTelemetry']
+            : ['clientTelemetry', 'clientScreenshot'],
     };
 }

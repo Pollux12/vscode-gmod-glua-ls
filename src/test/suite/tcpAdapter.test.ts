@@ -61,6 +61,42 @@ suite('TCP Debug Adapter', () => {
             await close(tcpServer);
         }
     });
+
+    test('parses a maximum-size screenshot response split across socket writes', async () => {
+        const server = net.createServer();
+        let acceptedSocket: net.Socket | undefined;
+        const accepted = new Promise<net.Socket>((resolve) => {
+            server.once('connection', (socket) => {
+                acceptedSocket = socket;
+                resolve(socket);
+            });
+        });
+        await listen(server);
+        const address = server.address();
+        assert.ok(address && typeof address !== 'string');
+
+        const adapter = new TcpAdapter(address.port, '127.0.0.1');
+        try {
+            await waitForEvent(adapter.onOpen);
+            const socket = await accepted;
+            const data = Buffer.alloc(1024 * 1024, 0x5a).toString('base64');
+            const message = JSON.stringify({
+                jsonrpc: '2.0',
+                id: 7,
+                result: { mimeType: 'image/jpeg', data, byteCount: 1024 * 1024, quality: 70 },
+            }) + '\n';
+            const received = waitForEvent(adapter.onMessage);
+            for (let offset = 0; offset < message.length; offset += 16 * 1024) {
+                socket.write(message.slice(offset, offset + 16 * 1024));
+            }
+            const response = await received as { result?: { data?: string } };
+            assert.strictEqual(response.result?.data?.length, data.length);
+        } finally {
+            adapter.end();
+            acceptedSocket?.destroy();
+            await close(server);
+        }
+    });
 });
 
 const tcpServer = net.createServer();
