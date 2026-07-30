@@ -33,8 +33,10 @@ suite('Extension Conflict', () => {
             );
         }
         assert.strictEqual(detectionCount, 2, 'Every server-start attempt must check the conflict.');
-        assert.match(GLUA_ENHANCED_CONFLICT_MESSAGE, /^Conflict detected:/);
-        assert.match(GLUA_ENHANCED_CONFLICT_MESSAGE, /Disable GLua Enhanced/);
-        assert.doesNotMatch(GLUA_ENHANCED_CONFLICT_MESSAGE, /Manage GLua Enhanced/);
+        assert.strictEqual(
+            GLUA_ENHANCED_CONFLICT_MESSAGE,
+            'The GLua Enhanced extension is enabled and conflicts with GLuaLS. ' +
+                'Disable it, then restart the GLua Language Server for GLuaLS to work.'
+        );
     });
 });
