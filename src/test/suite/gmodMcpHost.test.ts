@@ -218,8 +218,12 @@ suite('GMod MCP Host', () => {
             const executeTool = tools.tools.find((tool) => tool.name === 'execute_lua');
             assert.strictEqual(executeTool?.annotations?.openWorldHint, true);
             const readConsoleTool = tools.tools.find((tool) => tool.name === 'read_console');
-            const readConsoleRealmSchema = (readConsoleTool?.inputSchema as { properties?: { realm?: unknown } } | undefined)?.properties?.realm;
+            const readConsoleSchema = readConsoleTool?.inputSchema as {
+                properties?: { realm?: unknown; observeMs?: { maximum?: unknown } };
+            } | undefined;
+            const readConsoleRealmSchema = readConsoleSchema?.properties?.realm;
             assert.doesNotMatch(JSON.stringify(readConsoleRealmSchema), /shared/);
+            assert.strictEqual(readConsoleSchema?.properties?.observeMs?.maximum, 30_000);
 
             const missingRealm = await client.callTool({
                 name: 'execute_lua',
@@ -485,6 +489,26 @@ suite('GMod MCP Host', () => {
                 arguments: { source: 'session-test', includeSessions: true },
             });
             assert.strictEqual((getJson(getText(consoleWithSessions.content)) as { availableSessions: unknown[] }).availableSessions.length, 3);
+
+            const observationCursor = (getJson(getText(consoleWithSessions.content)) as { latestCursor: number }).latestCursor;
+            const waitingConsole = client.callTool({
+                name: 'read_console',
+                arguments: { cursor: observationCursor, observeMs: 50, source: 'await-test' },
+            });
+            await wait(10);
+            host.recordDebugOutput({
+                message: 'output captured during observation', source: 'await-test', realm: 'server', sessionId: 'server-one',
+            });
+            const waitingConsoleResult = await waitingConsole;
+            const waitingConsoleJson = getJson(getText(waitingConsoleResult.content)) as {
+                lines: Array<{ message: unknown }>;
+                observeMs: unknown;
+                observationStartedAt: unknown;
+                observedAt: unknown;
+            };
+            assert.deepStrictEqual(waitingConsoleJson.lines.map((line) => line.message), ['output captured during observation']);
+            assert.strictEqual(waitingConsoleJson.observeMs, 50);
+            assert.ok(Date.parse(String(waitingConsoleJson.observationStartedAt)) <= Date.parse(String(waitingConsoleJson.observedAt)));
 
             host.recordDebugOutput({
                 message: Array.from({ length: 1005 }, (_, index) => `buffer line ${index}`).join('\n'),

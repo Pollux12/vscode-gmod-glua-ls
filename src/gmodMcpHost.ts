@@ -15,6 +15,7 @@ const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_LUA_BYTES = 256 * 1024;
 const MAX_LUA_FILE_PATH_BYTES = 1024;
 const MAX_CONSOLE_COMMAND_BYTES = 2048;
+const MAX_CONSOLE_OBSERVE_MS = 30_000;
 const MAX_CONSOLE_LINES = 1000;
 const MAX_RUNTIME_ISSUES = 200;
 const MAX_ENTRY_TEXT_BYTES = 8 * 1024;
@@ -394,6 +395,7 @@ export class GmodMcpHost implements vscode.Disposable {
                 'The active VS Code debug-session UI does not select an MCP target; specify sessionId when more than one server is connected.',
                 'Use run_console_command only for one selected-server console command; it does not run commands on clients.',
                 'After runtime activity, use read_console for output, get_errors for in-game runtime failures, and get_issues for GLuaLS static diagnostics.',
+                'To await asynchronous console output, pass the previous read_console cursor with a bounded observeMs window.',
                 'Start with small limits and narrow filters. Request stack traces only when the runtime error summary is insufficient.',
             ].join(' '),
         });
@@ -629,10 +631,11 @@ export class GmodMcpHost implements vscode.Disposable {
             'read_console',
             {
                 title: 'Read Garry\'s Mod Console',
-                description: 'Read a bounded, filterable page of captured Garry\'s Mod console lines. Filter by an exact debugger session ID when correlating output. Omit cursor for the latest lines; pass a previous cursor to page forward chronologically without skipping buffered output.',
+                description: 'Read a bounded, filterable page of captured Garry\'s Mod console lines. Filter by an exact debugger session ID when correlating output. Omit cursor for the latest lines; pass a previous cursor to page forward chronologically without skipping buffered output. Set observeMs to wait before reading so asynchronous output can arrive.',
                 inputSchema: {
                     lines: z.number().int().min(1).max(200).optional().describe('Maximum lines to return. Defaults to 50.'),
                     cursor: z.number().int().nonnegative().optional().describe('Return only lines captured after this cursor.'),
+                    observeMs: z.number().int().min(0).max(MAX_CONSOLE_OBSERVE_MS).optional().describe('Wait this many milliseconds before reading. Defaults to 0 and is limited to 30000. Combine with a previous cursor to await new output.'),
                     realm: z.enum(['server', 'client']).optional().describe('Only return lines from this realm.'),
                     sessionId: z.string().min(1).max(MAX_METADATA_BYTES).optional().describe('Only return lines from this exact debugger session.'),
                     includeSessions: z.boolean().optional().describe('Include bounded available debugger sessions. Defaults to false.'),
@@ -646,7 +649,11 @@ export class GmodMcpHost implements vscode.Disposable {
                     openWorldHint: false,
                 },
             },
-            ({ lines = 50, cursor, realm, sessionId, includeSessions = false, source, contains }) => {
+            async ({ lines = 50, cursor, observeMs = 0, realm, sessionId, includeSessions = false, source, contains }) => {
+                const observationStartedAt = new Date();
+                if (observeMs > 0) {
+                    await delay(observeMs);
+                }
                 const sessionStates = this.getRuntimeSessionStates();
                 const candidates = (cursor == null
                     ? this.consoleLines
@@ -671,6 +678,9 @@ export class GmodMcpHost implements vscode.Disposable {
                     matched: candidates.length,
                     dropped: cursor != null && cursor < this.consoleDroppedThroughCursor,
                     truncated: selected.truncated || selected.items.some((line) => line.truncated),
+                    observeMs,
+                    observationStartedAt: observationStartedAt.toISOString(),
+                    observedAt: new Date().toISOString(),
                     availableSessions: includeSessions ? this.getRuntimeSessions() : undefined,
                 }, false, true);
             }

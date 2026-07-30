@@ -8,6 +8,7 @@
 
 - Replace Copilot-specific AI tools and the custom MCP dialect with a standards-compliant Streamable HTTP MCP server for any compatible agent.
 - Keep the MCP surface focused on `execute_lua`, `run_console_command`, `read_console`, `get_errors`, and `get_issues`, with runtime timestamps, cursors, filtering, and bounded pagination.
+- Allow `read_console` to wait for a bounded observation window when agents need asynchronous output.
 - Add dual-session, multi-server MCP routing: route mutations to a selected `gluals_gmod` server session, retain independent `gluals_gmod_client` telemetry, and filter runtime reads by session and server/client realm.
 - Support workspace file execution and manual `lua_refresh_file` dispatch through `execute_lua`, while guiding agents to rely on Garry's Mod auto-refresh after eligible file saves.
 - Add automatic VS Code MCP discovery and a command to copy authenticated configuration for external agents.
