@@ -177,13 +177,6 @@ async function loadGrammar() {
                 return new oniguruma.OnigString(text);
             }
         }),
-        getInjections(scopeName) {
-            if (scopeName === "source.lua") {
-                return ["gluals.lua.injection"];
-            }
-
-            return [];
-        },
         loadGrammar(scopeName) {
             if (scopeName === "source.lua") {
                 return vscodeTextmate.parseRawGrammar(
@@ -192,7 +185,7 @@ async function loadGrammar() {
                 );
             }
 
-            if (scopeName === "gluals.lua.injection") {
+            if (scopeName === "source.glua") {
                 const grammarPath = path.join(repoRoot, "syntaxes", "glua.tmLanguage.json");
                 const grammar = JSON.parse(fs.readFileSync(grammarPath, "utf8"));
                 return vscodeTextmate.parseRawGrammar(
@@ -205,7 +198,7 @@ async function loadGrammar() {
         }
     });
 
-    const grammar = await registry.loadGrammar("source.lua");
+    const grammar = await registry.loadGrammar("source.glua");
     assert.ok(grammar, "expected the GLua grammar to load");
     return grammar;
 }
@@ -248,14 +241,104 @@ function assertScope(lines, tokensByLine, lineIndex, text, expectedScope, occurr
 }
 
 function assertManifest(packageJson) {
+    assert.ok(
+        packageJson.activationEvents?.includes("onLanguage:lua"),
+        "expected lightweight activation for standard Lua documents"
+    );
+    const languageContribution = packageJson.contributes?.languages?.find(
+        (language) =>
+            language.id === "glua" &&
+            Array.isArray(language.extensions) &&
+            language.extensions.includes(".lua")
+    );
+    assert.ok(languageContribution, "expected a dedicated glua language contribution");
+    assert.equal(
+        packageJson.contributes?.languages?.some((language) => language.id === "lua"),
+        false,
+        "expected the standard Lua language definition to remain untouched"
+    );
+    for (const filenamePattern of [
+        "**/lua/**/*.lua",
+        "**/gamemode/**/*.lua",
+        "**/init.lua",
+        "**/cl_init.lua",
+        "**/shared.lua",
+        "**/cl_*.lua",
+        "**/sv_*.lua",
+        "**/sh_*.lua"
+    ]) {
+        assert.ok(
+            languageContribution.filenamePatterns?.includes(filenamePattern),
+            `expected GLua filename pattern ${filenamePattern}`
+        );
+    }
+
     const grammarContribution = packageJson.contributes?.grammars?.find(
         (grammar) =>
-            grammar.scopeName === "gluals.lua.injection" &&
-            Array.isArray(grammar.injectTo) &&
-            grammar.injectTo.includes("source.lua") &&
+            grammar.language === "glua" &&
+            grammar.scopeName === "source.glua" &&
             grammar.path === "./syntaxes/glua.tmLanguage.json"
     );
-    assert.ok(grammarContribution, "expected a lua injection grammar contribution");
+    assert.ok(grammarContribution, "expected a GLua grammar contribution");
+    assert.deepEqual(
+        packageJson.contributes?.snippets?.map((snippet) => snippet.language),
+        ["glua"],
+        "expected snippets to target glua"
+    );
+    assert.deepEqual(
+        packageJson.contributes?.breakpoints?.map((breakpoint) => breakpoint.language),
+        ["glua"],
+        "expected breakpoints to target glua"
+    );
+    for (const debuggerContribution of packageJson.contributes?.debuggers ?? []) {
+        assert.deepEqual(
+            debuggerContribution.languages,
+            ["glua"],
+            `expected ${debuggerContribution.type} to target glua`
+        );
+    }
+    assert.ok(
+        packageJson.contributes?.configurationDefaults?.["[glua]"],
+        "expected glua language-specific configuration defaults"
+    );
+    assert.equal(
+        packageJson.contributes?.configurationDefaults?.["[lua]"],
+        undefined,
+        "expected standard Lua configuration defaults to remain untouched"
+    );
+    const menuConditions = Object.values(packageJson.contributes?.menus ?? {})
+        .flat()
+        .map((item) => item.when)
+        .filter((condition) => typeof condition === "string");
+    assert.equal(
+        menuConditions.some((condition) => condition.includes("resourceLangId == lua")),
+        false,
+        "expected editor actions not to target standard Lua documents"
+    );
+    const gluaDocumentCommands = new Set([
+        "gluals.showSyntaxTree",
+        "gluals.addUndefinedGlobalToGlobals",
+        "gluals.gmod.runFile",
+        "gluals.gmod.refreshFile",
+        "gluals.gmod.runSelection"
+    ]);
+    for (const command of packageJson.contributes?.commands ?? []) {
+        if (gluaDocumentCommands.has(command.command)) {
+            assert.equal(
+                command.enablement,
+                "resourceLangId == glua",
+                `expected ${command.command} to be disabled outside GLua documents`
+            );
+        }
+    }
+    assert.ok(
+        packageJson.contributes?.menus?.["problem/context"]?.some(
+            (item) =>
+                item.command === "gluals.addUndefinedGlobalToGlobals" &&
+                item.when.includes("resourceLangId == glua")
+        ),
+        "expected the undefined-global Problems action to target GLua documents"
+    );
 
     const semanticTokenTypes = packageJson.contributes?.semanticTokenTypes ?? [];
     assert.ok(
@@ -294,9 +377,9 @@ function assertManifest(packageJson) {
         "expected the custom object semantic token modifier"
     );
     const semanticScopes = packageJson.contributes?.semanticTokenScopes?.find(
-        (entry) => entry.language === "lua"
+        (entry) => entry.language === "glua"
     )?.scopes;
-    assert.ok(semanticScopes, "expected lua semanticTokenScopes");
+    assert.ok(semanticScopes, "expected glua semanticTokenScopes");
 
     for (const key of [
         "class",

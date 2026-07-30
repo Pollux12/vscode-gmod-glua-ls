@@ -1,7 +1,6 @@
 {
-    "name": "GLua Injection",
-    "scopeName": "gluals.lua.injection",
-    "injectionSelector": "L:source.lua -comment -string",
+    "name": "GLua",
+    "scopeName": "source.glua",
     "patterns": [
         {
             "include": "#doc-comments"
@@ -17,6 +16,9 @@
         },
         {
             "include": "#gmod-constants"
+        },
+        {
+            "include": "source.lua"
         }
     ],
     "repository": {

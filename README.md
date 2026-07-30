@@ -98,7 +98,25 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 ## Troubleshooting
 
-Make sure you don't have any other potentially conflicting extensions installed, such as EmmyLua, LuaLS, GLua Enhanced - this should be the only Lua Language Server or Lua Debugger you have installed. It is recommended you create a new VSCode profile for GLua/Garry's Mod development to avoid conflict, especially if other Lua extensions are required for non-gmod related projects.
+This extension uses the dedicated `glua` language mode. Standard Lua extensions can be installed alongside it: GLuaLS only attaches to files using `glua`, while a Lua language server can attach to files using `lua`. Extensions that also provide GLua tooling can still conflict because they target the same `glua` documents. If GLua Enhanced is enabled, GLuaLS blocks language-server startup and reports a conflict error. Disable GLua Enhanced before starting GLuaLS.
+
+The language mode separates editor providers and open-document synchronization. A language server that indexes files directly from the workspace may still scan every `.lua` file under that workspace root, so mixed GLua/Lua workspaces can also require exclude rules in each language server.
+
+VS Code cannot infer whether a `.lua` file contains standard Lua or Garry's Mod GLua. This extension makes `.lua` files use GLua by default. To treat selected files as standard Lua, click the language mode in the status bar, choose **Lua**, and configure a file association. For example, workspace settings can keep build scripts on the standard Lua language server:
+
+```json
+{
+    "files.associations": {
+        "premake5.lua": "lua",
+        "BuildProjects.lua": "lua",
+        "premake5_create_project.lua": "lua"
+    }
+}
+```
+
+The extension also associates conventional Garry's Mod paths and filenames with `glua`, including `lua`, `gamemode`, `autorun`, `entities`, `weapons`, `vgui`, `init.lua`, `cl_init.lua`, `shared.lua`, and the `cl_`, `sv_`, and `sh_` realm prefixes. These patterns work for standalone addon and gamemode repositories; the project does not need to be inside the Garry's Mod installation. If a likely Garry's Mod file is using the standard `lua` mode, the extension reports that GLuaLS is inactive and offers to switch that file to `glua`.
+
+Language-specific editor settings for this extension now belong under `[glua]`. Keep settings intended for a standard Lua extension under `[lua]`.
 
 The debugger is only designed to be used on local development servers - please do not install the binary module on production servers. `gm_rdb` only accepts localhost connections by default. If you need remote attach, start Garry's Mod or SRCDS with `-rdb_allow_remote`. `rdb.activate(...)` keeps the server running by default. If you want it to pause on the next hook event instead, add `-rdb_pause_on_activate`. This extension has only been tested with VSCode and may not work with forks. AI features have only been tested with GitHub Copilot Chat and may not work with other providers.
 

@@ -68,6 +68,8 @@ import {
     isStartupProgressToken,
     StartupServerState,
 } from './startupProgress';
+import { throwIfGluaEnhancedIsEnabled } from './extensionConflict';
+import { registerGluaLanguageModeWarning } from './gluaLanguageModeWarning';
 
 /**
  * Command registration entry
@@ -79,11 +81,13 @@ interface CommandEntry {
 // Global state
 export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
+let extensionInitializationPromise: Promise<void> | undefined;
 let serverStartPromise: Promise<void> | undefined;
-let suppressNextStartupError = false;
 let startupRunCounter = 0;
 let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
+// Lets Stop invalidate a Restart that is still cleaning up before its replacement start is published.
+let serverStopGeneration = 0;
 
 class StartupCancelledError extends Error {
     constructor() {
@@ -105,8 +109,8 @@ function throwIfStartupCancelled(startupRunId: number): void {
 
 let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
-let gmodRdbUpdater: GmodRdbUpdater | undefined;
-let gmodClientRdbUpdater: GmodClientRdbUpdater | undefined;
+let gmodRdbUpdater: GmodRdbUpdater;
+let gmodClientRdbUpdater: GmodClientRdbUpdater;
 let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
@@ -175,6 +179,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         isDevelopmentMode(context),
         context
     );
+    gmodRdbUpdater = new GmodRdbUpdater(context);
+    gmodClientRdbUpdater = new GmodClientRdbUpdater(context);
+
+    registerGluaLanguageModeWarning(context);
 
     // Register all components
     registerCommands(context);
@@ -183,9 +191,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
     registerUndefinedGlobalCodeActions(context);
+    registerNonLanguageFeatures(context);
+    await refreshGmodDebugConfigContext();
 
-    // Initialize features
-    await initializeExtension();
+    if (vscode.workspace.textDocuments.some(isLuaDocumentForLanguageServer)) {
+        await startServer();
+    }
 }
 
 /**
@@ -265,7 +276,16 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     // Register all commands
     const commands = commandEntries.map(({ id, handler }) =>
-        vscode.commands.registerCommand(id, handler)
+        vscode.commands.registerCommand(id, async (...args: any[]) => {
+            if (
+                id !== 'gluals.startServer'
+                && id !== 'gluals.stopServer'
+                && id !== 'gluals.restartServer'
+            ) {
+                await ensureExtensionInitialized();
+            }
+            return handler(...args);
+        })
     );
 
     // Override the built-in "Evaluate in Debug Console" editor action so that
@@ -383,7 +403,7 @@ function registerLanguageConfiguration(context: vscode.ExtensionContext): void {
 function refreshLanguageConfiguration(): void {
     languageConfigurationDisposable?.dispose();
     languageConfigurationDisposable = vscode.languages.setLanguageConfiguration(
-        'lua',
+        extensionContext.LANGUAGE_ID,
         new LuaLanguageConfiguration()
     );
 }
@@ -408,8 +428,6 @@ function registerDebugConfigurationProviders(context: vscode.ExtensionContext): 
 async function initializeExtension(): Promise<void> {
     // Initialize GMod annotation manager
     gmodAnnotationManager = new GmodAnnotationManager(extensionContext.vscodeContext);
-    gmodRdbUpdater = new GmodRdbUpdater(extensionContext.vscodeContext);
-    gmodClientRdbUpdater = new GmodClientRdbUpdater(extensionContext.vscodeContext);
     void gmodRdbUpdater.ensureRuntimeFilesUpToDate();
 
     // Initialize annotations before starting server
@@ -430,20 +448,24 @@ async function initializeExtension(): Promise<void> {
     // Set up client getter for syntax tree provider
     setClientGetter(() => extensionContext.client);
 
-    await startServer();
-    if (vscode.window.activeTextEditor && extensionContext.client) {
-        activeEditor = vscode.window.activeTextEditor;
-    }
+    initializeGmodMcpHost(extensionContext.vscodeContext);
+    await startGmodMcpHost(false);
+}
+
+function registerNonLanguageFeatures(context: vscode.ExtensionContext): void {
     if (typeof vscode.lm.registerTool === 'function') {
         const controlToolCallbacks = {
             executeControlCommand: executeGmodControlCommand,
             getDebugState: getGmodDebugState,
             getCurrentRealm: getPersistedGmodRealm,
         };
-        extensionContext.vscodeContext.subscriptions.push(
+        context.subscriptions.push(
             vscode.lm.registerTool(
                 'search_glua_docs',
-                new GluaDocSearchTool(() => extensionContext.client)
+                new GluaDocSearchTool(
+                    () => extensionContext.client,
+                    ensureServerStarted
+                )
             ),
             vscode.lm.registerTool(
                 'gmod_run_lua',
@@ -478,13 +500,15 @@ async function initializeExtension(): Promise<void> {
         console.warn('vscode.lm.registerTool is unavailable; skipping GLua docs tool registration.');
     }
     registerDebuggers();
-    initializeGmodExplorer(extensionContext.vscodeContext);
-    initializeGmodRealmView(extensionContext.vscodeContext);
-    initializeGmodErrorView(extensionContext.vscodeContext);
-    initializeGmodEntityExplorerView(extensionContext.vscodeContext);
-    await refreshGmodDebugConfigContext();
-    initializeGmodMcpHost(extensionContext.vscodeContext);
-    await startGmodMcpHost(false);
+    initializeGmodExplorer(context);
+    initializeGmodRealmView(context);
+    initializeGmodErrorView(context);
+    initializeGmodEntityExplorerView(context);
+}
+
+function ensureExtensionInitialized(): Promise<void> {
+    extensionInitializationPromise ??= initializeExtension();
+    return extensionInitializationPromise;
 }
 
 function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
@@ -505,11 +529,11 @@ function onWorkspaceFoldersChanged(): void {
 }
 
 function onDidOpenTextDocument(document: vscode.TextDocument): void {
-    if (!extensionContext.client || !isLuaDocumentForLanguageServer(document)) {
+    if (!isLuaDocumentForLanguageServer(document)) {
         return;
     }
 
-    void warmupDocumentSymbolsForDocument(document);
+    void startServer().then(() => warmupDocumentSymbolsForDocument(document));
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -574,74 +598,87 @@ function delay(ms: number): Promise<void> {
 }
 
 
-async function startServer(): Promise<void> {
+function ensureServerStarted(): Promise<void> {
     if (serverStartPromise) {
-        await serverStartPromise;
-        return;
+        return serverStartPromise;
     }
 
     if (extensionContext.client?.isRunning()) {
         extensionContext.setServerRunning();
-        return;
+        return Promise.resolve();
     }
 
     const startupRunId = ++startupRunCounter;
     currentStartupRunId = startupRunId;
-    serverStartPromise = (async () => {
-        try {
-            extensionContext.clearServerVersions();
-            extensionContext.setServerStarting();
-            const startupStateHandlers = await doStartServer(startupRunId);
-            if (startupStateHandlers.isDiagnosticsInProgress()) {
-                extensionContext.setServerDiagnosing();
-            } else {
-                extensionContext.setServerRunning();
-            }
-            void warmupOpenDocumentSymbols();
-            onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
-        } catch (reason) {
-            const errorMessage = reason instanceof Error ? reason.message : String(reason);
-            const client = extensionContext.client;
-            extensionContext.client = undefined;
-            if (client) {
-                try {
-                    await client.stop();
-                } catch {
-                    // Ignore cleanup failures after startup errors.
-                }
-            }
+    serverStartPromise = Promise.resolve().then(() => runServerStart(startupRunId));
+    return serverStartPromise;
+}
 
-            if (suppressNextStartupError || reason instanceof StartupCancelledError) {
-                extensionContext.setServerStopped();
-                return;
-            }
+async function startServer(): Promise<void> {
+    try {
+        await ensureServerStarted();
+    } catch {
+        // Startup failures are presented once by runServerStart.
+    }
+}
 
-            extensionContext.setServerError(
-                'Failed to start GLua Language Server',
-                errorMessage
-            );
-            vscode.window.showErrorMessage(
-                `Failed to start GLua Language Server: ${errorMessage}`,
-                'Retry',
-                'Show Logs'
-            ).then(action => {
-                if (action === 'Retry') {
-                    restartServer();
-                } else if (action === 'Show Logs') {
-                    void showServerLogs(extensionContext.vscodeContext);
-                }
-            });
-        } finally {
-            cancelledStartupRuns.delete(startupRunId);
-            if (currentStartupRunId === startupRunId) {
-                currentStartupRunId = undefined;
-            }
-            suppressNextStartupError = false;
-            serverStartPromise = undefined;
+async function runServerStart(startupRunId: number): Promise<void> {
+    try {
+        throwIfStartupCancelled(startupRunId);
+        extensionContext.setServerStarting();
+        await ensureExtensionInitialized();
+        throwIfStartupCancelled(startupRunId);
+
+        extensionContext.clearServerVersions();
+        const startupStateHandlers = await doStartServer(startupRunId);
+        throwIfStartupCancelled(startupRunId);
+        if (startupStateHandlers.isDiagnosticsInProgress()) {
+            extensionContext.setServerDiagnosing();
+        } else {
+            extensionContext.setServerRunning();
         }
-    })();
+        void warmupOpenDocumentSymbols();
+        onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
+    } catch (reason) {
+        const errorMessage = reason instanceof Error ? reason.message : String(reason);
+        const client = extensionContext.client;
+        extensionContext.client = undefined;
+        if (client) {
+            try {
+                await client.stop();
+            } catch {
+                // Ignore cleanup failures after startup errors.
+            }
+        }
 
-    await serverStartPromise;
+        if (cancelledStartupRuns.has(startupRunId) || reason instanceof StartupCancelledError) {
+            extensionContext.setServerStopped();
+            throw reason instanceof StartupCancelledError ? reason : new StartupCancelledError();
+        }
+
+        extensionContext.setServerError(
+            'Failed to start GLua Language Server',
+            errorMessage
+        );
+        vscode.window.showErrorMessage(
+            `Failed to start GLua Language Server: ${errorMessage}`,
+            'Retry',
+            'Show Logs'
+        ).then(action => {
+            if (action === 'Retry') {
+                restartServer();
+            } else if (action === 'Show Logs') {
+                void showServerLogs(extensionContext.vscodeContext);
+            }
+        });
+        throw reason;
+    } finally {
+        cancelledStartupRuns.delete(startupRunId);
+        if (currentStartupRunId === startupRunId) {
+            currentStartupRunId = undefined;
+        }
+        serverStartPromise = undefined;
+    }
 }
 
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
@@ -838,6 +875,7 @@ async function cleanupExistingClient(): Promise<void> {
  */
 async function doStartServer(startupRunId: number): Promise<StartupStateHandlerRegistration> {
     await cleanupExistingClient();
+    throwIfGluaEnhancedIsEnabled();
     throwIfStartupCancelled(startupRunId);
     const context = extensionContext.vscodeContext;
     const configManager = new ConfigurationManager(getConfigurationScope());
@@ -941,6 +979,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
     // Register the custom hover provider with verbosity controls (+/− buttons).
     const { HoverVerbosityProvider } = await import('./hoverVerbosityProvider.js');
+    throwIfStartupCancelled(startupRunId);
     const verbosityProvider = new HoverVerbosityProvider(client);
     disposeHoverProviderRegistration();
     hoverProviderRegistration = vscode.languages.registerHoverProvider(
@@ -1103,11 +1142,11 @@ function resolveDevLocalExecutablePath(context: vscode.ExtensionContext): string
 }
 
 async function restartServer(): Promise<void> {
+    const stopGeneration = serverStopGeneration;
     extensionContext.setServerStopping('Restarting server...');
     const pendingStart = serverStartPromise;
     if (pendingStart) {
         // Restart during startup should cancel the in-flight start without surfacing a failure toast.
-        suppressNextStartupError = true;
         cancelPendingStartupRun();
     }
 
@@ -1117,6 +1156,9 @@ async function restartServer(): Promise<void> {
             await pendingStart.catch(() => {
                 // Intentional cancellation during restart.
             });
+        }
+        if (stopGeneration !== serverStopGeneration) {
+            return;
         }
         await startServer();
     } catch (error) {
@@ -1148,11 +1190,11 @@ async function startServerCommand(): Promise<void> {
 }
 
 async function stopServer(): Promise<void> {
+    serverStopGeneration += 1;
     const pendingStart = serverStartPromise;
     try {
         if (pendingStart) {
             // Stopping while startup is in-flight is intentional, so suppress startup-failed toast.
-            suppressNextStartupError = true;
             cancelPendingStartupRun();
         }
         disposeHoverProviderRegistration();
@@ -1227,8 +1269,8 @@ async function removeGmodAnnotations(): Promise<void> {
 
 async function checkForGmodRdbUpdates(): Promise<void> {
     await Promise.all([
-        gmodRdbUpdater?.runManualUpdateCommand() ?? Promise.resolve(),
-        gmodClientRdbUpdater?.runManualUpdateCommand() ?? Promise.resolve(),
+        gmodRdbUpdater.runManualUpdateCommand(),
+        gmodClientRdbUpdater.runManualUpdateCommand(),
     ]);
 }
 
@@ -1328,19 +1370,36 @@ async function runGmodRunLua(): Promise<void> {
     await runGmodControlCommand('runLua', { lua });
 }
 
-async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
+async function resolveGluaDocumentUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
     const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
     if (!targetUri?.fsPath) {
-        vscode.window.showWarningMessage('No Lua file selected.');
+        vscode.window.showWarningMessage('No GLua file selected.');
+        return undefined;
+    }
+
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    const document = activeDocument?.uri.toString() === targetUri.toString()
+        ? activeDocument
+        : await vscode.workspace.openTextDocument(targetUri);
+    if (document.languageId !== extensionContext.LANGUAGE_ID) {
+        vscode.window.showWarningMessage('Selected file is not using the GLua language mode.');
+        return undefined;
+    }
+
+    return targetUri;
+}
+
+async function runGmodRunFile(uri?: vscode.Uri): Promise<void> {
+    const targetUri = await resolveGluaDocumentUri(uri);
+    if (!targetUri) {
         return;
     }
     await runGmodControlCommand('runFile', { path: targetUri.fsPath });
 }
 
 async function runGmodRefreshFile(uri?: vscode.Uri): Promise<void> {
-    const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
-    if (!targetUri?.fsPath) {
-        vscode.window.showWarningMessage('No Lua file selected.');
+    const targetUri = await resolveGluaDocumentUri(uri);
+    if (!targetUri) {
         return;
     }
     await runGmodControlCommand('refreshFile', { path: targetUri.fsPath });
@@ -1350,6 +1409,10 @@ async function runGmodRunSelection(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showWarningMessage('No active editor.');
+        return;
+    }
+    if (editor.document.languageId !== extensionContext.LANGUAGE_ID) {
+        vscode.window.showWarningMessage('Current file is not using the GLua language mode.');
         return;
     }
     const selection = editor.selection;
@@ -1483,15 +1546,15 @@ async function setGmodRealm(realm?: string): Promise<void> {
     vscode.window.showInformationMessage(`GMod Lua execution realm set to ${selectedRealm}.`);
 }
 
-function onDidStartDebugSession(session: vscode.DebugSession): void {
+export function onDidStartDebugSession(session: vscode.DebugSession): void {
     if (session.type === 'gluals_gmod') {
-        void gmodRdbUpdater?.ensureRuntimeFilesUpToDate(session);
+        void gmodRdbUpdater.ensureRuntimeFilesUpToDate(session);
         gmodErrorStores.set(session.id, new GmodErrorStore());
         gmodEntityExplorerProvider?.clear();
         gmodSessionRealms.set(session.id, getPersistedGmodRealm(session));
         gmodRealmProvider?.refresh();
     } else if (session.type === 'gluals_gmod_client') {
-        void gmodClientRdbUpdater?.ensureRuntimeFilesUpToDate(session);
+        void gmodClientRdbUpdater.ensureRuntimeFilesUpToDate(session);
         gmodErrorStores.set(session.id, new GmodErrorStore());
     }
 
@@ -1501,7 +1564,7 @@ function onDidStartDebugSession(session: vscode.DebugSession): void {
     }
 }
 
-function onDidTerminateDebugSession(session: vscode.DebugSession): void {
+export function onDidTerminateDebugSession(session: vscode.DebugSession): void {
     const store = gmodErrorStores.get(session.id);
     if (store) {
         store.dispose();
@@ -1832,10 +1895,6 @@ async function loadMoreGmodEntityExplorer(): Promise<void> {
 async function configureGmodDebugger(): Promise<void> {
     await runGmodDebugSetupWizard(extensionContext.vscodeContext, {
         installClientDebugger: async (garrysmodPath: string) => {
-            if (!gmodClientRdbUpdater) {
-                throw new Error('rdb_client updater is not initialized');
-            }
-
             await gmodClientRdbUpdater.downloadAndInstall(extensionContext.vscodeContext, garrysmodPath);
         },
     });
@@ -2095,7 +2154,7 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.connected') {
-        if (event.body && typeof event.body === 'object' && gmodRdbUpdater) {
+        if (event.body && typeof event.body === 'object') {
             const body = event.body as GmodConnectedBody;
             if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
                 void gmodRdbUpdater.handleVersionMismatch(body.moduleVersion);
@@ -2106,7 +2165,7 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     }
 
     if (event.event === 'gmod.client.connected') {
-        if (event.body && typeof event.body === 'object' && gmodClientRdbUpdater) {
+        if (event.body && typeof event.body === 'object') {
             const body = event.body as GmodConnectedBody;
             if (typeof body.moduleVersion === 'string' && body.moduleVersion.length > 0) {
                 void gmodClientRdbUpdater.handleVersionMismatch(body.moduleVersion);

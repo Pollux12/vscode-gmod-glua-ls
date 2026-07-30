@@ -1,4 +1,7 @@
 {
     "gluals.gmod.autoLoadAnnotations": false,
-    "gluals.gmod.mcp.enabled": false
+    "gluals.gmod.mcp.enabled": false,
+    "files.associations": {
+        "**/cold-start-gamemode/gamemode/init.lua": "lua"
+    }
 }

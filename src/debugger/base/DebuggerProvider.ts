@@ -41,7 +41,7 @@ export abstract class DebuggerProvider implements vscode.DebugConfigurationProvi
         for (const key in associations) {
             if (associations.hasOwnProperty(key)) {
                 const element = associations[key];
-                if (element === 'lua' && key.startsWith('*.')) {
+                if (element === 'glua' && key.startsWith('*.')) {
                     ext.push(key.substring(1));
                 }
             }

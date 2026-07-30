@@ -63,7 +63,7 @@ interface TooltipAction {
  * Manages language client, status bar, and extension state
  */
 export class EmmyContext implements vscode.Disposable {
-    public readonly LANGUAGE_ID = 'lua' as const;
+    public readonly LANGUAGE_ID = 'glua' as const;
 
     private _client?: LanguageClient;
     private _serverStatus: ServerStatus;

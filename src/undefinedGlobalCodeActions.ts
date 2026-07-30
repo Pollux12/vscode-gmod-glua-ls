@@ -5,6 +5,7 @@ import { readGluarcConfig, writeGluarcConfig, setNestedValue, getNestedValue } f
 // Must match the server's diagnostic code definition (see res/gluarcSettings/data.js:13)
 const UNDEFINED_GLOBAL_CODE = 'undefined-global';
 const CONTEXT_KEY_HAS_UNDEFINED_GLOBAL = 'gluals.hasUndefinedGlobalAtCursor';
+const GLUA_LANGUAGE_ID = 'glua';
 
 /**
  * Setup undefined global code actions.
@@ -14,9 +15,9 @@ const CONTEXT_KEY_HAS_UNDEFINED_GLOBAL = 'gluals.hasUndefinedGlobalAtCursor';
  * - Command handler for adding variables to globals
  */
 export function registerUndefinedGlobalCodeActions(context: vscode.ExtensionContext): void {
-    // Register CodeActionProvider for Lua files
+    // Register CodeActionProvider for GLua files
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
-        { language: 'lua' },
+        { language: GLUA_LANGUAGE_ID },
         new UndefinedGlobalCodeActionProvider(),
         {
             providedCodeActionKinds: [vscode.CodeActionKind.QuickFix]
@@ -71,8 +72,10 @@ export function registerUndefinedGlobalCodeActions(context: vscode.ExtensionCont
 async function updateContextKeyForEditor(editor: vscode.TextEditor): Promise<void> {
     let hasUndefinedGlobal = false;
     try {
-        const position = editor.selection.active;
-        hasUndefinedGlobal = hasUndefinedGlobalDiagnostic(editor, position);
+        if (editor.document.languageId === GLUA_LANGUAGE_ID) {
+            const position = editor.selection.active;
+            hasUndefinedGlobal = hasUndefinedGlobalDiagnostic(editor, position);
+        }
     } catch (error) {
         // Silently ignore errors during shutdown/deactivation
     }
@@ -170,6 +173,12 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
             return;
         }
 
+        const doc = await vscode.workspace.openTextDocument(documentUri);
+        if (doc.languageId !== GLUA_LANGUAGE_ID) {
+            vscode.window.showWarningMessage('This action only applies to GLua files.');
+            return;
+        }
+
         const markerRange = new vscode.Range(
             new vscode.Position(marker.startLineNumber - 1, marker.startColumn - 1),
             new vscode.Position(marker.endLineNumber - 1, marker.endColumn - 1)
@@ -180,11 +189,14 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
             vscode.window.showWarningMessage('Could not find the matching diagnostic for this problem.');
             return;
         }
-        const doc = await vscode.workspace.openTextDocument(documentUri);
         variableName = doc.getText(diagnostic.range);
     } else {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
+            return;
+        }
+        if (editor.document.languageId !== GLUA_LANGUAGE_ID) {
+            vscode.window.showWarningMessage('This action only applies to GLua files.');
             return;
         }
         documentUri = editor.document.uri;

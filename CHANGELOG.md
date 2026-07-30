@@ -2,6 +2,45 @@
 
 ---
 
+## [1.1.2] [Pre-Release] - 2026-07-30
+
+## VS Code Extension
+
+- Add a dedicated `glua` language mode so GLuaLS can run alongside standard Lua tooling without changing VS Code's built-in `lua` mode.
+- Add automatic `glua` selection for common Garry's Mod directories, entrypoint filenames, and realm-prefixed scripts, including standalone projects.
+- Add a warning and switch action when a likely Garry's Mod file opens in standard Lua mode.
+- Add startup conflict detection for GLua Enhanced and prevent GLuaLS from starting while the conflicting extension is enabled.
+- Fix extension initialization for debugger runtime updates and document symbols.
+- Fix language server start, stop, and restart races during extension initialization.
+- Fix documentation search when it starts the language server, including startup retries and original startup error reporting.
+
+## Language Server
+
+- Improve net message analysis for aliases and wrappers across diagnostics, completion, hover, code lens, symbols, and references.
+- Add library conflict warnings and respect configured library load order.
+- Add downloadable `glua_doc_cli` builds.
+- Improve documentation exports by handling invalid settings, excluded folders, text encodings, and export errors.
+- Fix explicitly annotated types being replaced by inferred types.
+- Fix multi-return arguments being checked against the wrong parameter positions.
+- Fix immutable type narrowing being lost inside closures.
+- Fix declared types being lost when fields are initialized with empty tables.
+- Fix declared `self` types being replaced by call-site inference.
+- Fix `Partial<T>` annotations producing incorrect mismatch diagnostics.
+- Improve contextual typing for table literals assigned to declared fields, including nested callbacks.
+- Fix structural table checks for defaults, methods, callbacks, generics, intersections, and nested fields.
+- Fix scripted child inference and inherited tool and member types across workspaces, realms, and base classes.
+
+## Annotations
+
+- Add net payload annotations for read and write operations, send direction, recipients, and receive callbacks.
+- Add generic iterator types for `RandomPairs`, `SortedPairs`, `SortedPairsByValue`, and `SortedPairsByMemberValue`.
+- Improve custom structure overrides for common Garry's Mod data types and mark fields built later in `TextData` and `TextureData` as optional.
+- Improve `derma.DefineSkin` to accept partial skin definitions.
+- Fix deprecated argument, callback, and return details being lost during annotation generation.
+- Fix direct and aliased class overrides being dropped or duplicated.
+
+---
+
 ## [1.1.1] [Pre-Release] - 2026-07-24
 
 ## VS Code Extension
