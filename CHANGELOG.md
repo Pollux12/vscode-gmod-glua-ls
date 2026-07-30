@@ -11,6 +11,7 @@
 - Add dual-session, multi-server MCP routing: route mutations to a selected `gluals_gmod` server session, retain independent `gluals_gmod_client` telemetry, and filter runtime reads by session and server/client realm.
 - Support workspace file execution and manual `lua_refresh_file` dispatch through `execute_lua`, while guiding agents to rely on Garry's Mod auto-refresh after eligible file saves.
 - Add automatic VS Code MCP discovery and a command to copy authenticated configuration for external agents.
+- Store MCP bearer tokens exclusively in VS Code secret storage.
 - Improve startup timeout diagnostics by separating workspace-loading stalls from analysis stalls.
 - Improve status bar to show the language server version after startup.
 - Improve status bar to show the annotation library version after startup.

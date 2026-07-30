@@ -1753,12 +1753,6 @@
                         "scope": "machine",
                         "markdownDescription": "Loopback port for the MCP Streamable HTTP server (`0` chooses a random ephemeral port)."
                     },
-                    "gluals.gmod.mcp.authToken": {
-                        "type": "string",
-                        "default": "",
-                        "scope": "machine",
-                        "markdownDescription": "Optional MCP bearer token override. Leave empty to generate and securely store a token automatically."
-                    },
                     "gluals.gmod.mcp.rateLimitPerMinute": {
                         "type": "integer",
                         "default": 120,

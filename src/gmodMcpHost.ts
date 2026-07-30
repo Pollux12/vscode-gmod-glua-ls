@@ -126,7 +126,6 @@ interface HostConfig {
     readonly enabled: boolean;
     readonly port: number;
     readonly rateLimitPerMinute: number;
-    readonly configuredAuthToken: string;
 }
 
 export class GmodMcpHost implements vscode.Disposable {
@@ -177,7 +176,7 @@ export class GmodMcpHost implements vscode.Disposable {
             return;
         }
 
-        this.authToken = await this.resolveAuthToken(config.configuredAuthToken);
+        this.authToken = await this.resolveAuthToken();
         const server = http.createServer((request, response) => {
             void this.handleHttpRequest(request, response).catch((error) => {
                 this.logError('Unhandled MCP request failure', error);
@@ -858,15 +857,11 @@ export class GmodMcpHost implements vscode.Disposable {
             enabled: config.get<boolean>('enabled', true),
             port: Number.isFinite(portValue) ? Math.max(0, Math.min(65535, Math.floor(portValue))) : 21113,
             rateLimitPerMinute: Number.isFinite(rateValue) ? Math.max(1, Math.min(600, Math.floor(rateValue))) : 120,
-            configuredAuthToken: (config.get<string>('authToken', '') ?? '').trim(),
         };
         return { ...resolved, ...this.options.config };
     }
 
-    private async resolveAuthToken(configuredToken: string): Promise<string> {
-        if (configuredToken.length > 0) {
-            return configuredToken;
-        }
+    private async resolveAuthToken(): Promise<string> {
         const stored = await this.options.secretStorage.get(MCP_SECRET_KEY);
         if (stored) {
             return stored;

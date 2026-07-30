@@ -61,7 +61,6 @@ suite('GMod MCP Host', () => {
                 enabled: true,
                 port: 0,
                 rateLimitPerMinute: 120,
-                configuredAuthToken: '',
             },
             getLanguageIssues: () => [{
                 file: 'lua/test.lua',
@@ -168,6 +167,8 @@ suite('GMod MCP Host', () => {
         const secondClient = new Client({ name: 'gluals-test-2', version: '1.0.0' });
         try {
             const connection = await host.getConnectionInfo();
+            assert.strictEqual(secrets.size, 1);
+            assert.strictEqual([...secrets.values()][0], connection.authToken);
             const unauthorized = await fetch(connection.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
