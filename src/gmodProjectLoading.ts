@@ -127,36 +127,6 @@ export function registerGmodProjectLoading(
         },
     );
 
-    const activeEditorHandler = vscode.window.onDidChangeActiveTextEditor(editor => {
-        if (!editor || editor.document.languageId !== 'glua' || candidates.length === 0) {
-            return;
-        }
-        const candidate = candidateContainingUri(candidates, editor.document.uri);
-        if (!candidate || candidate.id === currentGamemodeId || pendingChoice) {
-            return;
-        }
-
-        const params: ChooseGamemodeParams = {
-            candidates,
-            currentGamemodeId,
-            requestedGamemodeId: candidate.id,
-            reason: 'documentOpen',
-        };
-        pendingChoice = chooseGamemode(params, candidates);
-        void pendingChoice
-            .then(async result => {
-                if (result.selectedGamemodeId !== candidate.id) {
-                    return;
-                }
-                await activateGamemode(candidate);
-            })
-            .catch(error => {
-                console.warn('Failed to activate gamemode in GLuaLS:', error);
-            })
-            .finally(() => {
-                pendingChoice = undefined;
-            });
-    });
     const selectCommandHandler = vscode.commands.registerCommand(
         SELECT_GAMEMODE_COMMAND,
         async () => {
@@ -196,7 +166,6 @@ export function registerGmodProjectLoading(
 
     return vscode.Disposable.from(
         chooseHandler,
-        activeEditorHandler,
         selectCommandHandler,
         projectsChangedHandler,
         statusBar,
@@ -333,15 +302,6 @@ function normalizeCandidates(candidates: readonly GamemodeCandidate[] | undefine
         .sort((left, right) =>
             left.name.localeCompare(right.name) || left.rootUri.localeCompare(right.rootUri),
         );
-}
-
-function candidateContainingUri(
-    candidates: readonly GamemodeCandidate[],
-    uri: vscode.Uri,
-): GamemodeCandidate | undefined {
-    return candidates
-        .filter(candidate => uriIsWithin(uri, vscode.Uri.parse(candidate.rootUri)))
-        .sort((left, right) => right.rootUri.length - left.rootUri.length)[0];
 }
 
 function uriIsWithin(uri: vscode.Uri, root: vscode.Uri): boolean {
