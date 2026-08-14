@@ -486,7 +486,11 @@
                     "GLua Language Server",
                     "Garry's Mod Lua"
                 ],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./res/glua-file-light.svg",
+                    "dark": "./res/glua-file-dark.svg"
+                }
             }
         ],
         "snippets": [
