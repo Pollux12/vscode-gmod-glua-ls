@@ -2,6 +2,45 @@
 
 ---
 
+## [1.2.0] [Pre-Release] - 2026-08-14
+> Index & Analysis Refactor + Open VSX Releases
+
+## VS Code Extension
+
+- Add Open VSX releases, so the extension can be installed in editors that do not use the VS Code Marketplace.
+
+## Language Server
+
+- Fix diagnostics and types slowly becoming wrong as you edit, which previously needed a restart to clear.
+- Improve indexing performance and memory usage on large workspaces.
+- Improve typing responsiveness by skipping re-indexing for edits that do not change any code, such as whitespace.
+- Improve syntax highlighting so it stays correct while files are still being indexed.
+- Improve net message analysis performance on large workspaces.
+- Fix diagnostics flickering and disappearing while typing.
+- Fix diagnostics sometimes not coming back after being cancelled.
+- Fix semantic highlighting changing colors or flashing during fast edits.
+- Fix inlay hints disappearing while files are being re-indexed.
+- Fix table fields being lost when the same table is built across multiple files using `X = X or {}`.
+- Fix globals not being found inside functions when they are defined further down the file.
+- Fix globals using the wrong definition when several files add to the same table.
+- Fix fields declared with `function a.b.c()` not being found.
+- Fix type alias names being lost when merged into a union.
+- Fix the wrong overload being picked for some function calls.
+- Fix scripted class fields (`ENT`, `SWEP`, `TOOL`, `GM`) showing up in unrelated files.
+- Fix panel fields being missing while the workspace is still loading.
+- Fix loop variables losing their type or showing as `nil` in `for ... in pairs` and `while` loops.
+- Fix wrong types from `or` fallbacks such as `local x = y or {}`.
+- Fix math on unknown values always being treated as a number.
+- Fix false positive `missing-fields` when table fields are added further down.
+- Fix false positive `need-check-nil` when the value cannot actually be nil.
+- Fix false positive `undefined-field` on fields added dynamically.
+- Fix false positive `redundant-parameter` when calling overloaded functions.
+- Fix false warnings on tables when the field's source cannot be found.
+- Fix old results being kept after a file is deleted.
+- Fix workspace indexing when exclude patterns are left empty.
+
+---
+
 ## [1.1.2] [Pre-Release] - 2026-07-30
 
 ## VS Code Extension
