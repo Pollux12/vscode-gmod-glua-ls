@@ -95,7 +95,7 @@ jobs:
         echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
         echo "is_publish_event=${IS_PUBLISH_EVENT}" >> "$GITHUB_OUTPUT"
     - name: Set up Node 24.x
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version: 24.x
     - name: Install yarn
