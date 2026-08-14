@@ -112,7 +112,7 @@ export class GmodRdbUpdater {
         const garrysmodPath = this.resolveKnownGarrysmodPath();
         if (!garrysmodPath) {
             const action = await vscode.window.showInformationMessage(
-                'gm_rdb: path not configured.',
+                'gm_rdb (server): SRCDS server folder is not configured. Click Setup to select your dedicated server folder.',
                 'Setup'
             );
             if (action === 'Setup') {
@@ -124,7 +124,7 @@ export class GmodRdbUpdater {
         const detected = detectGmRdb(garrysmodPath);
         if (!detected) {
             const action = await vscode.window.showInformationMessage(
-                'gm_rdb not found in the configured path.',
+                'gm_rdb (server): gm_rdb server binary was not found in your SRCDS server folder. Click Setup to install it.',
                 'Setup'
             );
             if (action === 'Setup') {
@@ -139,7 +139,7 @@ export class GmodRdbUpdater {
         ]);
 
         if (installedVersion && this.normalizeVersion(installedVersion) === expectedVersion) {
-            vscode.window.showInformationMessage(`gm_rdb is up to date (${expectedVersion}).`);
+            vscode.window.showInformationMessage(`gm_rdb server binary is up to date (${expectedVersion}).`);
             return;
         }
 
@@ -147,7 +147,7 @@ export class GmodRdbUpdater {
             ? `(installed: ${installedVersion}, latest: ${expectedVersion})`
             : `(latest: ${expectedVersion})`;
         const action = await vscode.window.showInformationMessage(
-            `gm_rdb update available ${versionInfo}.`,
+            `gm_rdb server binary update available ${versionInfo}.`,
             'Update'
         );
         if (action === 'Update') {
@@ -178,7 +178,7 @@ export class GmodRdbUpdater {
 
     public async promptForUpdate(moduleVersion: string, expectedVersion: string): Promise<void> {
         const action = await vscode.window.showInformationMessage(
-            `gm_rdb module version mismatch detected (connected: ${moduleVersion}, expected: ${expectedVersion}).`,
+            `gm_rdb server version mismatch (connected: ${moduleVersion}, expected: ${expectedVersion}). Update the server binary to avoid debugging issues.`,
             'Update Now',
             'Later',
             'Skip This Version'

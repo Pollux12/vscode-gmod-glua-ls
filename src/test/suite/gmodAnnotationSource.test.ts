@@ -65,6 +65,6 @@ suite('GMod Annotation Source', () => {
         };
         const warning = buildAnnotationSourceWarning(config, resolveAnnotationSource(config));
 
-        assert.ok(warning?.includes('disable automatic annotation updates'));
+        assert.ok(warning?.includes('Automatic updates are turned off'));
     });
 });

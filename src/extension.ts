@@ -661,7 +661,7 @@ async function runServerStart(startupRunId: number): Promise<void> {
             errorMessage
         );
         vscode.window.showErrorMessage(
-            `Failed to start GLua Language Server: ${errorMessage}`,
+            `Could not start the GLua language server: ${errorMessage}. Check the output log or click Retry.`,
             'Retry',
             'Show Logs'
         ).then(action => {
@@ -1063,7 +1063,7 @@ async function showServerLogs(context: vscode.ExtensionContext): Promise<void> {
         await vscode.commands.executeCommand('revealFileInOS', serverLogDirectory);
     } catch {
         vscode.window.showWarningMessage(
-            `Could not reveal GLuaLS log folder. Log path: ${serverLogDirectory.fsPath}`
+            `Could not open the GLuaLS log folder in your file manager: ${serverLogDirectory.fsPath}`
         );
         extensionContext.client?.outputChannel?.show();
     }
@@ -1164,7 +1164,7 @@ async function restartServer(): Promise<void> {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         extensionContext.setServerError('Failed to restart server', errorMessage);
-        vscode.window.showErrorMessage(`Failed to restart server: ${errorMessage}`);
+        vscode.window.showErrorMessage(`Could not restart the GLua language server: ${errorMessage}. Try reloading the VS Code window.`);
     }
 }
 
@@ -1207,7 +1207,7 @@ async function stopServer(): Promise<void> {
         vscode.window.showInformationMessage('GLua Language Server stopped');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to stop server: ${errorMessage}`);
+        vscode.window.showErrorMessage(`Could not stop the GLua language server: ${errorMessage}`);
     }
 }
 
@@ -1220,24 +1220,24 @@ async function showSyntaxTree(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
 
     if (!editor) {
-        vscode.window.showWarningMessage('No active editor');
+        vscode.window.showWarningMessage('No active file open. Please open a Lua or GLua file first.');
         return;
     }
 
     const document = editor.document;
 
     if (document.languageId !== extensionContext.LANGUAGE_ID) {
-        vscode.window.showWarningMessage('Current file is not a Lua file');
+        vscode.window.showWarningMessage('The active file is not using GLua mode. Click the language mode in the bottom-right corner of VS Code and select "GLua".');
         return;
     }
 
     if (!extensionContext.client) {
-        vscode.window.showWarningMessage('Language server is not running');
+        vscode.window.showWarningMessage('GLua language server is not running. Run "GLua: Start Language Server" from the Command Palette to start it.');
         return;
     }
 
     if (!syntaxTreeManager) {
-        vscode.window.showErrorMessage('Syntax tree manager is not initialized');
+        vscode.window.showErrorMessage('Syntax tree view is not ready yet. Please wait a moment or restart the language server.');
         return;
     }
 
@@ -1250,7 +1250,7 @@ async function showSyntaxTree(): Promise<void> {
  */
 async function updateGmodAnnotations(): Promise<void> {
     if (!gmodAnnotationManager) {
-        vscode.window.showErrorMessage('GMod annotation manager not initialized');
+        vscode.window.showErrorMessage('GMod annotation manager is not ready yet. Please wait a moment or restart the language server.');
         return;
     }
     await gmodAnnotationManager.updateAnnotations();
@@ -1261,7 +1261,7 @@ async function updateGmodAnnotations(): Promise<void> {
  */
 async function removeGmodAnnotations(): Promise<void> {
     if (!gmodAnnotationManager) {
-        vscode.window.showErrorMessage('GMod annotation manager not initialized');
+        vscode.window.showErrorMessage('GMod annotation manager is not ready yet. Please wait a moment or restart the language server.');
         return;
     }
     await gmodAnnotationManager.removeAnnotations();
@@ -1373,7 +1373,7 @@ async function runGmodRunLua(): Promise<void> {
 async function resolveGluaDocumentUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
     const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
     if (!targetUri?.fsPath) {
-        vscode.window.showWarningMessage('No GLua file selected.');
+        vscode.window.showWarningMessage('Please select a GLua file first.');
         return undefined;
     }
 
@@ -1382,7 +1382,7 @@ async function resolveGluaDocumentUri(uri?: vscode.Uri): Promise<vscode.Uri | un
         ? activeDocument
         : await vscode.workspace.openTextDocument(targetUri);
     if (document.languageId !== extensionContext.LANGUAGE_ID) {
-        vscode.window.showWarningMessage('Selected file is not using the GLua language mode.');
+        vscode.window.showWarningMessage('The active file is not using GLua mode. Click the language mode in the bottom-right corner of VS Code and select "GLua".');
         return undefined;
     }
 
@@ -1408,17 +1408,17 @@ async function runGmodRefreshFile(uri?: vscode.Uri): Promise<void> {
 async function runGmodRunSelection(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-        vscode.window.showWarningMessage('No active editor.');
+        vscode.window.showWarningMessage('No active file open. Please open a Lua or GLua file first.');
         return;
     }
     if (editor.document.languageId !== extensionContext.LANGUAGE_ID) {
-        vscode.window.showWarningMessage('Current file is not using the GLua language mode.');
+        vscode.window.showWarningMessage('The active file is not using GLua mode. Click the language mode in the bottom-right corner of VS Code and select "GLua".');
         return;
     }
     const selection = editor.selection;
     const lua = editor.document.getText(selection);
     if (!lua.trim()) {
-        vscode.window.showWarningMessage('No text selected.');
+        vscode.window.showWarningMessage('Please highlight some code first.');
         return;
     }
     await runGmodControlCommand('runLua', { lua });
@@ -1443,7 +1443,7 @@ function normalizeWorkspaceIgnoreDirEntry(entry: string): string {
 
 async function addDirectoryToIgnoreList(targetUri?: vscode.Uri): Promise<void> {
     if (!targetUri) {
-        vscode.window.showWarningMessage('No directory selected.');
+        vscode.window.showWarningMessage('Please select a folder first.');
         return;
     }
 
@@ -1452,18 +1452,18 @@ async function addDirectoryToIgnoreList(targetUri?: vscode.Uri): Promise<void> {
         stats = await vscode.workspace.fs.stat(targetUri);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to inspect selected directory: ${message}`);
+        vscode.window.showErrorMessage(`Could not inspect the selected folder: ${message}`);
         return;
     }
 
     if ((stats.type & vscode.FileType.Directory) === 0) {
-        vscode.window.showWarningMessage('The selected Explorer item is not a directory.');
+        vscode.window.showWarningMessage('The selected item is a file. Please select a folder to add to workspace.ignoreDir in .gluarc.json.');
         return;
     }
 
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(targetUri);
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found. Cannot update .gluarc.json.');
+        vscode.window.showErrorMessage('No open workspace folder found. Open a folder in VS Code to save changes to .gluarc.json.');
         return;
     }
 
@@ -1471,7 +1471,7 @@ async function addDirectoryToIgnoreList(targetUri?: vscode.Uri): Promise<void> {
         path.relative(workspaceFolder.uri.fsPath, targetUri.fsPath)
     );
     if (!relativeDirectory) {
-        vscode.window.showWarningMessage('The workspace root cannot be added to workspace.ignoreDir.');
+        vscode.window.showWarningMessage('Cannot ignore the entire workspace folder in .gluarc.json. Please select a subfolder inside the workspace.');
         return;
     }
 
@@ -1504,7 +1504,7 @@ async function addDirectoryToIgnoreList(targetUri?: vscode.Uri): Promise<void> {
         vscode.window.showInformationMessage(`Added '${relativeDirectory}' to workspace.ignoreDir.`);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to add directory to workspace.ignoreDir: ${message}`);
+        vscode.window.showErrorMessage(`Could not add folder to workspace.ignoreDir in .gluarc.json: ${message}`);
     }
 }
 
@@ -1989,7 +1989,7 @@ async function restartGmodMcpHost(showNotification: boolean = true): Promise<voi
 
 function healthCheckGmodMcpHost(): void {
     if (!gmodMcpHost) {
-        vscode.window.showWarningMessage('GMod MCP host is not initialized.');
+        vscode.window.showWarningMessage('GMod MCP host is not ready yet. Please wait a moment or reload the window.');
         return;
     }
 

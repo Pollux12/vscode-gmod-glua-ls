@@ -146,16 +146,16 @@ export function describeAnnotationSource(source: AnnotationSource): string {
 export function buildAnnotationSourceWarning(config: AnnotationSourceConfig, source: AnnotationSource): string | undefined {
     const commit = normalizeCommit(config.commit);
     if (commit) {
-        return `Using pinned GMod annotations source ${describeAnnotationSource(source)}. Commit pins disable automatic annotation updates and may not match the bundled GLuaLS version.`;
+        return `Using pinned GMod annotations commit (${describeAnnotationSource(source)}) from settings ("gluals.gmod.annotationsCommit"). Automatic updates are turned off and annotations may not match your GLuaLS version.`;
     }
 
     if (config.hasExplicitBranch) {
-        return `Using custom GMod annotations branch ${describeAnnotationSource(source)}. This overrides automatic channel selection and may not match the bundled GLuaLS version.`;
+        return `Using custom GMod annotations branch (${describeAnnotationSource(source)}) from settings ("gluals.gmod.annotationsBranch"). This overrides automatic updates and may not match your GLuaLS version.`;
     }
 
     const channel = normalizeAnnotationChannel(config.channel);
     if (channel !== 'auto' && channel !== config.buildChannel) {
-        return `Using non-default GMod annotations channel '${channel}' (${describeAnnotationSource(source)}). This overrides the extension build channel '${config.buildChannel}' and may not match the bundled GLuaLS version.`;
+        return `Using '${channel}' annotations on the '${config.buildChannel}' extension build ("gluals.gmod.annotationsChannel"). Annotations may not match your GLuaLS version.`;
     }
 
     return undefined;
