@@ -7,10 +7,12 @@
 
 ## VS Code Extension
 
+- Add a new dedicated GLua file icon for Garry's Mod Lua files (`glua`).
 - Add Open VSX releases, so the extension can be installed in editors that do not use the VS Code Marketplace.
 
 ## Language Server
 
+- Fix common worktree or agent locations being parsed due to incomplete default ignore list.
 - Fix diagnostics and types slowly becoming wrong as you edit, which previously needed a restart to clear.
 - Improve indexing performance and memory usage on large workspaces.
 - Improve typing responsiveness by skipping re-indexing for edits that do not change any code, such as whitespace.

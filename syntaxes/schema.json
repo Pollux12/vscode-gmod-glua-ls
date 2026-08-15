@@ -2484,6 +2484,46 @@
         "ignoreDirDefaults": {
           "default": [
             {
+              "glob": "**/.git/**",
+              "id": "git"
+            },
+            {
+              "glob": "**/.github/**",
+              "id": "github"
+            },
+            {
+              "glob": "**/.claude/**",
+              "id": "claude"
+            },
+            {
+              "glob": "**/.agents/**",
+              "id": "agents"
+            },
+            {
+              "glob": "**/.gemini/**",
+              "id": "gemini"
+            },
+            {
+              "glob": "**/.vscode/**",
+              "id": "vscode"
+            },
+            {
+              "glob": "**/.idea/**",
+              "id": "idea"
+            },
+            {
+              "glob": "**/.svn/**",
+              "id": "svn"
+            },
+            {
+              "glob": "**/.hg/**",
+              "id": "hg"
+            },
+            {
+              "glob": "**/node_modules/**",
+              "id": "node-modules"
+            },
+            {
               "glob": "**/gmod_wire_expression2/**",
               "id": "wire-expression2"
             },
@@ -2596,7 +2636,7 @@
           ]
         },
         "id": {
-          "description": "Stable identifier. Built-in ids: `\"wire-expression2\"`, `\"wire-expression-files\"`,\n`\"tests\"`, `\"test\"`. Custom ids can be any non-empty string.",
+          "description": "Stable identifier. Built-in ids: `\"git\"`, `\"github\"`, `\"claude\"`, `\"agents\"`,\n`\"gemini\"`, `\"vscode\"`, `\"idea\"`, `\"svn\"`, `\"hg\"`, `\"node-modules\"`,\n`\"wire-expression2\"`, `\"wire-expression-files\"`, `\"tests\"`, `\"test\"`.\nCustom ids can be any non-empty string.",
           "type": "string"
         },
         "label": {
@@ -2971,6 +3011,46 @@
         "encoding": "utf-8",
         "ignoreDir": [],
         "ignoreDirDefaults": [
+          {
+            "glob": "**/.git/**",
+            "id": "git"
+          },
+          {
+            "glob": "**/.github/**",
+            "id": "github"
+          },
+          {
+            "glob": "**/.claude/**",
+            "id": "claude"
+          },
+          {
+            "glob": "**/.agents/**",
+            "id": "agents"
+          },
+          {
+            "glob": "**/.gemini/**",
+            "id": "gemini"
+          },
+          {
+            "glob": "**/.vscode/**",
+            "id": "vscode"
+          },
+          {
+            "glob": "**/.idea/**",
+            "id": "idea"
+          },
+          {
+            "glob": "**/.svn/**",
+            "id": "svn"
+          },
+          {
+            "glob": "**/.hg/**",
+            "id": "hg"
+          },
+          {
+            "glob": "**/node_modules/**",
+            "id": "node-modules"
+          },
           {
             "glob": "**/gmod_wire_expression2/**",
             "id": "wire-expression2"

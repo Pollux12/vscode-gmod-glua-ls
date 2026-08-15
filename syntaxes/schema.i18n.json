@@ -852,7 +852,7 @@
         "en": "The glob pattern to apply. Omit when only using `disabled`."
     },
     "IgnoreDirDefaultDefinition.id": {
-        "en": "Stable identifier. Built-in ids: `\"wire-expression2\"`, `\"wire-expression-files\"`,\n`\"tests\"`, `\"test\"`. Custom ids can be any non-empty string."
+        "en": "Stable identifier. Built-in ids: `\"git\"`, `\"github\"`, `\"claude\"`, `\"agents\"`,\n`\"gemini\"`, `\"vscode\"`, `\"idea\"`, `\"svn\"`, `\"hg\"`, `\"node-modules\"`,\n`\"wire-expression2\"`, `\"wire-expression-files\"`, `\"tests\"`, `\"test\"`.\nCustom ids can be any non-empty string."
     },
     "IgnoreDirDefaultDefinition.label": {
         "en": "Optional human-readable label (informational only)."
