@@ -57,6 +57,7 @@ import {
     enableCompletionColorPreviewHtml,
     enableCompletionColorPreviewHtmlForResult,
 } from './completionColorPreview';
+import { provideDiagnosticsPreservingOnCancel } from './diagnosticCancellationMiddleware';
 import { getServerLogDirectory, withServerLogPathArgument } from './serverLogPath';
 import {
     STARTUP_DIAGNOSE_PROGRESS_TOKEN,
@@ -935,6 +936,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
                 // Our custom HoverVerbosityProvider handles all hover requests.
                 return undefined;
             },
+            provideDiagnostics: provideDiagnosticsPreservingOnCancel,
         },
     };
 
