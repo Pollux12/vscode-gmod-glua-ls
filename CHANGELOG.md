@@ -2,7 +2,7 @@
 
 ---
 
-## [1.2.0] [Pre-Release] - 2026-08-14
+## [1.2.0] [Pre-Release] - 2026-08-17
 > Index & Analysis Refactor + Open VSX Releases
 
 ## VS Code Extension
@@ -11,13 +11,14 @@
 - Add Open VSX releases, so the extension can be installed in editors that do not use the VS Code Marketplace.
 
 ## Language Server
-
-- Fix common worktree or agent locations being parsed due to incomplete default ignore list.
-- Fix diagnostics and types slowly becoming wrong as you edit, which previously needed a restart to clear.
+- Refactor analysis and indexing systems to make diagnostics deterministic.
 - Improve indexing performance and memory usage on large workspaces.
 - Improve typing responsiveness by skipping re-indexing for edits that do not change any code, such as whitespace.
 - Improve syntax highlighting so it stays correct while files are still being indexed.
 - Improve net message analysis performance on large workspaces.
+- Fix self incorrectly resolving to definition method rather than to the actual object in certain cases.
+- Fix methods sometimes showing as unknown and having no valid return type.
+- Fix common worktree or agent locations being parsed due to incomplete default ignore list.
 - Fix diagnostics flickering and disappearing while typing.
 - Fix diagnostics sometimes not coming back after being cancelled.
 - Fix semantic highlighting changing colors or flashing during fast edits.
