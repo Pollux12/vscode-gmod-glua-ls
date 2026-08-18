@@ -1,8 +1,8 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { resolve } from "path";
-import decompress from "decompress";
-import decompressTarGz from "decompress-targz";
+import AdmZip from "adm-zip";
+import { extract as extractTar } from "tar";
 import { downloadTo } from "./util.js";
 
 const args = process.argv;
@@ -351,14 +351,12 @@ async function resolveLatestReleaseAssetUrl(assetName, options = {}) {
 
 async function installLanguageServerFromSource(sourcePath, assetName) {
     if (sourcePath.endsWith(".tar.gz")) {
-        await decompress(sourcePath, `server/`, {
-            plugins: [decompressTarGz()],
-        });
+        await extractTar({ file: sourcePath, cwd: `server/` });
         return;
     }
 
     if (sourcePath.endsWith(".zip")) {
-        await decompress(sourcePath, `server/`);
+        new AdmZip(sourcePath).extractAllTo(`server/`, true);
         return;
     }
 
