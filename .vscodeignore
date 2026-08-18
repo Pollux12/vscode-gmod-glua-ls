@@ -14,6 +14,12 @@ prepare-version.js
 .github/**
 .context-engine/**
 .grepai/**
+.opencode/**
+.claude/**
+.cursor/**
+.serena/**
+.agents/**
+.idea/**
 .actrc
 test-fixtures/**
 **/.github/**
