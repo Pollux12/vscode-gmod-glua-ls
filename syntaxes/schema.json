@@ -89,6 +89,11 @@
           "type": "string"
         },
         {
+          "const": "undefined-method",
+          "description": "Undefined method",
+          "type": "string"
+        },
+        {
           "const": "local-const-reassign",
           "description": "Local const reassign",
           "type": "string"
@@ -291,6 +296,16 @@
         {
           "const": "call-non-callable",
           "description": "Call to a non-callable value",
+          "type": "string"
+        },
+        {
+          "const": "infer-unknown",
+          "description": "A formerly unknown value was inferred from usage context",
+          "type": "string"
+        },
+        {
+          "const": "infer-unguarded-child",
+          "description": "A child value was inferred from an unguarded parent relationship",
           "type": "string"
         },
         {
@@ -1515,6 +1530,7 @@
             "mat": "IMaterial",
             "npc": "NPC",
             "panel": "Panel",
+            "pentity": "Entity",
             "phys": "PhysObj",
             "player": "Player",
             "ply": "Player",
@@ -1681,6 +1697,44 @@
                 "rootDir": "plugins"
               },
               {
+                "aliases": [
+                  "Schema"
+                ],
+                "classGlobal": "SCHEMA",
+                "fixedClassName": "SCHEMA",
+                "hookOwner": true,
+                "id": "schemas",
+                "include": [
+                  "gamemodes/*/schema/**",
+                  "schema/**",
+                  "gamemode/schema.lua"
+                ],
+                "isGlobalSingleton": true,
+                "label": "Schemas",
+                "path": [
+                  "schema"
+                ],
+                "rootDir": "gamemodes",
+                "superTypes": [
+                  "GM"
+                ]
+              },
+              {
+                "classGlobal": "PLAYER",
+                "icon": "person",
+                "id": "player_classes",
+                "include": [
+                  "player_class/**",
+                  "gamemode/player_class/**",
+                  "gamemodes/*/gamemode/player_class/**"
+                ],
+                "label": "Player Classes",
+                "path": [
+                  "player_class"
+                ],
+                "rootDir": "gamemodes"
+              },
+              {
                 "classGlobal": "GM",
                 "classNamePrefix": "gamemode_",
                 "icon": "folder-library",
@@ -1813,6 +1867,15 @@
     },
     "EmmyrcGmodScriptedClassDefinition": {
       "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "classGlobal": {
           "type": [
             "string",
@@ -1841,6 +1904,19 @@
             "null"
           ]
         },
+        "fixedClassName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hookOwner": {
+          "description": "Whether this class global and its aliases define gamemode hooks.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "icon": {
           "type": [
             "string",
@@ -1856,6 +1932,12 @@
           },
           "type": [
             "array",
+            "null"
+          ]
+        },
+        "isGlobalSingleton": {
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -1894,6 +1976,15 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "superTypes": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
           ]
         }
       },
@@ -2056,6 +2147,44 @@
               "rootDir": "plugins"
             },
             {
+              "aliases": [
+                "Schema"
+              ],
+              "classGlobal": "SCHEMA",
+              "fixedClassName": "SCHEMA",
+              "hookOwner": true,
+              "id": "schemas",
+              "include": [
+                "gamemodes/*/schema/**",
+                "schema/**",
+                "gamemode/schema.lua"
+              ],
+              "isGlobalSingleton": true,
+              "label": "Schemas",
+              "path": [
+                "schema"
+              ],
+              "rootDir": "gamemodes",
+              "superTypes": [
+                "GM"
+              ]
+            },
+            {
+              "classGlobal": "PLAYER",
+              "icon": "person",
+              "id": "player_classes",
+              "include": [
+                "player_class/**",
+                "gamemode/player_class/**",
+                "gamemodes/*/gamemode/player_class/**"
+              ],
+              "label": "Player Classes",
+              "path": [
+                "player_class"
+              ],
+              "rootDir": "gamemodes"
+            },
+            {
               "classGlobal": "GM",
               "classNamePrefix": "gamemode_",
               "icon": "folder-library",
@@ -2126,8 +2255,8 @@
           "x-vscode-setting": true
         },
         "enumParamHint": {
-          "default": false,
-          "description": "Show name of enumerator when passing a literal value to a function\nthat expects an enum.\n\nExample:\n\n```lua\n--- @enum Level\nlocal Foo = {\n   Info = 1,\n   Error = 2,\n}\n\n--- @param l Level\nfunction print_level(l) end\n\nprint_level(1 --[[ Hint: Level.Info ]])\n```",
+          "default": true,
+          "description": "Show name of enumerator when passing a literal value to a function\nthat expects an enum, including Garry's Mod enums such as `EF`\nand `MASK`.\n\nExample:\n\n```lua\nent:AddEffects(32 --[[ Hint: EF_NODRAW ]])\n```",
           "type": "boolean",
           "x-vscode-setting": true
         },
@@ -2757,6 +2886,7 @@
           "mat": "IMaterial",
           "npc": "NPC",
           "panel": "Panel",
+          "pentity": "Entity",
           "phys": "PhysObj",
           "player": "Player",
           "ply": "Player",
@@ -2903,6 +3033,44 @@
               "rootDir": "plugins"
             },
             {
+              "aliases": [
+                "Schema"
+              ],
+              "classGlobal": "SCHEMA",
+              "fixedClassName": "SCHEMA",
+              "hookOwner": true,
+              "id": "schemas",
+              "include": [
+                "gamemodes/*/schema/**",
+                "schema/**",
+                "gamemode/schema.lua"
+              ],
+              "isGlobalSingleton": true,
+              "label": "Schemas",
+              "path": [
+                "schema"
+              ],
+              "rootDir": "gamemodes",
+              "superTypes": [
+                "GM"
+              ]
+            },
+            {
+              "classGlobal": "PLAYER",
+              "icon": "person",
+              "id": "player_classes",
+              "include": [
+                "player_class/**",
+                "gamemode/player_class/**",
+                "gamemodes/*/gamemode/player_class/**"
+              ],
+              "label": "Player Classes",
+              "path": [
+                "player_class"
+              ],
+              "rootDir": "gamemodes"
+            },
+            {
               "classGlobal": "GM",
               "classNamePrefix": "gamemode_",
               "icon": "folder-library",
@@ -2930,7 +3098,7 @@
         "closingEndHint": true,
         "closingEndHintControlFlow": false,
         "closingEndHintMinLines": 15,
-        "enumParamHint": false,
+        "enumParamHint": true,
         "indexHint": true,
         "localHint": true,
         "metaCallHint": true,
