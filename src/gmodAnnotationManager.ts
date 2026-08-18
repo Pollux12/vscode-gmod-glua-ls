@@ -227,7 +227,7 @@ export class GmodAnnotationManager implements vscode.Disposable {
         if (overridePath) {
             console.log(`[GLuaLS] Using custom annotation path override: ${overridePath}`);
             if (!this.isAccessibleDirectory(overridePath)) {
-                vscode.window.showWarningMessage(`Configured annotation path is invalid, inaccessible, or not a directory: ${overridePath}`);
+                vscode.window.showWarningMessage(`Custom annotations folder cannot be opened or is not a folder: "${overridePath}". Please check the "gluals.gmod.annotationsPath" setting or .gluarc.json.`);
             }
             return;
         }
@@ -328,8 +328,8 @@ export class GmodAnnotationManager implements vscode.Disposable {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Failed to download GMod annotations:', errorMessage);
             vscode.window.showErrorMessage(
-                `Failed to download GMod annotations: ${errorMessage}. `
-                + 'You can disable auto-loading in settings (gluals.gmod.autoLoadAnnotations).'
+                `Could not download GMod annotations: ${errorMessage}. `
+                + 'Check your internet connection, then run "GLua: Download GMod Annotations" from the Command Palette to try again.'
             );
         }
     }
@@ -353,7 +353,7 @@ export class GmodAnnotationManager implements vscode.Disposable {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Failed to update GMod annotations:', errorMessage);
-            vscode.window.showErrorMessage(`Failed to update GMod annotations: ${errorMessage}`);
+            vscode.window.showErrorMessage(`Could not update GMod annotations: ${errorMessage}. Check your internet connection, then run "GLua: Update GMod Annotations" from the Command Palette to try again.`);
         }
     }
 
@@ -388,7 +388,7 @@ export class GmodAnnotationManager implements vscode.Disposable {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to remove annotations: ${errorMessage}`);
+            vscode.window.showErrorMessage(`Could not remove GMod annotations: ${errorMessage}. Check folder permissions and try again.`);
         }
     }
 }

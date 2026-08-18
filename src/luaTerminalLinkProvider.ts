@@ -311,7 +311,7 @@ class LuaTerminalLinkProvider implements vscode.TerminalLinkProvider {
 
         if (!resolvedPath) {
             vscode.window.showWarningMessage(
-                `File not found: ${filePath}`
+                `Could not find file: ${filePath}. Make sure the file exists in your workspace.`
             );
             return;
         }
@@ -341,7 +341,7 @@ class LuaTerminalLinkProvider implements vscode.TerminalLinkProvider {
             }
         } catch (error) {
             vscode.window.showErrorMessage(
-                `Failed to open file: ${resolvedPath}`
+                `Could not open file: ${resolvedPath}`
             );
         }
     }

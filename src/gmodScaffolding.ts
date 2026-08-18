@@ -76,7 +76,7 @@ export async function scaffoldNewScriptedClass(
 ): Promise<void> {
     const definitions = await getOfferedDefinitions(treeItem);
     if (definitions.length === 0) {
-        vscode.window.showWarningMessage('No scripted class templates are configured for scaffolding.');
+        vscode.window.showWarningMessage('No Garry\'s Mod template files found. Ensure templates exist in your workspace or extension settings.');
         return;
     }
 
@@ -109,7 +109,7 @@ export async function scaffoldNewScriptedClass(
 
     if (fileConflicts.length > 0) {
         const overwriteAction = await vscode.window.showWarningMessage(
-            `Scaffold target already exists (${fileConflicts.length} file${fileConflicts.length === 1 ? '' : 's'}). Overwrite?`,
+            `Files already exist at this target location (${fileConflicts.length} file${fileConflicts.length === 1 ? '' : 's'}). Overwrite them?`,
             { modal: true },
             'Overwrite'
         );
@@ -134,7 +134,7 @@ export async function scaffoldNewScriptedClass(
         vscode.window.showInformationMessage(`Created ${selectedDefinition.label} scaffold: ${className}`);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to scaffold ${selectedDefinition.label}: ${message}`);
+        vscode.window.showErrorMessage(`Could not create ${selectedDefinition.label} files: ${message}`);
     }
 }
 

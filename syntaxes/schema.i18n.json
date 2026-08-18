@@ -118,6 +118,12 @@
         "en": "Incomplete signature doc",
         "zh-CN": "不完整的签名文档。"
     },
+    "DiagnosticCode.infer-unguarded-child": {
+        "en": "A child value was inferred from an unguarded parent relationship"
+    },
+    "DiagnosticCode.infer-unknown": {
+        "en": "A formerly unknown value was inferred from usage context"
+    },
     "DiagnosticCode.inject-field": {
         "en": "Inject Field",
         "zh-CN": "注入字段。"
@@ -227,6 +233,9 @@
     "DiagnosticCode.undefined-global-assignment": {
         "en": "Undefined global passed as a function argument or assigned to a\nvariable / table field. These are silent uses (no immediate runtime\nerror) so they're warned rather than errored."
     },
+    "DiagnosticCode.undefined-method": {
+        "en": "Undefined method"
+    },
     "DiagnosticCode.unknown-doc-tag": {
         "en": "Unknown doc annotation",
         "zh-CN": "未知文档注解。"
@@ -280,6 +289,60 @@
     },
     "EmmyLibraryItem.anyOf.1": {
         "en": "Library configuration with path and ignore rules"
+    },
+    "Emmyrc.$schema": {
+        "en": "$schema"
+    },
+    "Emmyrc.codeAction": {
+        "en": "codeAction"
+    },
+    "Emmyrc.codeLens": {
+        "en": "codeLens"
+    },
+    "Emmyrc.completion": {
+        "en": "completion"
+    },
+    "Emmyrc.diagnostics": {
+        "en": "diagnostics"
+    },
+    "Emmyrc.doc": {
+        "en": "doc"
+    },
+    "Emmyrc.documentColor": {
+        "en": "documentColor"
+    },
+    "Emmyrc.format": {
+        "en": "format"
+    },
+    "Emmyrc.gmod": {
+        "en": "gmod"
+    },
+    "Emmyrc.hint": {
+        "en": "hint"
+    },
+    "Emmyrc.hover": {
+        "en": "hover"
+    },
+    "Emmyrc.inlineValues": {
+        "en": "inlineValues"
+    },
+    "Emmyrc.references": {
+        "en": "references"
+    },
+    "Emmyrc.resource": {
+        "en": "resource"
+    },
+    "Emmyrc.runtime": {
+        "en": "runtime"
+    },
+    "Emmyrc.semanticTokens": {
+        "en": "semanticTokens"
+    },
+    "Emmyrc.strict": {
+        "en": "strict"
+    },
+    "Emmyrc.workspace": {
+        "en": "workspace"
     },
     "EmmyrcCodeAction.insertSpace": {
         "en": "Add space after `---` comments when inserting `@diagnostic disable-next-line`.",
@@ -628,11 +691,68 @@
     "EmmyrcGmod.autoLoadAnnotations": {
         "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
     },
+    "EmmyrcGmod.defaultRealm": {
+        "en": "defaultRealm"
+    },
+    "EmmyrcGmod.detectRealmFromCalls": {
+        "en": "detectRealmFromCalls"
+    },
+    "EmmyrcGmod.detectRealmFromFilename": {
+        "en": "detectRealmFromFilename"
+    },
+    "EmmyrcGmod.dynamicFieldsGlobal": {
+        "en": "dynamicFieldsGlobal"
+    },
+    "EmmyrcGmod.enabled": {
+        "en": "enabled"
+    },
     "EmmyrcGmod.fileParamDefaults": {
         "en": "Parameter-name to type-name fallbacks for otherwise unresolved params."
     },
+    "EmmyrcGmod.hookMappings": {
+        "en": "hookMappings"
+    },
+    "EmmyrcGmod.inferDynamicFields": {
+        "en": "inferDynamicFields"
+    },
+    "EmmyrcGmod.network": {
+        "en": "network"
+    },
+    "EmmyrcGmod.outline": {
+        "en": "outline"
+    },
+    "EmmyrcGmod.scriptedClassScopes": {
+        "en": "scriptedClassScopes"
+    },
     "EmmyrcGmod.templatePath": {
         "en": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root."
+    },
+    "EmmyrcGmod.vgui": {
+        "en": "vgui"
+    },
+    "EmmyrcGmodHookMappings.emitterToHook": {
+        "en": "emitterToHook"
+    },
+    "EmmyrcGmodHookMappings.methodPrefixes": {
+        "en": "methodPrefixes"
+    },
+    "EmmyrcGmodHookMappings.methodToHook": {
+        "en": "methodToHook"
+    },
+    "EmmyrcGmodNetwork.codeLensEnabled": {
+        "en": "codeLensEnabled"
+    },
+    "EmmyrcGmodNetwork.completion": {
+        "en": "completion"
+    },
+    "EmmyrcGmodNetwork.enabled": {
+        "en": "enabled"
+    },
+    "EmmyrcGmodNetworkCompletion.mismatchHints": {
+        "en": "mismatchHints"
+    },
+    "EmmyrcGmodNetworkCompletion.smartReadSuggestions": {
+        "en": "smartReadSuggestions"
     },
     "EmmyrcGmodOutline.verbosity": {
         "en": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals."
@@ -646,8 +766,74 @@
     "EmmyrcGmodOutlineVerbosity.verbose": {
         "en": "Show everything (legacy behavior, includes control-flow blocks and all locals)."
     },
+    "EmmyrcGmodScriptedClassDefinition.aliases": {
+        "en": "aliases"
+    },
+    "EmmyrcGmodScriptedClassDefinition.classGlobal": {
+        "en": "classGlobal"
+    },
     "EmmyrcGmodScriptedClassDefinition.classNamePrefix": {
         "en": "Optional prefix prepended to class names derived from the folder segment.\nFor example, gamemodes use `\"gamemode_\"` so a folder `sandbox` produces the\nclass name `gamemode_sandbox`, matching the runtime convention."
+    },
+    "EmmyrcGmodScriptedClassDefinition.disabled": {
+        "en": "disabled"
+    },
+    "EmmyrcGmodScriptedClassDefinition.exclude": {
+        "en": "exclude"
+    },
+    "EmmyrcGmodScriptedClassDefinition.fixedClassName": {
+        "en": "fixedClassName"
+    },
+    "EmmyrcGmodScriptedClassDefinition.hookOwner": {
+        "en": "Whether this class global and its aliases define gamemode hooks."
+    },
+    "EmmyrcGmodScriptedClassDefinition.icon": {
+        "en": "icon"
+    },
+    "EmmyrcGmodScriptedClassDefinition.id": {
+        "en": "id"
+    },
+    "EmmyrcGmodScriptedClassDefinition.include": {
+        "en": "include"
+    },
+    "EmmyrcGmodScriptedClassDefinition.isGlobalSingleton": {
+        "en": "isGlobalSingleton"
+    },
+    "EmmyrcGmodScriptedClassDefinition.label": {
+        "en": "label"
+    },
+    "EmmyrcGmodScriptedClassDefinition.parentId": {
+        "en": "parentId"
+    },
+    "EmmyrcGmodScriptedClassDefinition.path": {
+        "en": "path"
+    },
+    "EmmyrcGmodScriptedClassDefinition.rootDir": {
+        "en": "rootDir"
+    },
+    "EmmyrcGmodScriptedClassDefinition.scaffold": {
+        "en": "scaffold"
+    },
+    "EmmyrcGmodScriptedClassDefinition.superTypes": {
+        "en": "superTypes"
+    },
+    "EmmyrcGmodScriptedClassScaffold.files": {
+        "en": "files"
+    },
+    "EmmyrcGmodScriptedClassScaffoldFile.path": {
+        "en": "path"
+    },
+    "EmmyrcGmodScriptedClassScaffoldFile.template": {
+        "en": "template"
+    },
+    "EmmyrcGmodScriptedClassScopes.include": {
+        "en": "include"
+    },
+    "EmmyrcGmodVgui.codeLensEnabled": {
+        "en": "codeLensEnabled"
+    },
+    "EmmyrcGmodVgui.inlayHintEnabled": {
+        "en": "inlayHintEnabled"
     },
     "EmmyrcHover.enable": {
         "en": "Enable showing documentation on hover.",
@@ -663,7 +849,7 @@
         "en": "Minimum number of lines a block must span before a closing `end` hint\nis shown."
     },
     "EmmyrcInlayHint.enumParamHint": {
-        "en": "Show name of enumerator when passing a literal value to a function\nthat expects an enum.\n\nExample:\n\n```lua\n--- @enum Level\nlocal Foo = {\n   Info = 1,\n   Error = 2,\n}\n\n--- @param l Level\nfunction print_level(l) end\n\nprint_level(1 --[[ Hint: Level.Info ]])\n```",
+        "en": "Show name of enumerator when passing a literal value to a function\nthat expects an enum, including Garry's Mod enums such as `EF`\nand `MASK`.\n\nExample:\n\n```lua\nent:AddEffects(32 --[[ Hint: EF_NODRAW ]])\n```",
         "zh-CN": "是否启用枚举参数提示。"
     },
     "EmmyrcInlayHint.indexHint": {
@@ -740,6 +926,9 @@
     },
     "EmmyrcReformat.useDiff": {
         "en": "Whether to use the diff algorithm for formatting."
+    },
+    "EmmyrcResource.paths": {
+        "en": "paths"
     },
     "EmmyrcRuntime.extensions": {
         "en": "file Extensions. eg: .lua, .lua.txt",
@@ -842,6 +1031,12 @@
         "en": "Workspace roots. eg: [\"src\", \"test\"]",
         "zh-CN": "工作区根目录列表。例如：[\"src\", \"test\"]"
     },
+    "EmmyrcWorkspaceModuleMap.pattern": {
+        "en": "pattern"
+    },
+    "EmmyrcWorkspaceModuleMap.replace": {
+        "en": "replace"
+    },
     "IgnoreDirDefaultDefinition": {
         "en": "Object form for `workspace.ignoreDirDefaults` entries."
     },
@@ -852,7 +1047,7 @@
         "en": "The glob pattern to apply. Omit when only using `disabled`."
     },
     "IgnoreDirDefaultDefinition.id": {
-        "en": "Stable identifier. Built-in ids: `\"wire-expression2\"`, `\"wire-expression-files\"`,\n`\"tests\"`, `\"test\"`. Custom ids can be any non-empty string."
+        "en": "Stable identifier. Built-in ids: `\"git\"`, `\"github\"`, `\"claude\"`, `\"agents\"`,\n`\"gemini\"`, `\"vscode\"`, `\"idea\"`, `\"svn\"`, `\"hg\"`, `\"node-modules\"`,\n`\"wire-expression2\"`, `\"wire-expression-files\"`, `\"tests\"`, `\"test\"`.\nCustom ids can be any non-empty string."
     },
     "IgnoreDirDefaultDefinition.label": {
         "en": "Optional human-readable label (informational only)."

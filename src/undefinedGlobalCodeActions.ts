@@ -169,13 +169,13 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
         documentUri = arg.resource;
 
         if (marker.code !== undefined && String(marker.code) !== UNDEFINED_GLOBAL_CODE) {
-            vscode.window.showWarningMessage('This action only applies to undefined-global diagnostics.');
+            vscode.window.showWarningMessage('This quick fix only works on undefined global variable warnings.');
             return;
         }
 
         const doc = await vscode.workspace.openTextDocument(documentUri);
         if (doc.languageId !== GLUA_LANGUAGE_ID) {
-            vscode.window.showWarningMessage('This action only applies to GLua files.');
+            vscode.window.showWarningMessage('This quick fix is only available for GLua files.');
             return;
         }
 
@@ -186,7 +186,7 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
 
         const diagnostic = findDiagnosticByRange(documentUri, markerRange);
         if (!diagnostic) {
-            vscode.window.showWarningMessage('Could not find the matching diagnostic for this problem.');
+            vscode.window.showWarningMessage('Could not find the warning for this variable. Place your cursor on the variable name and try again.');
             return;
         }
         variableName = doc.getText(diagnostic.range);
@@ -196,7 +196,7 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
             return;
         }
         if (editor.document.languageId !== GLUA_LANGUAGE_ID) {
-            vscode.window.showWarningMessage('This action only applies to GLua files.');
+            vscode.window.showWarningMessage('This quick fix is only available for GLua files.');
             return;
         }
         documentUri = editor.document.uri;
@@ -204,7 +204,7 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
         const position = editor.selection.active;
         const diagnostic = getUndefinedGlobalDiagnostic(editor, position);
         if (!diagnostic) {
-            vscode.window.showWarningMessage('No undefined-global diagnostic found at the cursor position.');
+            vscode.window.showWarningMessage('No undefined global warning found at the cursor. Place your cursor on the underlined variable.');
             return;
         }
         variableName = getVariableNameFromDiagnostic(editor, diagnostic);
@@ -212,12 +212,12 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
 
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(documentUri);
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('No workspace folder found. Cannot update .gluarc.json.');
+        vscode.window.showErrorMessage('No open workspace folder found. Open a folder in VS Code to save global variables to .gluarc.json.');
         return;
     }
 
     if (!variableName) {
-        vscode.window.showErrorMessage('Could not determine the variable name from the diagnostic.');
+        vscode.window.showErrorMessage('Could not determine the variable name to add to diagnostics.globals in .gluarc.json.');
         return;
     }
 
@@ -252,7 +252,7 @@ async function handleAddUndefinedGlobalToGlobals(arg?: unknown): Promise<void> {
         vscode.window.showInformationMessage(`Added '${variableName}' to diagnostics.globals.`);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to add '${variableName}' to globals: ${message}`);
+        vscode.window.showErrorMessage(`Could not add '${variableName}' to diagnostics.globals in .gluarc.json: ${message}`);
     }
 }
 

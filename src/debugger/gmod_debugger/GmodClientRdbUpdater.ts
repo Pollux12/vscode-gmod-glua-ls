@@ -92,7 +92,7 @@ export class GmodClientRdbUpdater {
         const garrysmodPath = getStoredClientGarrysmodPath(this.context);
         if (!garrysmodPath) {
             const action = await vscode.window.showInformationMessage(
-                'rdb_client: path not configured.',
+                'gm_rdb (client): Garry\'s Mod game folder is not configured. Click Setup to select your Garry\'s Mod folder.',
                 'Setup'
             );
             if (action === 'Setup') {
@@ -104,7 +104,7 @@ export class GmodClientRdbUpdater {
         const detected = detectGmRdbClient(garrysmodPath);
         if (!detected) {
             const action = await vscode.window.showInformationMessage(
-                'rdb_client not found in the configured path.',
+                'gm_rdb (client): gm_rdb client binary was not found in your Garry\'s Mod folder. Click Setup to install it.',
                 'Setup'
             );
             if (action === 'Setup') {
@@ -119,7 +119,7 @@ export class GmodClientRdbUpdater {
         ]);
 
         if (installedVersion && this.normalizeVersion(installedVersion) === expectedVersion) {
-            vscode.window.showInformationMessage(`rdb_client is up to date (${expectedVersion}).`);
+            vscode.window.showInformationMessage(`gm_rdb client binary is up to date (${expectedVersion}).`);
             return;
         }
 
@@ -127,7 +127,7 @@ export class GmodClientRdbUpdater {
             ? `(installed: ${installedVersion}, latest: ${expectedVersion})`
             : `(latest: ${expectedVersion})`;
         const action = await vscode.window.showInformationMessage(
-            `rdb_client update available ${versionInfo}.`,
+            `gm_rdb client binary update available ${versionInfo}.`,
             'Update'
         );
         if (action === 'Update') {
@@ -144,7 +144,7 @@ export class GmodClientRdbUpdater {
 
     public async promptForUpdate(moduleVersion: string, expectedVersion: string): Promise<void> {
         const action = await vscode.window.showInformationMessage(
-            `rdb_client module version mismatch detected (connected: ${moduleVersion}, expected: ${expectedVersion}).`,
+            `gm_rdb client version mismatch (connected: ${moduleVersion}, expected: ${expectedVersion}). Update the client binary to avoid debugging issues.`,
             'Update Now',
             'Later',
             'Skip This Version'

@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 export const GLUA_ENHANCED_EXTENSION_ID = 'venner.vscode-glua-enhanced';
 export const GLUA_ENHANCED_CONFLICT_MESSAGE =
     'The GLua Enhanced extension is enabled and conflicts with GLuaLS. ' +
-    'Disable it, then restart the GLua Language Server for GLuaLS to work.';
+    'Please disable GLua Enhanced in the Extensions tab and restart the GLua language server.';
 
 export interface ExtensionConflictServices {
     getExtension(extensionId: string): unknown | undefined;

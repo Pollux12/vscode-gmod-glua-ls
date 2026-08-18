@@ -10,7 +10,7 @@
     "license": "MIT",
     "homepage": "https://gluals.arnux.net",
     "engines": {
-        "vscode": "^1.120.0"
+        "vscode": "^1.100.0"
     },
     "categories": [
         "Programming Languages",
@@ -486,7 +486,11 @@
                     "GLua Language Server",
                     "Garry's Mod Lua"
                 ],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./res/glua-file-light.svg",
+                    "dark": "./res/glua-file-dark.svg"
+                }
             }
         ],
         "snippets": [
@@ -2552,14 +2556,13 @@
         "@types/adm-zip": "^0.5.7",
         "@types/mocha": "^10.0.10",
         "@types/node": "^26.1.2",
-        "@types/vscode": "1.125.0",
+        "@types/vscode": "1.100.0",
         "@vscode/test-electron": "^3.1.0",
         "@vscode/vsce": "^3.9.2",
-        "decompress": "4.2.1",
-        "decompress-targz": "4.1.1",
         "eslint": "^10.8.0",
         "globals": "^17.9.0",
         "mocha": "^11.8.0",
+        "tar": "^7.5.22",
         "typescript": "^7.0.2",
         "vscode-oniguruma": "^2.0.1",
         "vscode-textmate": "^9.2.0"

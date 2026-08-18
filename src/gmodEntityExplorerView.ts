@@ -433,7 +433,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     async editProperty(entityIndex: number, property: string, currentValue: unknown): Promise<void> {
         const session = this.requireActiveSession();
         if (!session) {
-            vscode.window.showErrorMessage('Cannot edit: no active GMod debug session.');
+            vscode.window.showErrorMessage('Cannot edit value: you must start a Garry\'s Mod debug session first.');
             return;
         }
 
@@ -455,7 +455,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             vscode.window.showInformationMessage(`Updated entity ${entityIndex} property \"${property}\".`);
         } catch (error) {
             if (this.extractErrorCode(error) === -32001) {
-                vscode.window.showErrorMessage('Cannot edit: debugger must be paused');
+                vscode.window.showErrorMessage('Cannot edit value: pause the debugger in VS Code before editing.');
                 return;
             }
             vscode.window.showErrorMessage(`Failed to edit entity property: ${this.extractErrorMessage(error)}`);
@@ -465,7 +465,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     async editNetworkVar(entityIndex: number, name: string, currentValue: unknown): Promise<void> {
         const session = this.requireActiveSession();
         if (!session) {
-            vscode.window.showErrorMessage('Cannot edit: no active GMod debug session.');
+            vscode.window.showErrorMessage('Cannot edit value: you must start a Garry\'s Mod debug session first.');
             return;
         }
 
@@ -499,7 +499,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             vscode.window.showInformationMessage(`Updated entity ${entityIndex} NetworkVar "${name}".`);
         } catch (error) {
             if (this.extractErrorCode(error) === -32001) {
-                vscode.window.showErrorMessage('Cannot edit NetworkVars: debugger must be paused');
+                vscode.window.showErrorMessage('Cannot edit NetworkVar: pause the debugger in VS Code before editing.');
                 return;
             }
             vscode.window.showErrorMessage(`Failed to edit NetworkVar: ${this.extractErrorMessage(error)}`);
@@ -509,7 +509,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     async editTableValue(entityIndex: number, property: string, currentValue: unknown): Promise<void> {
         const session = this.requireActiveSession();
         if (!session) {
-            vscode.window.showErrorMessage('Cannot edit: no active GMod debug session.');
+            vscode.window.showErrorMessage('Cannot edit value: you must start a Garry\'s Mod debug session first.');
             return;
         }
 
@@ -543,7 +543,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             vscode.window.showInformationMessage(`Updated entity ${entityIndex} EntityTable value "${property}".`);
         } catch (error) {
             if (this.extractErrorCode(error) === -32001) {
-                vscode.window.showErrorMessage('Cannot edit EntityTable values: debugger must be paused');
+                vscode.window.showErrorMessage('Cannot edit EntityTable: pause the debugger in VS Code before editing.');
                 return;
             }
             vscode.window.showErrorMessage(`Failed to edit EntityTable value: ${this.extractErrorMessage(error)}`);
@@ -1395,7 +1395,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
             const vector = this.parseVectorInput(raw);
             if (!vector) {
-                vscode.window.showErrorMessage('Invalid position format. Expected: x, y, z');
+                vscode.window.showErrorMessage('Invalid position format. Enter 3 numbers separated by commas: X, Y, Z (e.g. 100, 200, 0)');
                 return undefined;
             }
             return vector;
@@ -1416,7 +1416,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
             const vector = this.parseVectorInput(raw);
             if (!vector) {
-                vscode.window.showErrorMessage('Invalid angles format. Expected: pitch, yaw, roll');
+                vscode.window.showErrorMessage('Invalid angles format. Enter 3 numbers separated by commas: Pitch, Yaw, Roll (e.g. 0, 90, 0)');
                 return undefined;
             }
             return vector;
@@ -1450,7 +1450,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
             const nextNumber = Number(input);
             if (!Number.isFinite(nextNumber)) {
-                vscode.window.showErrorMessage('Invalid number value.');
+                vscode.window.showErrorMessage('Please enter a valid number.');
                 return undefined;
             }
 

@@ -120,6 +120,8 @@ if (saveButton) {
     saveButton.addEventListener("click", saveNow);
 }
 
+vscode.postMessage({ type: "ready" });
+
 function getValue(path, defaultValue) {
     if (!Array.isArray(path)) {
         return defaultValue;

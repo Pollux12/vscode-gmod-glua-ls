@@ -813,7 +813,7 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
     const srcdsRoot = path.dirname(garrysmodPath);
     if (!hasSrcdsExecutable(srcdsRoot)) {
         vscode.window.showErrorMessage(
-            `Could not find SRCDS executable in ${srcdsRoot}. This path looks like a client install; refusing to install gm_rdb server binary.`
+            `Could not find srcds.exe in "${srcdsRoot}". This looks like your Garry's Mod client folder rather than a dedicated server (SRCDS) folder. Please select your SRCDS server folder to install the server binary.`
         );
         return;
     }
@@ -1094,7 +1094,7 @@ async function promptForSrcdsPath(
         const resolved = normalizeSrcdsRootInput(rawPath);
         if (!hasSrcdsExecutable(resolved.srcdsRoot)) {
             const action = await vscode.window.showWarningMessage(
-                `No SRCDS executable was found in ${resolved.srcdsRoot}. Choose a different path, or continue anyway for custom/symlink setups.`,
+                `No server executable (srcds) found in "${resolved.srcdsRoot}". Choose a different folder, or continue anyway if your setup uses custom scripts or symlinks.`,
                 'Choose Different Path',
                 'Use Anyway',
                 'Cancel Setup'
@@ -1298,7 +1298,7 @@ function pickLaunchProgram(srcdsRoot: string, srcdsRootExpression?: string): Lau
     if (process.platform !== 'win32') {
         if (!ensureExecutableIfPossible(executablePath)) {
             vscode.window.showWarningMessage(
-                `Could not make "${executablePath}" executable. The launch configuration may not work correctly — check file permissions.`
+                `Could not make "${executablePath}" executable. Check file permissions if launching SRCDS fails.`
             );
         }
     }
@@ -1369,7 +1369,7 @@ async function runOptionalClientDebuggerStep(
     }
 
     if (!installClientDebugger) {
-        vscode.window.showWarningMessage('Client debugger installer is unavailable right now.');
+        vscode.window.showWarningMessage('The gm_rdb client debugger installer is currently unavailable.');
         return false;
     }
 
@@ -1385,7 +1385,7 @@ async function runOptionalClientDebuggerStep(
 export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, options?: DebugWizardOptions): Promise<void> {
     const workspaceFolder = await pickWorkspaceFolder();
     if (!workspaceFolder) {
-        vscode.window.showWarningMessage('Open a workspace folder first.');
+        vscode.window.showWarningMessage('Please open a workspace folder in VS Code before configuring the debugger.');
         return;
     }
 

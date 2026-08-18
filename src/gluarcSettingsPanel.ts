@@ -148,24 +148,22 @@ export class GluarcSettingsPanel implements vscode.Disposable {
 
             this.config = await readGluarcConfig(this.workspaceFolder);
 
-            const htmlReady = this.setWebviewContent();
-            if (!htmlReady) {
-                return;
-            }
-
-            await this.panel.webview.postMessage({
-                type: 'init',
-                categories: this.categories,
-                config: this.config,
-                autoSaveEnabled: this._isAutoSaveEnabled(),
-            });
-
             const messageDisposable = this.panel.webview.onDidReceiveMessage(async (msg: unknown) => {
                 if (!msg || typeof msg !== 'object') {
                     return;
                 }
 
                 const message = msg as { type?: unknown; path?: unknown; value?: unknown };
+                if (message.type === 'ready') {
+                    await this.panel.webview.postMessage({
+                        type: 'init',
+                        categories: this.categories,
+                        config: this.config,
+                        autoSaveEnabled: this._isAutoSaveEnabled(),
+                    });
+                    return;
+                }
+
                 if (message.type === 'reloadServer') {
                     await vscode.commands.executeCommand('gluals.restartServer');
                     return;
@@ -226,6 +224,10 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 }
             });
             this._disposables.push(messageDisposable);
+
+            if (!this.setWebviewContent()) {
+                return;
+            }
 
             const gluarcUri = getGluarcUri(this.workspaceFolder);
             const watcher = vscode.workspace.createFileSystemWatcher(
