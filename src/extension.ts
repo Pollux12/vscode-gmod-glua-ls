@@ -832,8 +832,36 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         }
     );
 
+    // A large workspace can legitimately take longer than this to index, and
+    // the server reports the phase it is in throughout. Treating the deadline
+    // as a failure told those users the server was broken when it was still
+    // working; say what it is doing instead and let the rest of the extension
+    // carry on while it finishes.
     startupTimeout = setTimeout(() => {
-        rejectStartup(new Error(formatStartupTimeoutMessage(STARTUP_COMPLETE_TIMEOUT_MS, lastStartupPhase)));
+        if (startupSettled) {
+            return;
+        }
+        const timeoutMessage = formatStartupTimeoutMessage(
+            STARTUP_COMPLETE_TIMEOUT_MS,
+            lastStartupPhase
+        );
+        logLanguageServerOutput(
+            client,
+            `${timeoutMessage} - still indexing.`
+        );
+        if (extensionContext.client === client) {
+            void vscode.window.showWarningMessage(
+                `The GLua language server is still indexing this workspace after ` +
+                `${STARTUP_COMPLETE_TIMEOUT_MS / 1000}s (${lastStartupPhase}). ` +
+                `It should not be taking this long, please report this issue with your logs.`,
+                'Show Logs'
+            ).then(action => {
+                if (action === 'Show Logs') {
+                    client.outputChannel?.show();
+                }
+            });
+        }
+        resolveStartup();
     }, STARTUP_COMPLETE_TIMEOUT_MS);
 
     return {
