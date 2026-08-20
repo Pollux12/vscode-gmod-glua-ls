@@ -229,6 +229,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.stopServer', handler: stopServer },
         { id: 'gluals.restartServer', handler: restartServer },
         { id: 'gluals.showServerMenu', handler: showServerMenu },
+        {
+            id: 'gluals.revealServerLogFolder',
+            handler: () => revealServerLogFolder(extensionContext.vscodeContext),
+        },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
         // GMod annotations commands
@@ -1085,17 +1089,34 @@ function createProcessServerOptions(
     return serverOptions;
 }
 
+/**
+ * Show the server log.
+ *
+ * The server writes the same lines to its output channel and to the log file,
+ * so this opens the channel: it is already in the editor, it can be scrolled
+ * and copied into a bug report, and it does not send anyone to a file manager
+ * to find a path. The folder is offered second for whole-file attachments.
+ */
 async function showServerLogs(context: vscode.ExtensionContext): Promise<void> {
+    const channel = extensionContext.client?.outputChannel;
+    if (channel) {
+        channel.show();
+        return;
+    }
+
+    await revealServerLogFolder(context);
+}
+
+async function revealServerLogFolder(context: vscode.ExtensionContext): Promise<void> {
     const serverLogDirectory = getServerLogDirectory(context);
 
     try {
         await vscode.workspace.fs.createDirectory(serverLogDirectory);
         await vscode.commands.executeCommand('revealFileInOS', serverLogDirectory);
     } catch {
-        vscode.window.showWarningMessage(
+        void vscode.window.showWarningMessage(
             `Could not open the GLuaLS log folder in your file manager: ${serverLogDirectory.fsPath}`
         );
-        extensionContext.client?.outputChannel?.show();
     }
 }
 

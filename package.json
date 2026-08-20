@@ -57,6 +57,10 @@
                 "title": "Stop GLua Language Server"
             },
             {
+                "command": "gluals.revealServerLogFolder",
+                "title": "Reveal GLua Language Server Log Folder"
+            },
+            {
                 "command": "gluals.showSyntaxTree",
                 "title": "Show Syntax Tree",
                 "icon": "$(symbol-structure)",
