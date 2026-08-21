@@ -145,6 +145,7 @@ interface ProgressNotificationParams {
 
 interface StartupStateHandlerRegistration {
     readonly completion: Promise<void>;
+    isReady(): boolean;
     isDiagnosticsInProgress(): boolean;
     dispose(error?: Error): void;
 }
@@ -636,12 +637,14 @@ async function runServerStart(startupRunId: number): Promise<void> {
         extensionContext.clearServerVersions();
         const startupStateHandlers = await doStartServer(startupRunId);
         throwIfStartupCancelled(startupRunId);
-        if (startupStateHandlers.isDiagnosticsInProgress()) {
-            extensionContext.setServerDiagnosing();
-        } else {
-            extensionContext.setServerRunning();
+        if (startupStateHandlers.isReady()) {
+            if (startupStateHandlers.isDiagnosticsInProgress()) {
+                extensionContext.setServerDiagnosing();
+            } else {
+                extensionContext.setServerRunning();
+            }
+            void warmupOpenDocumentSymbols();
         }
-        void warmupOpenDocumentSymbols();
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
@@ -660,21 +663,7 @@ async function runServerStart(startupRunId: number): Promise<void> {
             throw reason instanceof StartupCancelledError ? reason : new StartupCancelledError();
         }
 
-        extensionContext.setServerError(
-            'Failed to start GLua Language Server',
-            errorMessage
-        );
-        vscode.window.showErrorMessage(
-            `Could not start the GLua language server: ${errorMessage}. Check the output log or click Retry.`,
-            'Retry',
-            'Show Logs'
-        ).then(action => {
-            if (action === 'Retry') {
-                restartServer();
-            } else if (action === 'Show Logs') {
-                void showServerLogs(extensionContext.vscodeContext);
-            }
-        });
+        presentStartupFailure(errorMessage);
         throw reason;
     } finally {
         cancelledStartupRuns.delete(startupRunId);
@@ -683,6 +672,24 @@ async function runServerStart(startupRunId: number): Promise<void> {
         }
         serverStartPromise = undefined;
     }
+}
+
+function presentStartupFailure(errorMessage: string): void {
+    extensionContext.setServerError(
+        'Failed to start GLua Language Server',
+        errorMessage
+    );
+    vscode.window.showErrorMessage(
+        `Could not start the GLua language server: ${errorMessage}. Check the output log or click Retry.`,
+        'Retry',
+        'Show Logs'
+    ).then(action => {
+        if (action === 'Retry') {
+            restartServer();
+        } else if (action === 'Show Logs') {
+            void showServerLogs(extensionContext.vscodeContext);
+        }
+    });
 }
 
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
@@ -759,7 +766,17 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                     }
                 }
                 if (!readinessState.ready) {
-                    rejectStartup(new Error('GLua Language Server stopped before startup completed'));
+                    const message = 'GLua Language Server stopped before startup completed';
+                    if (startupSettled) {
+                        // The indexing timeout already settled startup, so no
+                        // rejection can carry this failure to the caller.
+                        cleanup();
+                        if (isActiveClient) {
+                            presentStartupFailure(message);
+                        }
+                    } else {
+                        rejectStartup(new Error(message));
+                    }
                 }
                 break;
             default:
@@ -869,6 +886,9 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
 
     return {
         completion,
+        isReady(): boolean {
+            return readinessState.ready;
+        },
         isDiagnosticsInProgress(): boolean {
             return readinessState.diagnosticsInProgress;
         },
