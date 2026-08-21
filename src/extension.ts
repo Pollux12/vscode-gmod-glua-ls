@@ -63,9 +63,11 @@ import {
     applyServerStartupState,
     applyStartupProgressEvent,
     createStartupReadinessState,
+    decideStartedServerStatus,
     describeStartupProgressEvent,
     formatStartupTimeoutMessage,
     isStartupProgressToken,
+    StartedServerStatus,
     StartupServerState,
 } from './startupProgress';
 import { throwIfGluaEnhancedIsEnabled } from './extensionConflict';
@@ -83,6 +85,11 @@ export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
 let extensionInitializationPromise: Promise<void> | undefined;
 let serverStartPromise: Promise<void> | undefined;
+// Startup handlers for the client being started, so a caller that finds a
+// running transport later can tell a still-indexing server from a ready one.
+let activeStartupStateHandlers:
+    | { readonly client: LanguageClient; readonly handlers: StartupStateHandlerRegistration }
+    | undefined;
 let startupRunCounter = 0;
 let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
@@ -608,8 +615,9 @@ function ensureServerStarted(): Promise<void> {
         return serverStartPromise;
     }
 
-    if (extensionContext.client?.isRunning()) {
-        extensionContext.setServerRunning();
+    const runningClient = extensionContext.client;
+    if (runningClient?.isRunning()) {
+        reportStartedServerStatus(startupStateHandlersFor(runningClient));
         return Promise.resolve();
     }
 
@@ -637,12 +645,7 @@ async function runServerStart(startupRunId: number): Promise<void> {
         extensionContext.clearServerVersions();
         const startupStateHandlers = await doStartServer(startupRunId);
         throwIfStartupCancelled(startupRunId);
-        if (startupStateHandlers.isReady()) {
-            if (startupStateHandlers.isDiagnosticsInProgress()) {
-                extensionContext.setServerDiagnosing();
-            } else {
-                extensionContext.setServerRunning();
-            }
+        if (reportStartedServerStatus(startupStateHandlers) !== 'indexing') {
             void warmupOpenDocumentSymbols();
         }
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
@@ -672,6 +675,36 @@ async function runServerStart(startupRunId: number): Promise<void> {
         }
         serverStartPromise = undefined;
     }
+}
+
+function startupStateHandlersFor(
+    client: LanguageClient
+): StartupStateHandlerRegistration | undefined {
+    return activeStartupStateHandlers?.client === client
+        ? activeStartupStateHandlers.handlers
+        : undefined;
+}
+
+// Report the status of a client whose transport is running. While it is still
+// indexing the startup handlers own the status - they show the phase the
+// server is in - so leave it to them rather than overwriting it with Running.
+function reportStartedServerStatus(
+    handlers: StartupStateHandlerRegistration | undefined
+): StartedServerStatus {
+    const status = decideStartedServerStatus(
+        handlers && {
+            ready: handlers.isReady(),
+            diagnosticsInProgress: handlers.isDiagnosticsInProgress(),
+        }
+    );
+
+    if (status === 'diagnosing') {
+        extensionContext.setServerDiagnosing();
+    } else if (status === 'running') {
+        extensionContext.setServerRunning();
+    }
+
+    return status;
 }
 
 function presentStartupFailure(errorMessage: string): void {
@@ -758,6 +791,9 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 }
                 break;
             case State.Stopped:
+                if (activeStartupStateHandlers?.client === client) {
+                    activeStartupStateHandlers = undefined;
+                }
                 if (isActiveClient) {
                     extensionContext.client = undefined;
                     disposeHoverProviderRegistration();
@@ -1010,6 +1046,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         clientOptions
     );
     const startupStateHandlers = registerLanguageClientStateHandlers(client);
+    activeStartupStateHandlers = { client, handlers: startupStateHandlers };
     extensionContext.client = client;
 
     try {
