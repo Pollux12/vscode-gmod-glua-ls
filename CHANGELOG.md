@@ -2,6 +2,43 @@
 
 ---
 
+## [1.2.1] [Pre-Release] - 2026-08-21
+> Performance Improvements + Regression Fixes
+
+## VS Code Extension
+
+- Add server logs to the editor's output panel, so problems can be reported without hunting for a log file.
+- Keep waiting while a large workspace finishes indexing, instead of giving up and reporting a failed start.
+
+## Language Server
+- Add a warning when a field typed as a base class is only ever used as one particular subclass, suggesting a guard instead of reporting its methods as undefined.
+- Add support for out parameters that are not fields.
+- Improve indexing and analysis speed on large workspaces.
+- Improve net message analysis speed on large workspaces.
+- Improve editor responsiveness while a workspace is being analysed.
+- Improve memory use by limiting how much lookup data is cached.
+- Fix all diagnostics in a file clearing on edit and staying blank until the next change.
+- Fix hovers, go to definition, and completions occasionally returning nothing right after an edit.
+- Fix diagnostics and types slowly becoming wrong as you edit, which previously needed a restart to clear.
+- Fix diagnostics missing when the workspace first finishes loading.
+- Fix the server hanging when a type could never be worked out.
+- Fix the server using a whole CPU core if its update loop failed.
+- Fix analysis pausing when the editor is slow to read the server's output.
+- Fix undefined methods and fields being hidden by an unrelated nil check.
+- Fix net message warnings missing messages that are sent through local helper functions.
+- Fix `self` not being typed as the scripted class of the file it is used in.
+- Fix fields missing from classes that inherit from more than one place.
+- Fix fields being missed when a table key contains a dot, such as `T["a.b"]`.
+- Fix parameter types sometimes staying wrong after an edit.
+- Fix scripted class fields being declared in the wrong order.
+- Fix a warning suggesting a type that cannot be written when several subclasses match.
+- Fix rename being offered on `self` and then refused.
+- Fix completions and diagnostics sometimes coming back in a different order between runs.
+- Fix the loading status ending on an old step name after indexing finished.
+- Fix server log lines being split up or dropped when the editor is slow to read them.
+
+---
+
 ## [1.2.0] [Pre-Release] - 2026-08-17
 > Index & Analysis Refactor + Open VSX Releases
 
