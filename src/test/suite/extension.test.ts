@@ -428,7 +428,6 @@ suite('Extension Integration', () => {
                 green: 255,
                 blue: 255,
                 alpha: 255,
-                hex: '#FFFFFF',
             },
         };
         item.documentation = new vscode.MarkdownString(COLOR_COMPLETION_DOCUMENTATION);
@@ -449,7 +448,6 @@ suite('Extension Integration', () => {
                 green: 255,
                 blue: 255,
                 alpha: 255,
-                hex: '#FFFFFF',
             },
         };
         const plainItem = new vscode.CompletionItem('plain');
@@ -462,6 +460,23 @@ suite('Extension Integration', () => {
         assert.strictEqual(plainItem.detail, undefined);
     });
 
+    test('sets an rgba detail for translucent color completion previews', () => {
+        const item = new vscode.CompletionItem('color_black_10');
+        item.kind = vscode.CompletionItemKind.Color;
+        (item as vscode.CompletionItem & { data?: unknown }).data = {
+            color: {
+                red: 0,
+                green: 0,
+                blue: 0,
+                alpha: 25,
+            },
+        };
+
+        enableCompletionColorPreviewHtml(item);
+
+        assert.strictEqual(item.detail, 'rgba(0, 0, 0, 0.098)');
+    });
+
     test('does not set color detail for non-color completion items', () => {
         const item = new vscode.CompletionItem('color_white');
         item.kind = vscode.CompletionItemKind.Variable;
@@ -471,7 +486,6 @@ suite('Extension Integration', () => {
                 green: 255,
                 blue: 255,
                 alpha: 255,
-                hex: '#FFFFFF',
             },
         };
         item.documentation = new vscode.MarkdownString(COLOR_COMPLETION_DOCUMENTATION);
@@ -490,7 +504,6 @@ suite('Extension Integration', () => {
                 green: 0,
                 blue: 0,
                 alpha: 255,
-                hex: '#000000',
             },
         };
         item.documentation = new vscode.MarkdownString(COLOR_COMPLETION_DOCUMENTATION);
@@ -518,7 +531,6 @@ suite('Extension Integration', () => {
                 green: 255,
                 blue: 255,
                 alpha: 255,
-                hex: '#FFFFFF',
             },
         };
 

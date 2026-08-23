@@ -6,8 +6,18 @@ export function enableCompletionColorPreviewHtml(item: vscode.CompletionItem): v
         return item;
     }
 
-    item.detail = color.hex;
+    item.detail = toParseableColor(color);
     return item;
+}
+
+// VS Code only previews colours whose detail matches its strict CSS colour regex,
+// which accepts #RGB/#RRGGBB but not #RRGGBBAA, so translucent colours use rgba().
+function toParseableColor(color: CompletionColorData): string {
+    if (color.alpha === 255) {
+        return `#${[color.red, color.green, color.blue].map((c) => c.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+    }
+
+    return `rgba(${color.red}, ${color.green}, ${color.blue}, ${(color.alpha / 255).toFixed(3)})`;
 }
 
 export function enableCompletionColorPreviewHtmlForResult<T extends vscode.CompletionList | vscode.CompletionItem[] | undefined | null>(
@@ -34,7 +44,6 @@ type CompletionColorData = {
     green: number;
     blue: number;
     alpha: number;
-    hex: string;
 };
 
 function getCompletionColorData(item: vscode.CompletionItem): CompletionColorData | undefined {
@@ -52,9 +61,7 @@ function getCompletionColorData(item: vscode.CompletionItem): CompletionColorDat
         !isByte(color.red) ||
         !isByte(color.green) ||
         !isByte(color.blue) ||
-        !isByte(color.alpha) ||
-        typeof color.hex !== 'string' ||
-        !/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color.hex)
+        !isByte(color.alpha)
     ) {
         return undefined;
     }
@@ -64,7 +71,6 @@ function getCompletionColorData(item: vscode.CompletionItem): CompletionColorDat
         green: color.green,
         blue: color.blue,
         alpha: color.alpha,
-        hex: color.hex.toUpperCase(),
     };
 }
 
