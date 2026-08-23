@@ -284,6 +284,11 @@ export class EmmyContext implements vscode.Disposable {
                 detail: 'View server logs and output',
             },
             {
+                label: '$(folder-opened) Reveal Log Folder',
+                description: 'Open the server log folder',
+                detail: 'The same lines as the output channel, as a file you can attach to a bug report',
+            },
+            {
                 label: '$(symbol-structure) Show Syntax Tree',
                 description: 'View syntax tree for current file',
                 detail: 'Display the syntax tree of the active Lua file',
@@ -312,6 +317,8 @@ export class EmmyContext implements vscode.Disposable {
             await vscode.commands.executeCommand('gluals.gmod.configureDebugger');
         } else if (selected.label.includes('Server Info')) {
             this.showServerInfo();
+        } else if (selected.label.includes('Reveal Log Folder')) {
+            await vscode.commands.executeCommand('gluals.revealServerLogFolder');
         } else if (selected.label.includes('Output')) {
             this._client?.outputChannel?.show();
         } else if (selected.label.includes('Syntax Tree')) {

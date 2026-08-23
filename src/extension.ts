@@ -63,9 +63,11 @@ import {
     applyServerStartupState,
     applyStartupProgressEvent,
     createStartupReadinessState,
+    decideStartedServerStatus,
     describeStartupProgressEvent,
     formatStartupTimeoutMessage,
     isStartupProgressToken,
+    StartedServerStatus,
     StartupServerState,
 } from './startupProgress';
 import { throwIfGluaEnhancedIsEnabled } from './extensionConflict';
@@ -83,6 +85,11 @@ export let extensionContext: EmmyContext;
 let activeEditor: vscode.TextEditor | undefined;
 let extensionInitializationPromise: Promise<void> | undefined;
 let serverStartPromise: Promise<void> | undefined;
+// Startup handlers for the client being started, so a caller that finds a
+// running transport later can tell a still-indexing server from a ready one.
+let activeStartupStateHandlers:
+    | { readonly client: LanguageClient; readonly handlers: StartupStateHandlerRegistration }
+    | undefined;
 let startupRunCounter = 0;
 let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
@@ -145,6 +152,7 @@ interface ProgressNotificationParams {
 
 interface StartupStateHandlerRegistration {
     readonly completion: Promise<void>;
+    isReady(): boolean;
     isDiagnosticsInProgress(): boolean;
     dispose(error?: Error): void;
 }
@@ -228,6 +236,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.stopServer', handler: stopServer },
         { id: 'gluals.restartServer', handler: restartServer },
         { id: 'gluals.showServerMenu', handler: showServerMenu },
+        {
+            id: 'gluals.revealServerLogFolder',
+            handler: () => revealServerLogFolder(extensionContext.vscodeContext),
+        },
         { id: 'gluals.showReferences', handler: showReferences },
         { id: 'gluals.showSyntaxTree', handler: showSyntaxTree },
         // GMod annotations commands
@@ -603,8 +615,9 @@ function ensureServerStarted(): Promise<void> {
         return serverStartPromise;
     }
 
-    if (extensionContext.client?.isRunning()) {
-        extensionContext.setServerRunning();
+    const runningClient = extensionContext.client;
+    if (runningClient?.isRunning()) {
+        reportStartedServerStatus(startupStateHandlersFor(runningClient));
         return Promise.resolve();
     }
 
@@ -632,12 +645,9 @@ async function runServerStart(startupRunId: number): Promise<void> {
         extensionContext.clearServerVersions();
         const startupStateHandlers = await doStartServer(startupRunId);
         throwIfStartupCancelled(startupRunId);
-        if (startupStateHandlers.isDiagnosticsInProgress()) {
-            extensionContext.setServerDiagnosing();
-        } else {
-            extensionContext.setServerRunning();
+        if (reportStartedServerStatus(startupStateHandlers) !== 'indexing') {
+            void warmupOpenDocumentSymbols();
         }
-        void warmupOpenDocumentSymbols();
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
@@ -656,21 +666,7 @@ async function runServerStart(startupRunId: number): Promise<void> {
             throw reason instanceof StartupCancelledError ? reason : new StartupCancelledError();
         }
 
-        extensionContext.setServerError(
-            'Failed to start GLua Language Server',
-            errorMessage
-        );
-        vscode.window.showErrorMessage(
-            `Could not start the GLua language server: ${errorMessage}. Check the output log or click Retry.`,
-            'Retry',
-            'Show Logs'
-        ).then(action => {
-            if (action === 'Retry') {
-                restartServer();
-            } else if (action === 'Show Logs') {
-                void showServerLogs(extensionContext.vscodeContext);
-            }
-        });
+        presentStartupFailure(errorMessage);
         throw reason;
     } finally {
         cancelledStartupRuns.delete(startupRunId);
@@ -679,6 +675,54 @@ async function runServerStart(startupRunId: number): Promise<void> {
         }
         serverStartPromise = undefined;
     }
+}
+
+function startupStateHandlersFor(
+    client: LanguageClient
+): StartupStateHandlerRegistration | undefined {
+    return activeStartupStateHandlers?.client === client
+        ? activeStartupStateHandlers.handlers
+        : undefined;
+}
+
+// Report the status of a client whose transport is running. While it is still
+// indexing the startup handlers own the status - they show the phase the
+// server is in - so leave it to them rather than overwriting it with Running.
+function reportStartedServerStatus(
+    handlers: StartupStateHandlerRegistration | undefined
+): StartedServerStatus {
+    const status = decideStartedServerStatus(
+        handlers && {
+            ready: handlers.isReady(),
+            diagnosticsInProgress: handlers.isDiagnosticsInProgress(),
+        }
+    );
+
+    if (status === 'diagnosing') {
+        extensionContext.setServerDiagnosing();
+    } else if (status === 'running') {
+        extensionContext.setServerRunning();
+    }
+
+    return status;
+}
+
+function presentStartupFailure(errorMessage: string): void {
+    extensionContext.setServerError(
+        'Failed to start GLua Language Server',
+        errorMessage
+    );
+    vscode.window.showErrorMessage(
+        `Could not start the GLua language server: ${errorMessage}. Check the output log or click Retry.`,
+        'Retry',
+        'Show Logs'
+    ).then(action => {
+        if (action === 'Retry') {
+            restartServer();
+        } else if (action === 'Show Logs') {
+            void showServerLogs(extensionContext.vscodeContext);
+        }
+    });
 }
 
 function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
@@ -747,6 +791,9 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 }
                 break;
             case State.Stopped:
+                if (activeStartupStateHandlers?.client === client) {
+                    activeStartupStateHandlers = undefined;
+                }
                 if (isActiveClient) {
                     extensionContext.client = undefined;
                     disposeHoverProviderRegistration();
@@ -755,7 +802,17 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                     }
                 }
                 if (!readinessState.ready) {
-                    rejectStartup(new Error('GLua Language Server stopped before startup completed'));
+                    const message = 'GLua Language Server stopped before startup completed';
+                    if (startupSettled) {
+                        // The indexing timeout already settled startup, so no
+                        // rejection can carry this failure to the caller.
+                        cleanup();
+                        if (isActiveClient) {
+                            presentStartupFailure(message);
+                        }
+                    } else {
+                        rejectStartup(new Error(message));
+                    }
                 }
                 break;
             default:
@@ -831,12 +888,43 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         }
     );
 
+    // A large workspace can legitimately take longer than this to index, and
+    // the server reports the phase it is in throughout. Treating the deadline
+    // as a failure told those users the server was broken when it was still
+    // working; say what it is doing instead and let the rest of the extension
+    // carry on while it finishes.
     startupTimeout = setTimeout(() => {
-        rejectStartup(new Error(formatStartupTimeoutMessage(STARTUP_COMPLETE_TIMEOUT_MS, lastStartupPhase)));
+        if (startupSettled) {
+            return;
+        }
+        const timeoutMessage = formatStartupTimeoutMessage(
+            STARTUP_COMPLETE_TIMEOUT_MS,
+            lastStartupPhase
+        );
+        logLanguageServerOutput(
+            client,
+            `${timeoutMessage} - still indexing.`
+        );
+        if (extensionContext.client === client) {
+            void vscode.window.showWarningMessage(
+                `The GLua language server is still indexing this workspace after ` +
+                `${STARTUP_COMPLETE_TIMEOUT_MS / 1000}s (${lastStartupPhase}). ` +
+                `It should not be taking this long, please report this issue with your logs.`,
+                'Show Logs'
+            ).then(action => {
+                if (action === 'Show Logs') {
+                    client.outputChannel?.show();
+                }
+            });
+        }
+        resolveStartup();
     }, STARTUP_COMPLETE_TIMEOUT_MS);
 
     return {
         completion,
+        isReady(): boolean {
+            return readinessState.ready;
+        },
         isDiagnosticsInProgress(): boolean {
             return readinessState.diagnosticsInProgress;
         },
@@ -958,6 +1046,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         clientOptions
     );
     const startupStateHandlers = registerLanguageClientStateHandlers(client);
+    activeStartupStateHandlers = { client, handlers: startupStateHandlers };
     extensionContext.client = client;
 
     try {
@@ -1055,17 +1144,34 @@ function createProcessServerOptions(
     return serverOptions;
 }
 
+/**
+ * Show the server log.
+ *
+ * The server writes the same lines to its output channel and to the log file,
+ * so this opens the channel: it is already in the editor, it can be scrolled
+ * and copied into a bug report, and it does not send anyone to a file manager
+ * to find a path. The folder is offered second for whole-file attachments.
+ */
 async function showServerLogs(context: vscode.ExtensionContext): Promise<void> {
+    const channel = extensionContext.client?.outputChannel;
+    if (channel) {
+        channel.show();
+        return;
+    }
+
+    await revealServerLogFolder(context);
+}
+
+async function revealServerLogFolder(context: vscode.ExtensionContext): Promise<void> {
     const serverLogDirectory = getServerLogDirectory(context);
 
     try {
         await vscode.workspace.fs.createDirectory(serverLogDirectory);
         await vscode.commands.executeCommand('revealFileInOS', serverLogDirectory);
     } catch {
-        vscode.window.showWarningMessage(
+        void vscode.window.showWarningMessage(
             `Could not open the GLuaLS log folder in your file manager: ${serverLogDirectory.fsPath}`
         );
-        extensionContext.client?.outputChannel?.show();
     }
 }
 

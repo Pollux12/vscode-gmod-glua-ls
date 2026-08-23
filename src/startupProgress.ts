@@ -90,6 +90,32 @@ export function applyStartupProgressEvent(
     };
 }
 
+/**
+ * What a caller that found a running client transport should report. The
+ * transport being up does not mean the server is ready: after the startup
+ * timeout settles the start promise the workspace can still be indexing.
+ */
+export type StartedServerStatus = 'indexing' | 'diagnosing' | 'running';
+
+/**
+ * Decide the status for a client whose transport is running. Pass `undefined`
+ * when no startup handlers track the client, in which case the running
+ * transport is the only evidence available.
+ */
+export function decideStartedServerStatus(
+    readiness: Pick<StartupReadinessState, 'ready' | 'diagnosticsInProgress'> | undefined
+): StartedServerStatus {
+    if (!readiness) {
+        return 'running';
+    }
+
+    if (!readiness.ready) {
+        return 'indexing';
+    }
+
+    return readiness.diagnosticsInProgress ? 'diagnosing' : 'running';
+}
+
 export function describeStartupProgressEvent(event: StartupProgressEvent): string {
     const message = event.message?.trim();
     if (message) {

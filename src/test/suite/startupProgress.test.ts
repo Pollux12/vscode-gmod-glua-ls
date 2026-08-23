@@ -6,6 +6,7 @@ import {
     applyServerStartupState,
     applyStartupProgressEvent,
     createStartupReadinessState,
+    decideStartedServerStatus,
     describeStartupProgressEvent,
     formatStartupTimeoutMessage,
 } from '../../startupProgress';
@@ -87,5 +88,29 @@ suite('Startup Progress', () => {
             formatStartupTimeoutMessage(60_000, 'Indexing addon files'),
             'LS_STARTUP_TIMEOUT after 60s; last phase: Indexing addon files'
         );
+    });
+
+    test('keeps a running transport out of the running status while indexing', () => {
+        // The startup timeout settles the start promise while the workspace is
+        // still indexing, so a later caller sees a running transport with an
+        // unready server and must not report it as running.
+        assert.strictEqual(
+            decideStartedServerStatus(createStartupReadinessState()),
+            'indexing'
+        );
+
+        assert.strictEqual(
+            decideStartedServerStatus({ ready: true, diagnosticsInProgress: true }),
+            'diagnosing'
+        );
+
+        assert.strictEqual(
+            decideStartedServerStatus({ ready: true, diagnosticsInProgress: false }),
+            'running'
+        );
+    });
+
+    test('reports a running transport with no startup handlers as running', () => {
+        assert.strictEqual(decideStartedServerStatus(undefined), 'running');
     });
 });
