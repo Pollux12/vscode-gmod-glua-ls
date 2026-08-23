@@ -2,7 +2,7 @@
 
 ---
 
-## [1.2.1] [Pre-Release] - 2026-08-21
+## [1.2.1] [Pre-Release] - 2026-08-23
 > Performance Improvements + Regression Fixes
 
 ## VS Code Extension
@@ -17,6 +17,8 @@
 - Improve net message analysis speed on large workspaces.
 - Improve editor responsiveness while a workspace is being analysed.
 - Improve memory use by limiting how much lookup data is cached.
+- Improve typing responsiveness by answering hovers, completions and go to definition before an edit has finished re-indexing.
+- Improve completion speed in large files by filtering members without reading the file again.
 - Fix all diagnostics in a file clearing on edit and staying blank until the next change.
 - Fix hovers, go to definition, and completions occasionally returning nothing right after an edit.
 - Fix diagnostics and types slowly becoming wrong as you edit, which previously needed a restart to clear.
@@ -36,6 +38,22 @@
 - Fix completions and diagnostics sometimes coming back in a different order between runs.
 - Fix the loading status ending on an old step name after indexing finished.
 - Fix server log lines being split up or dropped when the editor is slow to read them.
+- Fix types changing depending on the order files happened to be analysed in, which made results differ between a fresh start and an edit.
+- Fix reading a global that is never defined anywhere clearing the type of the variable it was assigned to.
+- Fix `x = x or default` giving a different type depending on which file declared `default`.
+- Fix a global's type being worked out from only some of the files that define it.
+- Fix a table field's type being taken from whichever file wrote it first.
+- Fix table fields being widened by writes that only run inside an `if`.
+- Fix `pairs` loop variables typed from only the keys written so far.
+- Fix a `_G` loop variable typed from a snapshot of the globals.
+- Fix fields being attached to whichever table was indexed first when a global is built across several files.
+- Fix a field lookup stopping at an entry that has no type yet.
+- Fix a member being dropped when its first attempt to attach failed.
+- Fix a local typed against a dynamic field that had not been indexed yet.
+- Fix a function's return type being decided by the first expression the analysis reached.
+- Fix a callback with no known return type overriding the function's own body.
+- Fix a value assigned later in a file contributing nothing to the field's type.
+- Fix a field losing its type when the value was worked out after the file was read.
 
 ---
 
