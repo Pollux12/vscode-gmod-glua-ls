@@ -2,6 +2,17 @@
 
 ---
 
+## [1.2.2] [Pre-Release] - 2026-08-24
+> Various regression fixes and improvements
+
+## VS Code Extension
+
+- Fix the colour swatch missing from completions for colours with an alpha value.
+
+## Language Server
+
+---
+
 ## [1.2.1] [Pre-Release] - 2026-08-23
 > Performance Improvements + Regression Fixes
 

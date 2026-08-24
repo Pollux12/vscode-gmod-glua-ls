@@ -160,6 +160,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - name: Preflight publish secrets
         shell: bash
         env:
@@ -176,26 +177,34 @@ jobs:
         uses: actions/github-script@v9
         env:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
+          TAG_VERSION: ${{ needs.build.outputs.tag_version }}
           PUBLISH_CHANNEL: ${{ needs.build.outputs.publish_channel }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
+
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const tag = process.env.TAG_NAME;
+            const version = process.env.TAG_VERSION;
             const prerelease = process.env.PUBLISH_CHANNEL === 'prerelease';
 
-            const macosWarning = [
-              '## macOS support is experimental',
-              '',
-              'macOS VSIX packages bundle experimental darwin-x64 and darwin-arm64 language server builds. Debugger support on macOS is also experimental and may require extra validation before regular use.',
-            ].join('\n');
-            const appendMacosWarning = (body = '') => {
-              if (body.includes('## macOS support is experimental')) {
-                return body;
+            const macosNote = '> [!NOTE]\n> macOS builds (`darwin-x64`, `darwin-arm64`), including the debugger, are experimental.';
+
+            // Release notes are the matching CHANGELOG.md section verbatim, heading included.
+            const changelogNotes = () => {
+              const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+              const start = changelog.indexOf(`## [${version}]`);
+              if (start === -1) {
+                core.warning(`CHANGELOG.md has no section for ${version}; publishing release notes without it.`);
+                return '';
               }
-              return [body.trim(), macosWarning].filter(Boolean).join('\n\n');
+
+              return changelog.slice(start).split(/\n## \[/)[0].trim().replace(/\n*---$/, '').trim();
             };
+
+            const body = [changelogNotes(), macosNote].filter(Boolean).join('\n\n');
 
             try {
               const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
@@ -205,7 +214,7 @@ jobs:
                 release_id: existing.data.id,
                 tag_name: tag,
                 name: tag,
-                body: appendMacosWarning(existing.data.body ?? ''),
+                body,
                 prerelease,
                 draft: false,
               });
@@ -220,7 +229,7 @@ jobs:
                 repo,
                 tag_name: tag,
                 name: tag,
-                body: macosWarning,
+                body,
                 prerelease,
                 draft: false,
               });
