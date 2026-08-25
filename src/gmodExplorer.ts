@@ -18,6 +18,8 @@ type ResourceCategory =
     | 'other';
 type GmodExplorerItemType =
     | 'category'
+    | 'projectGroup'
+    | 'project'
     | 'scriptedClassType'
     | 'scriptedClass'
     | 'resourceCategory'
@@ -38,6 +40,9 @@ interface ItemData {
     rcType?: ResourceCategory;
     groupKey?: string;
     uri?: vscode.Uri;
+    projectId?: string;
+    projectKind?: LsProjectKind;
+    projectRootUri?: vscode.Uri;
 }
 
 interface LsPosition {
@@ -78,11 +83,23 @@ export interface LsScriptedClassEntry {
     className: string;
     definitionId?: string;
     range?: LsRange | null;
+    projectId?: string;
+}
+
+export type LsProjectKind = 'addon' | 'gamemode' | 'workspace';
+
+export interface LsProject {
+    id: string;
+    kind: LsProjectKind;
+    name: string;
+    rootUri: string;
+    role?: 'primary' | 'base';
 }
 
 export interface LsScriptedClassesResult {
     definitions: LsScriptedClassDefinition[];
     entries: LsScriptedClassEntry[];
+    projects?: LsProject[];
 }
 
 const LEGACY_SCRIPTED_CLASS_DEFINITIONS: LsScriptedClassDefinition[] = [
@@ -161,11 +178,13 @@ const LEGACY_DEFINITION_ID_BY_CLASS_TYPE = new Map<string, string>(
 
 interface ScriptedClassFileEntry {
     uri: vscode.Uri;
+    projectId?: string;
     startLine?: number;
     startCharacter?: number;
 }
 
 interface ScriptedClassCache {
+    projects: LsProject[];
     definitions: Map<string, LsScriptedClassDefinition>;
     childDefinitions: Map<string | undefined, LsScriptedClassDefinition[]>;
     classMaps: Map<string, Map<string, ScriptedClassFileEntry[]>>;
@@ -306,7 +325,10 @@ function normalizeLsScriptedClassesResult(result: unknown): LsScriptedClassesRes
         definitions = [...LEGACY_SCRIPTED_CLASS_DEFINITIONS];
     }
 
-    return { definitions, entries };
+    const projects = Array.isArray(candidate.projects)
+        ? candidate.projects.filter(isLsProject).sort(compareLsProjects)
+        : undefined;
+    return { definitions, entries, projects };
 }
 
 function createLegacyCompatibleResult(entries: unknown[]): LsScriptedClassesResult {
@@ -331,7 +353,66 @@ function normalizeLsScriptedClassEntry(entry: unknown): LsScriptedClassEntry {
         className: typeof typed.className === 'string' ? typed.className : '',
         definitionId,
         range: typed.range ?? null,
+        projectId: typeof typed.projectId === 'string' ? typed.projectId : undefined,
     };
+}
+
+function isLsProject(value: unknown): value is LsProject {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+    const candidate = value as Partial<LsProject>;
+    return typeof candidate.id === 'string'
+        && (candidate.kind === 'addon' || candidate.kind === 'gamemode' || candidate.kind === 'workspace')
+        && typeof candidate.name === 'string'
+        && typeof candidate.rootUri === 'string';
+}
+
+function compareLsProjects(left: LsProject, right: LsProject): number {
+    const order: Record<LsProjectKind, number> = { addon: 0, gamemode: 1, workspace: 2 };
+    return order[left.kind] - order[right.kind]
+        || left.name.localeCompare(right.name)
+        || left.rootUri.localeCompare(right.rootUri);
+}
+
+function owningProjectForUri(
+    projects: readonly LsProject[],
+    uri: vscode.Uri,
+): LsProject | undefined {
+    const matches = projects
+        .map(project => ({ project, root: parseLsUri(project.rootUri) }))
+        .filter((entry): entry is { project: LsProject; root: vscode.Uri } =>
+            !!entry.root && uriIsWithin(uri, entry.root),
+        )
+        .sort((left, right) => right.root.fsPath.length - left.root.fsPath.length);
+    const owner = matches[0];
+    if (!owner || owner.project.kind !== 'workspace') {
+        return owner?.project;
+    }
+
+    const relativeSegments = path
+        .relative(owner.root.fsPath, uri.fsPath)
+        .split(path.sep)
+        .filter(Boolean)
+        .map(segment => segment.toLowerCase());
+    const rootName = path.basename(owner.root.fsPath).toLowerCase();
+    const isContainerChild = (rootName === 'addons' || rootName === 'gamemodes')
+        && relativeSegments.length > 1;
+    const isNestedProject = relativeSegments.some((segment, index) =>
+        (segment === 'addons' || segment === 'gamemodes') && index + 1 < relativeSegments.length,
+    );
+    if (isContainerChild || isNestedProject) {
+        return undefined;
+    }
+    return owner.project;
+}
+
+function uriIsWithin(uri: vscode.Uri, root: vscode.Uri): boolean {
+    if (uri.scheme !== root.scheme) {
+        return false;
+    }
+    const relative = path.relative(root.fsPath, uri.fsPath);
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 async function withWorkspaceFallback(result: LsScriptedClassesResult): Promise<LsScriptedClassesResult> {
@@ -339,14 +420,18 @@ async function withWorkspaceFallback(result: LsScriptedClassesResult): Promise<L
         return result;
     }
 
-    const entries = await discoverScriptedClassEntriesFromWorkspace(result.definitions);
-    return entries.length > 0 ? { definitions: result.definitions, entries } : result;
+    const entries = await discoverScriptedClassEntriesFromWorkspace(
+        result.definitions,
+        result.projects ?? [],
+    );
+    return entries.length > 0 ? { ...result, entries } : result;
 }
 
 async function discoverScriptedClassEntriesFromWorkspace(
     definitions: readonly LsScriptedClassDefinition[],
+    projects: readonly LsProject[],
 ): Promise<LsScriptedClassEntry[]> {
-    const candidateUris = new Map<string, vscode.Uri>();
+    const candidateUris = new Map<string, { uri: vscode.Uri; projectId?: string }>();
 
     for (const definition of definitions) {
         const includeGlob = toWorkspaceGlob(definition.include);
@@ -355,14 +440,38 @@ async function discoverScriptedClassEntriesFromWorkspace(
         }
 
         const excludeGlob = toWorkspaceGlob(definition.exclude);
-        const files = await vscode.workspace.findFiles(includeGlob, excludeGlob, 500);
-        for (const file of files) {
-            candidateUris.set(file.toString(), file);
+        if (projects.length === 0) {
+            const files = await vscode.workspace.findFiles(includeGlob, excludeGlob, 500);
+            for (const file of files) {
+                candidateUris.set(file.toString(), { uri: file });
+            }
+            continue;
+        }
+
+        for (const project of projects) {
+            const root = parseLsUri(project.rootUri);
+            if (!root) {
+                continue;
+            }
+            const files = await vscode.workspace.findFiles(
+                new vscode.RelativePattern(
+                    root,
+                    includeGlob.startsWith('**/') ? includeGlob : `**/${includeGlob}`,
+                ),
+                excludeGlob,
+                500,
+            );
+            for (const file of files) {
+                if (owningProjectForUri(projects, file)?.id === project.id) {
+                    candidateUris.set(file.toString(), { uri: file, projectId: project.id });
+                }
+            }
         }
     }
 
     const entries: LsScriptedClassEntry[] = [];
-    for (const uri of candidateUris.values()) {
+    for (const candidate of candidateUris.values()) {
+        const { uri, projectId } = candidate;
         const match = detectScriptedClassForPath(uri.fsPath, definitions);
         if (!match) {
             continue;
@@ -374,6 +483,7 @@ async function discoverScriptedClassEntriesFromWorkspace(
             className: match.className,
             definitionId: match.definition.id,
             range: null,
+            projectId,
         });
     }
 
@@ -471,6 +581,15 @@ export class GmodExplorerItem extends vscode.TreeItem {
     private configure(): void {
         const d = this.data;
         switch (d.type) {
+            case 'projectGroup':
+                this.iconPath = new vscode.ThemeIcon(d.projectKind === 'gamemode' ? 'server-process' : 'root-folder');
+                break;
+            case 'project':
+                this.iconPath = new vscode.ThemeIcon(
+                    d.projectKind === 'gamemode' ? 'game' : d.projectKind === 'addon' ? 'package' : 'folder',
+                );
+                this.resourceUri = d.projectRootUri;
+                break;
             case 'category':
                 this.iconPath = new vscode.ThemeIcon('list-tree');
                 break;
@@ -595,7 +714,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
     private scriptedClassCache?: ScriptedClassCache;
-    private resourceCache?: Map<ResourceCategory, Map<string, vscode.Uri[]>>;
+    private resourceCache?: Map<string, Map<ResourceCategory, Map<string, vscode.Uri[]>>>;
 
     refresh(): void {
         this.scriptedClassCache = undefined;
@@ -613,6 +732,22 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         if (!element) {
+            const cache = await this.getScriptedClassCache();
+            if (cache.projects.length > 0) {
+                const groups: Array<{ kind: LsProjectKind; label: string }> = [
+                    { kind: 'addon', label: 'Addons' },
+                    { kind: 'gamemode', label: 'Gamemodes' },
+                    { kind: 'workspace', label: 'Workspaces' },
+                ];
+                return groups
+                    .filter(group => cache.projects.some(project => project.kind === group.kind))
+                    .map(group => new GmodExplorerItem({
+                        type: 'projectGroup',
+                        label: group.label,
+                        collapsible: vscode.TreeItemCollapsibleState.Expanded,
+                        projectKind: group.kind,
+                    }));
+            }
             return [
                 new GmodExplorerItem({ type: 'category', label: 'Scripted Classes', collapsible: vscode.TreeItemCollapsibleState.Expanded }),
                 new GmodExplorerItem({
@@ -630,10 +765,51 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
         const d = element.data;
 
+        if (d.type === 'projectGroup' && d.projectKind) {
+            const cache = await this.getScriptedClassCache();
+            return cache.projects
+                .filter(project => project.kind === d.projectKind)
+                .map(project => new GmodExplorerItem({
+                    type: 'project',
+                    label: project.role === 'base' ? `${project.name} (base)` : project.name,
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    projectId: project.id,
+                    projectKind: project.kind,
+                    projectRootUri: parseLsUri(project.rootUri),
+                }));
+        }
+
+        if (d.type === 'project' && d.projectId) {
+            return [
+                new GmodExplorerItem({
+                    type: 'category',
+                    label: 'Scripted Classes',
+                    collapsible: vscode.TreeItemCollapsibleState.Expanded,
+                    projectId: d.projectId,
+                }),
+                new GmodExplorerItem({
+                    type: 'scriptedClassType',
+                    label: 'VGUI Panels',
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    definitionId: '__vgui__',
+                    classGlobal: 'VGUI',
+                    hasScaffold: false,
+                    icon: 'window',
+                    projectId: d.projectId,
+                }),
+                new GmodExplorerItem({
+                    type: 'category',
+                    label: 'Resources',
+                    collapsible: vscode.TreeItemCollapsibleState.Collapsed,
+                    projectId: d.projectId,
+                }),
+            ];
+        }
+
         if (d.type === 'category') {
             switch (d.label) {
                 case 'Scripted Classes':
-                    return this.getScriptedClassTypeItems(undefined);
+                    return this.getScriptedClassTypeItems(undefined, d.projectId);
                 case 'Resources':
                     return RESOURCE_CATEGORY_ORDER.map((rcType) =>
                         new GmodExplorerItem({
@@ -641,6 +817,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                             label: RESOURCE_CATEGORY_CONFIG[rcType].label,
                             collapsible: vscode.TreeItemCollapsibleState.Collapsed,
                             rcType,
+                            projectId: d.projectId,
                         })
                     );
             }
@@ -648,22 +825,23 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
         if (d.type === 'scriptedClassType') {
             if (d.classGlobal === 'VGUI') {
-                return this.getScriptedClassItemsForVgui();
+                return this.getScriptedClassItemsForVgui(d.projectId);
             }
 
-            return this.getScriptedClassTypeChildren(d.definitionId);
+            return this.getScriptedClassTypeChildren(d.definitionId, d.projectId);
         }
 
         if (d.type === 'scriptedClass' && d.definitionId && d.className) {
             const cache = await this.getScriptedClassCache();
-            const files = cache.classMaps.get(d.definitionId)?.get(d.className) ?? [];
+            const files = (cache.classMaps.get(d.definitionId)?.get(d.className) ?? [])
+                .filter(file => !d.projectId || file.projectId === d.projectId);
             return files.sort((a, b) => a.uri.fsPath.localeCompare(b.uri.fsPath)).map((file) =>
                 new GmodExplorerItem({ type: 'file', label: path.basename(file.uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri: file.uri })
             );
         }
 
         if (d.type === 'resourceCategory' && d.rcType) {
-            const cache = await this.getResourceCache();
+            const cache = await this.getResourceCache(d.projectId);
             const groupMap = cache.get(d.rcType) ?? new Map<string, vscode.Uri[]>();
             const items: GmodExplorerItem[] = [];
             const rootFiles = groupMap.get('') ?? [];
@@ -678,13 +856,14 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                     rcType: d.rcType,
                     groupKey,
                     uri: files[0],
+                    projectId: d.projectId,
                 }));
             }
             return items;
         }
 
         if (d.type === 'resourceGroup' && d.rcType && d.groupKey !== undefined) {
-            const cache = await this.getResourceCache();
+            const cache = await this.getResourceCache(d.projectId);
             const files = cache.get(d.rcType)?.get(d.groupKey) ?? [];
             return files.sort((a, b) => a.fsPath.localeCompare(b.fsPath)).map((uri) =>
                 new GmodExplorerItem({ type: 'file', label: path.basename(uri.fsPath), collapsible: vscode.TreeItemCollapsibleState.None, uri })
@@ -716,7 +895,10 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         return vscode.Uri.file(path.dirname(uri.fsPath));
     }
 
-    private async getScriptedClassTypeItems(parentId: string | undefined): Promise<GmodExplorerItem[]> {
+    private async getScriptedClassTypeItems(
+        parentId: string | undefined,
+        projectId?: string,
+    ): Promise<GmodExplorerItem[]> {
         const cache = await this.getScriptedClassCache();
         return (cache.childDefinitions.get(parentId) ?? []).map((definition) =>
             new GmodExplorerItem({
@@ -727,11 +909,15 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 classGlobal: definition.classGlobal,
                 hasScaffold: hasScaffoldFiles(definition),
                 icon: definition.icon,
+                projectId,
             })
         );
     }
 
-    private async getScriptedClassTypeChildren(definitionId: string | undefined): Promise<GmodExplorerItem[]> {
+    private async getScriptedClassTypeChildren(
+        definitionId: string | undefined,
+        projectId?: string,
+    ): Promise<GmodExplorerItem[]> {
         if (!definitionId) {
             return [];
         }
@@ -744,6 +930,11 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
         const classMap = cache.classMaps.get(definitionId) ?? new Map<string, ScriptedClassFileEntry[]>();
         const classItems = [...classMap.entries()]
+            .map(([className, files]) => [
+                className,
+                files.filter(file => !projectId || file.projectId === projectId),
+            ] as const)
+            .filter(([, files]) => files.length > 0)
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([className, files]) => {
                 const firstFile = files[0];
@@ -758,16 +949,23 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                     uri: firstFile?.uri,
                     startLine: firstFile?.startLine,
                     startCharacter: firstFile?.startCharacter,
+                    projectId,
                 });
             });
 
-        const childTypes = await this.getScriptedClassTypeItems(definitionId);
+        const childTypes = await this.getScriptedClassTypeItems(definitionId, projectId);
         return [...classItems, ...childTypes];
     }
 
-    private async getScriptedClassItemsForVgui(): Promise<GmodExplorerItem[]> {
+    private async getScriptedClassItemsForVgui(projectId?: string): Promise<GmodExplorerItem[]> {
         const cache = await this.getScriptedClassCache();
-        return [...cache.vguiClassMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) => {
+        return [...cache.vguiClassMap.entries()]
+            .map(([className, files]) => [
+                className,
+                files.filter(file => !projectId || file.projectId === projectId),
+            ] as const)
+            .filter(([, files]) => files.length > 0)
+            .sort((a, b) => a[0].localeCompare(b[0])).map(([className, files]) => {
             const firstFile = files[0];
             const isVguiDefinition = files.length === 1
                 && typeof firstFile?.startLine === 'number'
@@ -788,6 +986,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
                 uri: firstFile?.uri,
                 startLine: firstFile?.startLine,
                 startCharacter: firstFile?.startCharacter,
+                projectId,
             });
         });
     }
@@ -813,12 +1012,12 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         if (data.type === 'resourceGroup' && data.rcType && data.groupKey !== undefined) {
-            const cache = await this.getResourceCache();
+            const cache = await this.getResourceCache(data.projectId);
             return cache.get(data.rcType)?.get(data.groupKey)?.[0];
         }
 
         if (data.type === 'resourceCategory' && data.rcType) {
-            const cache = await this.getResourceCache();
+            const cache = await this.getResourceCache(data.projectId);
             const groupMap = cache.get(data.rcType);
             if (!groupMap) {
                 return undefined;
@@ -892,6 +1091,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             const startCharacter = entry.range?.start?.character;
             const fileEntry: ScriptedClassFileEntry = {
                 uri,
+                projectId: entry.projectId,
                 startLine: typeof startLine === 'number' ? startLine : undefined,
                 startCharacter: typeof startCharacter === 'number' ? startCharacter : undefined,
             };
@@ -931,6 +1131,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         this.scriptedClassCache = {
+            projects: result.projects ?? [],
             definitions,
             childDefinitions,
             classMaps,
@@ -939,11 +1140,20 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         return this.scriptedClassCache;
     }
 
-    private async getResourceCache(): Promise<Map<ResourceCategory, Map<string, vscode.Uri[]>>> {
-        if (this.resourceCache) {
-            return this.resourceCache;
+    private async getResourceCache(
+        projectId?: string,
+    ): Promise<Map<ResourceCategory, Map<string, vscode.Uri[]>>> {
+        const cacheKey = projectId ?? '__flat__';
+        const existingCache = this.resourceCache?.get(cacheKey);
+        if (existingCache) {
+            return existingCache;
         }
 
+        const scriptedClassCache = await this.getScriptedClassCache();
+        const project = projectId
+            ? scriptedClassCache.projects.find(candidate => candidate.id === projectId)
+            : undefined;
+        const projectRoot = project ? parseLsUri(project.rootUri) : undefined;
         const cache = new Map<ResourceCategory, Map<string, vscode.Uri[]>>();
         const LIMIT = 500;
 
@@ -952,9 +1162,16 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             const seen = new Set<string>();
 
             for (const pattern of RESOURCE_CATEGORY_CONFIG[rcType].patterns) {
-                const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**', LIMIT);
+                const include = projectRoot
+                    ? new vscode.RelativePattern(projectRoot, pattern)
+                    : pattern;
+                const files = await vscode.workspace.findFiles(include, '**/node_modules/**', LIMIT);
                 for (const uri of files) {
-                    if (seen.has(uri.fsPath) || !isResourceFileForCategory(uri, rcType)) {
+                    if (
+                        seen.has(uri.fsPath)
+                        || !isResourceFileForCategory(uri, rcType)
+                        || (project && owningProjectForUri(scriptedClassCache.projects, uri)?.id !== project.id)
+                    ) {
                         continue;
                     }
 
@@ -969,7 +1186,8 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             cache.set(rcType, groupMap);
         }));
 
-        this.resourceCache = cache;
+        this.resourceCache ??= new Map();
+        this.resourceCache.set(cacheKey, cache);
         return cache;
     }
 
