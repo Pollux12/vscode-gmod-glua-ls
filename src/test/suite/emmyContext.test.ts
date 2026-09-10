@@ -94,7 +94,8 @@ suite('Emmy Context', () => {
 
             const tooltip = getTooltipMarkdown(context);
             assert.match(tooltip, /Language Server: 1\.2\.3/);
-            assert.match(tooltip, /Annotations: 2026-07-13T12:00:00\.000Z/);
+            const annotationText = new vscode.MarkdownString().appendText('Annotations: 2026-07-13T12:00:00.000Z').value.replace(/&nbsp;/g, ' ');
+            assert.ok(tooltip.includes(annotationText));
         } finally {
             context.dispose();
         }
