@@ -64,6 +64,7 @@ interface TooltipAction {
  */
 export class EmmyContext implements vscode.Disposable {
     public readonly LANGUAGE_ID = 'glua' as const;
+    public readonly outputChannel = vscode.window.createOutputChannel('GLua Language Server', { log: true });
 
     private _client?: LanguageClient;
     private _serverStatus: ServerStatus;
@@ -85,6 +86,7 @@ export class EmmyContext implements vscode.Disposable {
         this._statusBar.command = 'gluals.showServerMenu';
 
         this._disposables.push(this._statusBar);
+        this._disposables.push(this.outputChannel);
         this.updateStatusBar();
     }
 

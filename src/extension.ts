@@ -1003,6 +1003,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
     }
 
     const clientOptions: LanguageClientOptions = {
+        outputChannel: extensionContext.outputChannel,
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
         initializationOptions: initOptions,
         middleware: {
