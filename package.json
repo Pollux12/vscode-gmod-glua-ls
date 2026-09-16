@@ -2574,7 +2574,7 @@
     "dependencies": {
         "@vscode/debugadapter": "^1.61.0",
         "@vscode/debugprotocol": "^1.61.0",
-        "adm-zip": "^0.6.0",
-        "vscode-languageclient": "10.1.0"
+        "adm-zip": "^0.6.1",
+        "vscode-languageclient": "10.1.1"
     }
 }
