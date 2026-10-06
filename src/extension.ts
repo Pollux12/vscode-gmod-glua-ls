@@ -50,10 +50,6 @@ import {
     runGmodDebugSetupWizard,
 } from './debugger/gmod_debugger/GmodDebugSetupWizard';
 import {
-    isExpectedLifecycleRequestError,
-    sendRequestWithStartupRetry,
-} from './languageServerRequests';
-import {
     enableCompletionColorPreviewHtml,
     enableCompletionColorPreviewHtmlForResult,
 } from './completionColorPreview';
@@ -132,8 +128,6 @@ const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
 const GMOD_DEBUG_CONFIG_CONTEXT_KEY = 'gluals.gmod.hasDebugConfig';
 const GMOD_DEBUG_SETUP_CONTEXT_KEY = 'gluals.gmod.needsDebugSetup';
 const GMOD_TOOL_LOG_MAX_SIZE = 1000;
-const DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES = 6;
-const DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS = 250;
 const SERVER_STATUS_NOTIFICATION = 'gluals/serverStatus';
 const LSP_PROGRESS_NOTIFICATION = '$/progress';
 const STARTUP_COMPLETE_TIMEOUT_MS = 60000;
@@ -545,7 +539,7 @@ function onDidOpenTextDocument(document: vscode.TextDocument): void {
         return;
     }
 
-    void startServer().then(() => warmupDocumentSymbolsForDocument(document));
+    void startServer();
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -570,43 +564,6 @@ function onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined): voi
 
 function isLuaDocumentForLanguageServer(document: vscode.TextDocument): boolean {
     return document.languageId === extensionContext.LANGUAGE_ID && document.uri.scheme === 'file';
-}
-
-async function warmupOpenDocumentSymbols(): Promise<void> {
-    const candidates = vscode.workspace.textDocuments.filter((document) => isLuaDocumentForLanguageServer(document));
-    await Promise.all(candidates.map((document) => warmupDocumentSymbolsForDocument(document)));
-}
-
-async function warmupDocumentSymbolsForDocument(document: vscode.TextDocument): Promise<void> {
-    const client = extensionContext.client;
-    if (!client || !isLuaDocumentForLanguageServer(document)) {
-        return;
-    }
-
-    const params = {
-        textDocument: {
-            uri: document.uri.toString(),
-        },
-    };
-
-    for (let attempt = 0; attempt <= DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES; attempt += 1) {
-        try {
-            await sendRequestWithStartupRetry<unknown[]>(client, 'textDocument/documentSymbol', params, 1, 0);
-            return;
-        } catch (error) {
-            if (!isExpectedLifecycleRequestError(error) || attempt >= DOCUMENT_SYMBOL_WARMUP_MAX_RETRIES) {
-                return;
-            }
-
-            await delay(DOCUMENT_SYMBOL_WARMUP_RETRY_DELAY_MS * (attempt + 1));
-        }
-    }
-}
-
-function delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
 }
 
 
@@ -645,9 +602,7 @@ async function runServerStart(startupRunId: number): Promise<void> {
         extensionContext.clearServerVersions();
         const startupStateHandlers = await doStartServer(startupRunId);
         throwIfStartupCancelled(startupRunId);
-        if (reportStartedServerStatus(startupStateHandlers) !== 'indexing') {
-            void warmupOpenDocumentSymbols();
-        }
+        reportStartedServerStatus(startupStateHandlers);
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
@@ -1006,6 +961,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         outputChannel: extensionContext.outputChannel,
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
         initializationOptions: initOptions,
+        textSynchronization: { delayOpenNotifications: true },
         middleware: {
             async provideCompletionItem(document, position, context, token, next) {
                 const result = await next(document, position, context, token);
