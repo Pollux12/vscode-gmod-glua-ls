@@ -2048,16 +2048,15 @@
                         "default": "",
                         "markdownDescription": "%config.emmylua.ls.globalConfigPath.description%"
                     },
-                    "lua.trace.server": {
+                    "glua.trace.server": {
                         "type": "string",
                         "enum": [
-                            "off",
                             "messages",
                             "verbose"
                         ],
-                        "default": "off",
+                        "default": "messages",
                         "scope": "window",
-                        "markdownDescription": "%config.lua.trace.server.description%"
+                        "markdownDescription": "%config.glua.trace.server.description%"
                     },
                     "gluals.ls.debugPort": {
                         "type": [

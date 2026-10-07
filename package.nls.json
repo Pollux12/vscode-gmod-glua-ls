@@ -77,7 +77,7 @@
     "config.gluals.workspace.reindexDuration.description": "Delay between changing a file and full project reindex, in milliseconds.",
     "config.gluals.workspace.useDefaultIgnores.description": "Whether to apply default ignore directories. Set to false to disable\ndefault exclusions like E2 files and test directories.",
     "config.gmod.debugger.autoUpdateRdb.description": "Automatically prompt to update `gm_rdb` and `rdb_client` (the GMod debugger modules) when an outdated version is detected during the background update check.",
-    "config.lua.trace.server.description": "Traces the communication between VSCode and the EmmyLua language server in the Output view. Default is `off`",
+    "config.glua.trace.server.description": "How much of the communication between VS Code and the GLua language server is traced to the `GLua Language Server` output while its log level is `Trace` (set it with `Developer: Set Log Level...`).",
     "debug.gmod.args": "Arguments passed to launched program",
     "debug.gmod.attach.desc": "Attach to a running Garry's Mod remote debugger",
     "debug.gmod.attach.label": "GMod: Attach to gm_rdb",
