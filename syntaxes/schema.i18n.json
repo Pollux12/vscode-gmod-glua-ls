@@ -991,7 +991,7 @@
         "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, workspace configs are merged into one global baseline\n(first workspace config wins scalar conflicts, arrays are unioned), while\nlocal workspace configs can still override file-scoped behavior."
     },
     "EmmyrcWorkspace.enableReindex": {
-        "en": "Enable full project reindex after changing a file.",
+        "en": "After a save, once edits pause, drop the files deleted from disk\noutside the editor and compute every file's diagnostics again.",
         "zh-CN": "启用重新索引。"
     },
     "EmmyrcWorkspace.encoding": {
@@ -1021,7 +1021,7 @@
         "en": "Package directories. Treat the parent directory as a `library`, but only add files from the specified directory.\neg: `/usr/local/share/lua/5.1/module`"
     },
     "EmmyrcWorkspace.reindexDuration": {
-        "en": "Delay between changing a file and full project reindex, in milliseconds.",
+        "en": "How long edits must pause before the recheck `enableReindex` runs, in\nmilliseconds (at least 1000).",
         "zh-CN": "当保存文件时，ls 将在指定毫秒后重新索引工作区。"
     },
     "EmmyrcWorkspace.useDefaultIgnores": {

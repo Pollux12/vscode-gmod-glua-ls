@@ -2593,7 +2593,7 @@
         },
         "enableReindex": {
           "default": false,
-          "description": "Enable full project reindex after changing a file.",
+          "description": "After a save, once edits pause, drop the files deleted from disk\noutside the editor and compute every file's diagnostics again.",
           "type": "boolean",
           "x-vscode-setting": true
         },
@@ -2709,7 +2709,7 @@
         },
         "reindexDuration": {
           "default": 5000,
-          "description": "Delay between changing a file and full project reindex, in milliseconds.",
+          "description": "How long edits must pause before the recheck `enableReindex` runs, in\nmilliseconds (at least 1000).",
           "format": "uint64",
           "minimum": 0,
           "type": "integer",
