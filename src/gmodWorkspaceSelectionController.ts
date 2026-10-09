@@ -13,6 +13,8 @@ import {
     GamemodeSettings,
     GmodRoot,
     ProjectsChangedParams,
+    statusText,
+    statusTooltip,
     uriBasename,
 } from './gmodWorkspaceSelection';
 
@@ -86,6 +88,13 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
     private currentRoots: GmodRoot[] = [];
     private readonly prompted = new Set<string>();
     private promptQueue: Promise<void> = Promise.resolve();
+    private readonly statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    private readonly changeEmitter = new vscode.EventEmitter<void>();
+    readonly onDidChange = this.changeEmitter.event;
+
+    constructor() {
+        this.statusBar.command = 'gluals.gmod.selectGamemode';
+    }
 
     get roots(): readonly GmodRoot[] {
         return this.currentRoots;
@@ -93,6 +102,7 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
 
     handleProjectsChanged(params: ProjectsChangedParams): void {
         this.currentRoots = params.roots ?? [];
+        this.render();
 
         for (const root of this.currentRoots) {
             if (root.needsPick && !this.prompted.has(root.folderUri)) {
@@ -104,6 +114,7 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
 
     reset(): void {
         this.currentRoots = [];
+        this.render();
     }
 
     async selectGamemode(): Promise<void> {
@@ -120,7 +131,19 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
     }
 
     dispose(): void {
-        this.reset();
+        this.statusBar.dispose();
+        this.changeEmitter.dispose();
+    }
+
+    private render(): void {
+        if (this.currentRoots.length === 0) {
+            this.statusBar.hide();
+        } else {
+            this.statusBar.text = `$(folder-library) ${statusText(this.currentRoots)}`;
+            this.statusBar.tooltip = statusTooltip(this.currentRoots);
+            this.statusBar.show();
+        }
+        this.changeEmitter.fire();
     }
 
     private async pickRoot(roots: readonly GmodRoot[]): Promise<GmodRoot | undefined> {
