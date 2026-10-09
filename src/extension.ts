@@ -1575,7 +1575,7 @@ function initializeGmodExplorer(context: vscode.ExtensionContext): void {
         return;
     }
 
-    gmodExplorerProvider = registerGmodExplorer(context);
+    gmodExplorerProvider = registerGmodExplorer(context, gmodWorkspaceSelection);
 }
 
 function initializeGmodRealmView(context: vscode.ExtensionContext): void {
