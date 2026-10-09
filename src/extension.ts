@@ -37,7 +37,6 @@ import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { gamePathToClientPath } from './debugger/gmod_debugger/GmodSourcePaths';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import { GmodUpdateScheduler } from './debugger/gmod_debugger/GmodUpdateScheduler';
-import { detectGamemodeBaseLibraries } from './gmodGamemodeBaseDetector';
 import {
     hasAnyGmodDebugConfiguration,
     runGmodDebugSetupWizard,
@@ -852,29 +851,6 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
             initOptions.gmodAnnotationsPath = annotationsPath;
             annotationVersion = gmodAnnotationManager.getAnnotationVersion();
         }
-    }
-
-    // Detect gamemode base libraries for each workspace folder
-    const gamemodeBaseLibraries: string[] = [];
-    const config = vscode.workspace.getConfiguration('gluals');
-    const autoDetectEnabled = config.get<boolean>('gmod.autoDetectGamemodeBase', true);
-    if (autoDetectEnabled && vscode.workspace.workspaceFolders) {
-        for (const folder of vscode.workspace.workspaceFolders) {
-            try {
-                throwIfStartupCancelled(startupRunId);
-                const detected = await detectGamemodeBaseLibraries(folder);
-                throwIfStartupCancelled(startupRunId);
-                gamemodeBaseLibraries.push(...detected);
-            } catch (error) {
-                if (error instanceof StartupCancelledError) {
-                    throw error;
-                }
-                // Silently skip detection failures
-            }
-        }
-    }
-    if (gamemodeBaseLibraries.length > 0) {
-        initOptions.gamemodeBaseLibraries = gamemodeBaseLibraries;
     }
 
     const clientOptions: LanguageClientOptions = {

@@ -1461,6 +1461,13 @@
     "EmmyrcGmod": {
       "description": "Garry's Mod analysis settings.",
       "properties": {
+        "activeGamemode": {
+          "description": "The gamemode a Garry's Mod folder (named `garrysmod`, or holding `addons/`\nand `gamemodes/`) loads with its addons, together with the custom\ngamemodes it derives from. `\"*\"` loads every custom gamemode. Unset, a\nsole custom gamemode loads; with several, each loads while a file in it\nis open.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "annotationsPath": {
           "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely.",
           "type": [
@@ -1562,6 +1569,11 @@
         "inferDynamicFields": {
           "default": true,
           "description": "Track fields dynamically assigned to Garry's Mod objects.",
+          "type": "boolean"
+        },
+        "loadEverything": {
+          "default": false,
+          "description": "Load a whole Garry's Mod folder, `lua/` and the built-in gamemodes\nincluded, instead of its addons and active gamemode.",
           "type": "boolean"
         },
         "network": {
@@ -2958,6 +2970,7 @@
           "methodToHook": {}
         },
         "inferDynamicFields": true,
+        "loadEverything": false,
         "network": {
           "codeLensEnabled": true,
           "completion": {

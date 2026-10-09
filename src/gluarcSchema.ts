@@ -488,6 +488,8 @@ const GMOD_FIELD_REDISTRIBUTION: Record<string, string> = {
     hookMappings: 'runtime',
     autoLoadAnnotations: 'resource',
     autoDetectGamemodeBase: 'resource',
+    activeGamemode: 'resource',
+    loadEverything: 'resource',
     annotationsPath: 'resource',
     templatePath: 'workspace',
     defaultRealm: 'diagnostics',
