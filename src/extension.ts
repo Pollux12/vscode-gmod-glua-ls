@@ -19,6 +19,8 @@ import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
+import { GmodWorkspaceSelection, PROJECTS_CHANGED_NOTIFICATION } from './gmodWorkspaceSelectionController';
+import type { ProjectsChangedParams } from './gmodWorkspaceSelection';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
@@ -107,6 +109,7 @@ let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodRdbUpdater: GmodRdbUpdater;
 let gmodClientRdbUpdater: GmodClientRdbUpdater;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
+let gmodWorkspaceSelection: GmodWorkspaceSelection;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
 const gmodErrorStores = new Map<string, GmodErrorStore>();
 let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
@@ -161,6 +164,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         context,
         vscode.window.createOutputChannel('GLua Language Server', { log: true })
     );
+    gmodWorkspaceSelection = new GmodWorkspaceSelection();
+    context.subscriptions.push(gmodWorkspaceSelection);
     gmodRdbUpdater = new GmodRdbUpdater(context);
     gmodClientRdbUpdater = new GmodClientRdbUpdater(context);
 
@@ -232,6 +237,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.runSelection', handler: runGmodRunSelection },
         { id: 'gluals.gmod.runCommand', handler: runGmodRunCommand },
         { id: 'gluals.gmod.setRealm', handler: setGmodRealm },
+        { id: 'gluals.gmod.selectGamemode', handler: () => gmodWorkspaceSelection.selectGamemode() },
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
         { id: 'gluals.gmod.scaffold.new', handler: (treeItemOrUri?: any) => scaffoldNewScriptedClass(treeItemOrUri, context) },
         { id: 'gluals.openDocumentation', handler: openDocumentation },
@@ -825,6 +831,7 @@ async function cleanupExistingClient(): Promise<void> {
     }
 
     extensionContext.client = undefined;
+    gmodWorkspaceSelection.reset();
     try {
         await existingClient.stop();
     } catch {
@@ -898,6 +905,11 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         serverOptions,
         clientOptions
     );
+    client.onNotification(PROJECTS_CHANGED_NOTIFICATION, (params: ProjectsChangedParams) => {
+        if (extensionContext.client === client) {
+            gmodWorkspaceSelection.handleProjectsChanged(params);
+        }
+    });
     const startupStateHandlers = registerLanguageClientStateHandlers(client);
     activeStartupStateHandlers = { client, handlers: startupStateHandlers };
     extensionContext.client = client;
