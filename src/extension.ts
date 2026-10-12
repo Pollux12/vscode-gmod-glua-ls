@@ -179,7 +179,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Initialize extension context
     extensionContext = new EmmyContext(
         isDevelopmentMode(context),
-        context
+        context,
+        vscode.window.createOutputChannel('GLua Language Server', { log: true })
     );
     gmodRdbUpdater = new GmodRdbUpdater(context);
     gmodClientRdbUpdater = new GmodClientRdbUpdater(context);
