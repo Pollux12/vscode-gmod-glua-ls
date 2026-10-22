@@ -53,10 +53,6 @@ export const localePathDefault = join(__dirname, "..", "package.nls.json");
 export const readLocaleDefault = () => readJson(localePathDefault);
 export const writeLocaleDefault = (data) => writeJson(localePathDefault, data);
 
-export const localePathZhCn = join(__dirname, "..", "package.nls.zh-cn.json");
-export const readLocaleZhCn = () => readJson(localePathZhCn);
-export const writeLocaleZhCn = (data) => writeJson(localePathZhCn, data);
-
 export const packagePath = join(__dirname, "..", "package.json");
 export const readPackage = () => readJson(packagePath);
 export const writePackage = (data) => writeJson(packagePath, data);
