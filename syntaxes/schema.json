@@ -543,16 +543,6 @@
     "EmmyrcDiagnostic": {
       "description": "Represents the diagnostic configuration for Emmyrc.",
       "properties": {
-        "diagnosticInterval": {
-          "description": "Delay between opening/changing a file and scanning it for errors, in milliseconds.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ],
-          "x-vscode-setting": true
-        },
         "disable": {
           "default": [],
           "description": "A list of diagnostic codes that are disabled.",
@@ -1474,7 +1464,7 @@
           ]
         },
         "autoDetectGamemodeBase": {
-          "description": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\nSet to `false` to disable this detection.",
+          "description": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\n`base` and `sandbox` come from the GMod annotations and are never added.\nSet to `false` to disable this detection.",
           "type": [
             "boolean",
             "null"
@@ -2832,7 +2822,6 @@
     "diagnostics": {
       "$ref": "#/$defs/EmmyrcDiagnostic",
       "default": {
-        "diagnosticInterval": 500,
         "disable": [],
         "enable": true,
         "enables": [],

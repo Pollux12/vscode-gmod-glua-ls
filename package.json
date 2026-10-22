@@ -1287,23 +1287,8 @@
                 }
             },
             {
-                "title": "Diagnostics",
-                "order": 3,
-                "properties": {
-                    "gluals.diagnostics.diagnosticInterval": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "editPresentation": "singlelineText",
-                        "default": null,
-                        "markdownDescription": "%config.gluals.diagnostics.diagnosticInterval.description%"
-                    }
-                }
-            },
-            {
                 "title": "Document Color",
-                "order": 4,
+                "order": 3,
                 "properties": {
                     "gluals.documentColor.enable": {
                         "type": [
@@ -1332,7 +1317,7 @@
             },
             {
                 "title": "Hint",
-                "order": 5,
+                "order": 4,
                 "properties": {
                     "gluals.hint.enable": {
                         "type": [
@@ -1554,7 +1539,7 @@
             },
             {
                 "title": "Hover",
-                "order": 6,
+                "order": 5,
                 "properties": {
                     "gluals.hover.enable": {
                         "type": [
@@ -1583,7 +1568,7 @@
             },
             {
                 "title": "Inline Values",
-                "order": 7,
+                "order": 6,
                 "properties": {
                     "gluals.inlineValues.enable": {
                         "type": [
@@ -1612,7 +1597,7 @@
             },
             {
                 "title": "References",
-                "order": 8,
+                "order": 7,
                 "properties": {
                     "gluals.references.enable": {
                         "type": [
@@ -1687,7 +1672,7 @@
             },
             {
                 "title": "Semantic Tokens",
-                "order": 9,
+                "order": 8,
                 "properties": {
                     "gluals.semanticTokens.enable": {
                         "type": [
@@ -1739,7 +1724,7 @@
             },
             {
                 "title": "Workspace",
-                "order": 10,
+                "order": 9,
                 "properties": {
                     "gluals.workspace.enableReindex": {
                         "type": [
@@ -1823,7 +1808,7 @@
             },
             {
                 "title": "Strict",
-                "order": 11,
+                "order": 10,
                 "properties": {
                     "gluals.strict.inferredTypeMismatch": {
                         "type": [
@@ -1852,7 +1837,7 @@
             },
             {
                 "title": "GMod",
-                "order": 12,
+                "order": 11,
                 "properties": {
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
@@ -1975,7 +1960,7 @@
             },
             {
                 "title": "Decorations",
-                "order": 13,
+                "order": 12,
                 "properties": {
                     "gluals.decorations.globalUnderline": {
                         "type": "boolean",
@@ -2006,7 +1991,7 @@
             },
             {
                 "title": "Misc",
-                "order": 14,
+                "order": 13,
                 "properties": {
                     "gluals.language.completeAnnotation": {
                         "type": "boolean",
@@ -2023,7 +2008,7 @@
             },
             {
                 "title": "Language Server",
-                "order": 15,
+                "order": 14,
                 "properties": {
                     "gluals.ls.startParameters": {
                         "type": "array",
