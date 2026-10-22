@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { relativeWithin } from './GmodSourcePaths'
 
 export const GMOD_REALMS = ['server', 'client', 'shared'] as const
 export type GmodRealm = (typeof GMOD_REALMS)[number]
@@ -266,13 +267,8 @@ export class GmodDebugControlService {
     const resolved = path.isAbsolute(inputPath)
       ? path.resolve(inputPath)
       : (this.workspaceRoot ? path.resolve(this.workspaceRoot, inputPath) : path.resolve(inputPath))
-    // Prevent path traversal outside workspace root
-    if (this.workspaceRoot) {
-      const normalizedRoot = path.resolve(this.workspaceRoot)
-      const normalizedResolved = path.resolve(resolved)
-      if (!normalizedResolved.startsWith(normalizedRoot + path.sep) && normalizedResolved !== normalizedRoot) {
-        throw new Error(`Path escapes workspace root: ${inputPath}`)
-      }
+    if (this.workspaceRoot && relativeWithin(this.workspaceRoot, resolved) === undefined) {
+      throw new Error(`Path escapes workspace root: ${inputPath}`)
     }
     return resolved
   }
