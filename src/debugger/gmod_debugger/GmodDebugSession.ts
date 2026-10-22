@@ -44,6 +44,7 @@ import {
   GmodRealm,
   normalizeGmodRealm,
 } from './GmodDebugControlService'
+import { GmodSourceMapping } from './GmodSourcePaths'
 
 export interface LaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
@@ -192,7 +193,7 @@ export class GmodDebugSession extends DebugSession {
   private _debuggee_protocol_version?: string
   private _debuggee_module_version?: string
   private _controlService?: GmodDebugControlService
-  private _sourceRoot?: string
+  private _sourceMapping: GmodSourceMapping = {}
   private _configurationDoneReceived = false
   private _serverInitCompleted = false
   private _isPaused = false
@@ -319,8 +320,8 @@ export class GmodDebugSession extends DebugSession {
       const sourceRoot = args.sourceRoot ? args.sourceRoot : cwd
 
       this.setupSourceEnv(sourceRoot, args.sourceFileMap)
-      this._sourceRoot = sourceRoot
-      this.getControlService(args.realm, sourceRoot)
+      this._sourceMapping = { sourceRoot, sourceFileMap: args.sourceFileMap }
+      this.getControlService(args.realm)
 
       const programArgs = args.args ? args.args : []
 
@@ -418,8 +419,8 @@ export class GmodDebugSession extends DebugSession {
       this.sendEvent(new DebugEvent('gmod.errors.clear'))
 
       this.setupSourceEnv(args.sourceRoot, args.sourceFileMap)
-      this._sourceRoot = args.sourceRoot
-      this.getControlService(args.realm, args.sourceRoot)
+      this._sourceMapping = { sourceRoot: args.sourceRoot, sourceFileMap: args.sourceFileMap }
+      this.getControlService(args.realm)
 
       const port = args.port ? args.port : 21111
       const host = args.host === 'localhost'
@@ -1631,7 +1632,7 @@ export class GmodDebugSession extends DebugSession {
     return frames
   }
 
-  private getControlService(initialRealm?: GmodRealm, sourceRoot?: string): GmodDebugControlService {
+  private getControlService(initialRealm?: GmodRealm): GmodDebugControlService {
     const realm = initialRealm != null ? normalizeGmodRealm(initialRealm) : undefined
     if (!this._controlService) {
       this._controlService = new GmodDebugControlService(
@@ -1668,13 +1669,13 @@ export class GmodDebugSession extends DebugSession {
           },
         },
         realm ?? 'server',
-        sourceRoot ?? this._sourceRoot
+        this._sourceMapping
       )
     } else {
       if (realm) {
         this._controlService.setRealm(realm)
       }
-      this._controlService.setWorkspaceRoot(sourceRoot ?? this._sourceRoot)
+      this._controlService.setSourceMapping(this._sourceMapping)
     }
     return this._controlService
   }

@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { relativeWithin } from './GmodSourcePaths'
+import { clientPathToGamePath, gamePathToLuaPath, GmodSourceMapping } from './GmodSourcePaths'
 
 export const GMOD_REALMS = ['server', 'client', 'shared'] as const
 export type GmodRealm = (typeof GMOD_REALMS)[number]
@@ -83,20 +83,20 @@ export function formatGmodConsoleOutput(params: GmodConsoleOutput): string {
 
 export class GmodDebugControlService {
   private realm: GmodRealm
-  private workspaceRoot?: string
+  private sourceMapping: GmodSourceMapping
   private seq = 0
 
   public constructor(
     private readonly transport: GmodControlTransport,
     initialRealm: GmodRealm = 'server',
-    workspaceRoot?: string
+    sourceMapping: GmodSourceMapping = {}
   ) {
     this.realm = initialRealm
-    this.workspaceRoot = workspaceRoot
+    this.sourceMapping = sourceMapping
   }
 
-  public setWorkspaceRoot(workspaceRoot?: string) {
-    this.workspaceRoot = workspaceRoot
+  public setSourceMapping(sourceMapping: GmodSourceMapping) {
+    this.sourceMapping = sourceMapping
   }
 
   public getRealm(): GmodRealm {
@@ -166,65 +166,25 @@ export class GmodDebugControlService {
       }
 
       case 'runFile': {
-        const inputPath = typeof args.path === 'string' ? args.path : typeof args.file === 'string' ? args.file : ''
-        if (inputPath.trim().length === 0) {
-          diagnostics.push({ level: 'error', message: 'File path is required.' })
+        const luaPath = this.resolveLuaFile(args, diagnostics)
+        if (luaPath === undefined) {
           return { ok: false, command, realm, correlationId, diagnostics }
         }
-        const resolved = this.resolvePath(inputPath)
-        if (!fs.existsSync(resolved)) {
-          diagnostics.push({ level: 'error', message: `File not found: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-        const stat = fs.statSync(resolved)
-        if (!stat.isFile()) {
-          diagnostics.push({ level: 'error', message: `Not a file: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-        if (stat.size === 0) {
-          diagnostics.push({ level: 'warning', message: `File is empty: ${resolved}` })
-        }
-        const relativeLuaPath = this.toLuaRelativePath(resolved)
-        if (path.isAbsolute(relativeLuaPath)) {
-          diagnostics.push({ level: 'error', message: `File must be inside a lua/ directory: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-
-        request = `run_file(${realm}) ${relativeLuaPath}`
-        await this.transport.runFile(relativeLuaPath, realm)
-        diagnostics.push({ level: 'info', message: `File dispatched: ${relativeLuaPath}` })
+        request = `run_file(${realm}) ${luaPath}`
+        await this.transport.runFile(luaPath, realm)
+        diagnostics.push({ level: 'info', message: `File dispatched: ${luaPath}` })
         break
       }
 
       case 'refreshFile': {
         realm = 'server'
-        const inputPath = typeof args.path === 'string' ? args.path : typeof args.file === 'string' ? args.file : ''
-        if (inputPath.trim().length === 0) {
-          diagnostics.push({ level: 'error', message: 'File path is required.' })
+        const luaPath = this.resolveLuaFile(args, diagnostics)
+        if (luaPath === undefined) {
           return { ok: false, command, realm, correlationId, diagnostics }
         }
-
-        const resolved = this.resolvePath(inputPath)
-        if (!fs.existsSync(resolved)) {
-          diagnostics.push({ level: 'error', message: `File not found: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-
-        const stat = fs.statSync(resolved)
-        if (!stat.isFile()) {
-          diagnostics.push({ level: 'error', message: `Not a file: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-
-        const relativeLuaPath = this.toLuaRelativePath(resolved)
-        if (path.isAbsolute(relativeLuaPath)) {
-          diagnostics.push({ level: 'error', message: `File must be inside a lua/ directory: ${resolved}` })
-          return { ok: false, command, realm, correlationId, diagnostics }
-        }
-
-        request = `refresh_file(server) ${relativeLuaPath}`
-        await this.transport.refreshFile(relativeLuaPath)
-        diagnostics.push({ level: 'info', message: `Refresh dispatched: ${relativeLuaPath}` })
+        request = `refresh_file(server) ${luaPath}`
+        await this.transport.refreshFile(luaPath)
+        diagnostics.push({ level: 'info', message: `Refresh dispatched: ${luaPath}` })
         break
       }
 
@@ -263,28 +223,41 @@ export class GmodDebugControlService {
     return normalizeGmodRealm(realm)
   }
 
-  private resolvePath(inputPath: string): string {
-    const resolved = path.isAbsolute(inputPath)
-      ? path.resolve(inputPath)
-      : (this.workspaceRoot ? path.resolve(this.workspaceRoot, inputPath) : path.resolve(inputPath))
-    if (this.workspaceRoot && relativeWithin(this.workspaceRoot, resolved) === undefined) {
-      throw new Error(`Path escapes workspace root: ${inputPath}`)
-    }
-    return resolved
-  }
-
-  private toLuaRelativePath(filePath: string): string {
-    const normalized = filePath.replace(/\\/g, '/')
-    if (normalized.toLowerCase().startsWith('lua/')) {
-      return normalized.slice(4)
+  private resolveLuaFile(args: Record<string, unknown>, diagnostics: GmodControlDiagnostic[]): string | undefined {
+    const inputPath = typeof args.path === 'string' ? args.path : typeof args.file === 'string' ? args.file : ''
+    if (inputPath.trim().length === 0) {
+      diagnostics.push({ level: 'error', message: 'File path is required.' })
+      return undefined
     }
 
-    const marker = '/lua/'
-    const markerIndex = normalized.toLowerCase().lastIndexOf(marker)
-    if (markerIndex >= 0) {
-      return normalized.slice(markerIndex + marker.length)
+    const { sourceRoot } = this.sourceMapping
+    const resolved = sourceRoot === undefined ? path.resolve(inputPath) : path.resolve(sourceRoot, inputPath)
+    if (!fs.existsSync(resolved)) {
+      diagnostics.push({ level: 'error', message: `File not found: ${resolved}` })
+      return undefined
+    }
+    const stat = fs.statSync(resolved)
+    if (!stat.isFile()) {
+      diagnostics.push({ level: 'error', message: `Not a file: ${resolved}` })
+      return undefined
+    }
+    if (stat.size === 0) {
+      diagnostics.push({ level: 'warning', message: `File is empty: ${resolved}` })
     }
 
-    return normalized
+    const gamePath = clientPathToGamePath(resolved, this.sourceMapping)
+    if (gamePath === undefined) {
+      diagnostics.push({ level: 'error', message: `File is outside sourceRoot and every sourceFileMap folder: ${resolved}` })
+      return undefined
+    }
+    const luaPath = gamePathToLuaPath(gamePath)
+    if (luaPath === undefined) {
+      diagnostics.push({
+        level: 'error',
+        message: `File is not under lua/, gamemodes/, addons/<name>/lua/ or addons/<name>/gamemodes/: ${gamePath}`,
+      })
+      return undefined
+    }
+    return luaPath
   }
 }
