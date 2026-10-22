@@ -41,15 +41,6 @@ export interface GmodControlResult {
   diagnostics: GmodControlDiagnostic[]
 }
 
-export interface GmodConsoleOutput {
-  channel_id?: number
-  group?: string
-  severity?: number
-  source?: string
-  timestamp?: number | string
-  message?: string
-}
-
 export function normalizeGmodRealm(realm: unknown): GmodRealm {
   if (typeof realm === 'string') {
     const lowered = realm.toLowerCase()
@@ -58,27 +49,6 @@ export function normalizeGmodRealm(realm: unknown): GmodRealm {
     }
   }
   return 'server'
-}
-
-function formatTimestamp(timestamp?: number | string): string {
-  if (typeof timestamp === 'string' && timestamp.trim().length > 0) {
-    return timestamp
-  }
-  const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date()
-  const hh = `${date.getHours()}`.padStart(2, '0')
-  const mm = `${date.getMinutes()}`.padStart(2, '0')
-  const ss = `${date.getSeconds()}`.padStart(2, '0')
-  const ms = `${date.getMilliseconds()}`.padStart(3, '0')
-  return `${hh}:${mm}:${ss}.${ms}`
-}
-
-export function formatGmodConsoleOutput(params: GmodConsoleOutput): string {
-  const source = params.source ?? params.group ?? (params.channel_id != null ? `channel-${params.channel_id}` : 'console')
-  const severity = params.severity != null ? `sev:${params.severity}` : 'sev:?'
-  const tag = params.channel_id != null ? `ch:${params.channel_id}` : 'ch:?'
-  const message = params.message ?? ''
-  const line = `[${formatTimestamp(params.timestamp)}] [${source}] [${tag}] [${severity}] ${message}`
-  return line.endsWith('\n') ? line : `${line}\n`
 }
 
 export class GmodDebugControlService {

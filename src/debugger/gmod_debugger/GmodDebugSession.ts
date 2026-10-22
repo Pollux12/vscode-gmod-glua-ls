@@ -37,8 +37,8 @@ import {
   SetEntityPropertyParams,
   SetVarRequest,
 } from './lrdb/Client'
+import { GmodConsoleLineAssembler } from './GmodConsoleOutput'
 import {
-  formatGmodConsoleOutput,
   GmodControlCommand,
   GmodControlResult,
   GmodDebugControlService,
@@ -194,6 +194,16 @@ export class GmodDebugSession extends DebugSession {
   private _debuggee_protocol_version?: string
   private _debuggee_module_version?: string
   private _controlService?: GmodDebugControlService
+  private readonly _consoleOutput = new GmodConsoleLineAssembler((line) => {
+    this.sendEvent(new OutputEvent(line.ansi, 'stdout'))
+    this.sendEvent(new DebugEvent('gmod.output', {
+      message: line.text,
+      source: line.source,
+      severity: line.severity,
+      timestamp: line.timestamp,
+      realm: this._controlService?.getRealm() ?? 'server',
+    }))
+  })
   private _sourceMapping: GmodSourceMapping = {}
   private _configurationDoneReceived = false
   private _serverInitCompleted = false
@@ -446,6 +456,7 @@ export class GmodDebugSession extends DebugSession {
       })
 
       this._debug_client.onClose.on(() => {
+        this._consoleOutput.flush()
         this.sendEvent(new OutputEvent(`Debugger disconnected.\n`))
         this.sendEvent(new TerminatedEvent())
       })
@@ -1042,6 +1053,7 @@ export class GmodDebugSession extends DebugSession {
         delete this._debug_server_process
       }
 
+      this._consoleOutput.flush()
       if (this._debug_client) {
         this._debug_client.end()
         delete this._debug_client
@@ -1294,21 +1306,7 @@ export class GmodDebugSession extends DebugSession {
           break
 
         case 'output':
-          const formatted = formatGmodConsoleOutput(event.params)
-          const color = event.params.color ?? { r: 255, g: 255, b: 255, a: 255 }
-          this.sendEvent(
-            new OutputEvent(
-              `\u001b[38;2;${color.r};${color.g};${color.b}m${formatted}\u001b[0m`,
-              'stdout'
-            )
-          )
-          this.sendEvent(new DebugEvent('gmod.output', {
-            message: formatted,
-            source: event.params.source ?? event.params.group ?? 'console',
-            severity: event.params.severity,
-            timestamp: event.params.timestamp,
-            realm: this._controlService?.getRealm() ?? 'server',
-          }))
+          this._consoleOutput.push(event.params)
           break
 
         case 'error':
