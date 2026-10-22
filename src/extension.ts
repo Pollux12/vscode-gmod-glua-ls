@@ -274,7 +274,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gmodEntityExplorer.searchTable', handler: searchGmodEntityExplorerTable },
         { id: 'gmodEntityExplorer.searchNetworkVars', handler: searchGmodEntityExplorerNetworkVars },
         { id: 'gmodEntityExplorer.editProperty', handler: editGmodEntityExplorerProperty },
-        { id: 'gmodEntityExplorer.loadMore', handler: loadMoreGmodEntityExplorer },
         { id: 'gluals.gmod.explorer.copyRelativePath', handler: copyGmodExplorerRelativePath },
         { id: 'gluals.gmod.explorer.copyAbsolutePath', handler: copyGmodExplorerAbsolutePath },
         { id: 'gluals.gmod.explorer.copyClassName', handler: copyGmodExplorerClassName },
@@ -1946,14 +1945,6 @@ async function editGmodEntityExplorerProperty(item?: EntityTreeItem): Promise<vo
     }
 
     await gmodEntityExplorerProvider.editProperty(item.data.entityIndex, item.data.property, editableValue);
-}
-
-async function loadMoreGmodEntityExplorer(): Promise<void> {
-    if (!gmodEntityExplorerProvider) {
-        return;
-    }
-
-    await gmodEntityExplorerProvider.loadMore();
 }
 
 async function configureGmodDebugger(): Promise<void> {

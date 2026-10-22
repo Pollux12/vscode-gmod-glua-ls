@@ -263,11 +263,6 @@
                 "icon": "$(edit)"
             },
             {
-                "command": "gmodEntityExplorer.loadMore",
-                "title": "%command.gmodEntityExplorer.loadMore.title%",
-                "category": "GLuaLS"
-            },
-            {
                 "command": "gluals.gmod.explorer.copyRelativePath",
                 "title": "Explorer: Copy Relative Path",
                 "category": "GLuaLS",
