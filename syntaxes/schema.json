@@ -444,6 +444,7 @@
       ]
     },
     "EmmyrcCodeAction": {
+      "description": "Code action settings.",
       "properties": {
         "insertSpace": {
           "default": false,
@@ -455,6 +456,7 @@
       "type": "object"
     },
     "EmmyrcCodeLens": {
+      "description": "Code lens settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -592,6 +594,7 @@
       "type": "object"
     },
     "EmmyrcDoc": {
+      "description": "Documentation comment settings.",
       "properties": {
         "knownTags": {
           "default": [],
@@ -632,6 +635,7 @@
       "type": "object"
     },
     "EmmyrcDocumentColor": {
+      "description": "Color preview and color picker settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -1455,6 +1459,7 @@
       "type": "string"
     },
     "EmmyrcGmod": {
+      "description": "Garry's Mod analysis settings.",
       "properties": {
         "annotationsPath": {
           "description": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely.",
@@ -1479,15 +1484,18 @@
         },
         "defaultRealm": {
           "$ref": "#/$defs/EmmyrcGmodRealm",
-          "default": "shared"
+          "default": "shared",
+          "description": "Realm assumed for files with no realm signal."
         },
         "detectRealmFromCalls": {
+          "description": "Infer realm from calls such as `include`, `AddCSLuaFile`, `IncludeCS` and annotated wrappers. Defaults to `true`.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "detectRealmFromFilename": {
+          "description": "Detect realm from `cl_`, `sv_` and `sh_` filename prefixes and `client`/`server` parent folders. Defaults to `true`.",
           "type": [
             "boolean",
             "null"
@@ -1495,10 +1503,12 @@
         },
         "dynamicFieldsGlobal": {
           "default": true,
+          "description": "Share inferred dynamic fields across all files. Set `false` to scope them per file.",
           "type": "boolean"
         },
         "enabled": {
           "default": true,
+          "description": "Enable Garry's Mod analysis. Disabling it is unsupported and only meant for isolating issues.",
           "type": "boolean"
         },
         "fileParamDefaults": {
@@ -1551,6 +1561,7 @@
         },
         "inferDynamicFields": {
           "default": true,
+          "description": "Track fields dynamically assigned to Garry's Mod objects.",
           "type": "boolean"
         },
         "network": {
@@ -1759,16 +1770,19 @@
       "type": "object"
     },
     "EmmyrcGmodHookMappings": {
+      "description": "Custom hook detection rules.",
       "properties": {
         "emitterToHook": {
           "additionalProperties": {
             "type": "string"
           },
           "default": {},
+          "description": "Map custom emitter functions to the hook names they call.",
           "type": "object"
         },
         "methodPrefixes": {
           "default": [],
+          "description": "Extra class prefixes whose methods are treated as gamemode hooks, such as `COMPONENT`.",
           "items": {
             "type": "string"
           },
@@ -1779,15 +1793,18 @@
             "type": "string"
           },
           "default": {},
+          "description": "Map method names to hook names, such as `{ \"Think\": \"Think\" }`.",
           "type": "object"
         }
       },
       "type": "object"
     },
     "EmmyrcGmodNetwork": {
+      "description": "Network message analysis settings.",
       "properties": {
         "codeLensEnabled": {
           "default": true,
+          "description": "Show code lens actions on net message receivers.",
           "type": "boolean"
         },
         "completion": {
@@ -1799,25 +1816,30 @@
         },
         "enabled": {
           "default": true,
+          "description": "Enable network message flow analysis.",
           "type": "boolean"
         }
       },
       "type": "object"
     },
     "EmmyrcGmodNetworkCompletion": {
+      "description": "Network completion settings.",
       "properties": {
         "mismatchHints": {
           "default": true,
+          "description": "Mark suggestions whose read does not match the expected write.",
           "type": "boolean"
         },
         "smartReadSuggestions": {
           "default": true,
+          "description": "Suggest `net.Read*` calls in the order the sender writes them inside receive callbacks.",
           "type": "boolean"
         }
       },
       "type": "object"
     },
     "EmmyrcGmodOutline": {
+      "description": "Document outline settings.",
       "properties": {
         "verbosity": {
           "$ref": "#/$defs/EmmyrcGmodOutlineVerbosity",
@@ -1856,8 +1878,10 @@
       "type": "string"
     },
     "EmmyrcGmodScriptedClassDefinition": {
+      "description": "A scripted class group, such as entities or weapons.",
       "properties": {
         "aliases": {
+          "description": "Additional global names that refer to the same class.",
           "items": {
             "type": "string"
           },
@@ -1867,6 +1891,7 @@
           ]
         },
         "classGlobal": {
+          "description": "Global variable the class is authored through, such as `ENT` or `SWEP`.",
           "type": [
             "string",
             "null"
@@ -1880,12 +1905,14 @@
           ]
         },
         "disabled": {
+          "description": "Turn this definition off, such as a built-in group.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "exclude": {
+          "description": "Glob patterns excluded from this group only.",
           "items": {
             "type": "string"
           },
@@ -1895,6 +1922,7 @@
           ]
         },
         "fixedClassName": {
+          "description": "Class name shared by every matching file instead of one derived from the path.",
           "type": [
             "string",
             "null"
@@ -1908,15 +1936,18 @@
           ]
         },
         "icon": {
+          "description": "VS Code icon ID shown in the Class Explorer.",
           "type": [
             "string",
             "null"
           ]
         },
         "id": {
+          "description": "Name used to change or remove this entry, including built-in groups.",
           "type": "string"
         },
         "include": {
+          "description": "Glob patterns for files in this group.",
           "items": {
             "type": "string"
           },
@@ -1926,24 +1957,28 @@
           ]
         },
         "isGlobalSingleton": {
+          "description": "Merge every matching file into one workspace-wide global class.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "label": {
+          "description": "Display name in the Class Explorer and settings UI.",
           "type": [
             "string",
             "null"
           ]
         },
         "parentId": {
+          "description": "Parent definition ID for nested grouping in the Class Explorer.",
           "type": [
             "string",
             "null"
           ]
         },
         "path": {
+          "description": "Path segments that mark a class folder, such as `entities`; the folder or file after them names the class.",
           "items": {
             "type": "string"
           },
@@ -1953,6 +1988,7 @@
           ]
         },
         "rootDir": {
+          "description": "Default folder, relative to the workspace, that new classes are scaffolded into.",
           "type": [
             "string",
             "null"
@@ -1966,9 +2002,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Files created by the scaffold action."
         },
         "superTypes": {
+          "description": "Types the class inherits members and hooks from, such as `GM`.",
           "items": {
             "type": "string"
           },
@@ -1984,9 +2022,11 @@
       "type": "object"
     },
     "EmmyrcGmodScriptedClassScaffold": {
+      "description": "Files the scaffold action creates for a new class.",
       "properties": {
         "files": {
           "default": [],
+          "description": "Files to create for each new class.",
           "items": {
             "$ref": "#/$defs/EmmyrcGmodScriptedClassScaffoldFile"
           },
@@ -1996,11 +2036,14 @@
       "type": "object"
     },
     "EmmyrcGmodScriptedClassScaffoldFile": {
+      "description": "One scaffolded file.",
       "properties": {
         "path": {
+          "description": "Output path relative to the target folder; `{{name}}` is replaced with the class name.",
           "type": "string"
         },
         "template": {
+          "description": "Template file name, looked up in `gmod.templatePath` before the built-in templates.",
           "type": "string"
         }
       },
@@ -2021,6 +2064,7 @@
       ]
     },
     "EmmyrcGmodScriptedClassScopes": {
+      "description": "Scripted class groups used for class analysis, the Class Explorer and scaffolding.",
       "properties": {
         "include": {
           "default": [
@@ -2189,6 +2233,7 @@
               "rootDir": "gamemodes"
             }
           ],
+          "description": "Scripted class definitions, or glob strings, that decide which files are analyzed as scripted classes.",
           "items": {
             "$ref": "#/$defs/EmmyrcGmodScriptedClassScopeEntry"
           },
@@ -2199,19 +2244,23 @@
       "type": "object"
     },
     "EmmyrcGmodVgui": {
+      "description": "VGUI panel support.",
       "properties": {
         "codeLensEnabled": {
           "default": true,
+          "description": "Show code lens actions on `vgui.Register` calls.",
           "type": "boolean"
         },
         "inlayHintEnabled": {
           "default": false,
+          "description": "Show inlay hints for panel types inferred from `panel:Add` calls.",
           "type": "boolean"
         }
       },
       "type": "object"
     },
     "EmmyrcHover": {
+      "description": "Hover settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -2223,6 +2272,7 @@
       "type": "object"
     },
     "EmmyrcInlayHint": {
+      "description": "Inlay hint settings.",
       "properties": {
         "closingEndHint": {
           "default": true,
@@ -2284,6 +2334,7 @@
       "type": "object"
     },
     "EmmyrcInlineValues": {
+      "description": "Debugger inline value settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -2358,6 +2409,7 @@
       "type": "string"
     },
     "EmmyrcReference": {
+      "description": "Find-references settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -2381,6 +2433,7 @@
       "type": "object"
     },
     "EmmyrcReformat": {
+      "description": "Formatter settings.",
       "properties": {
         "configPrecedence": {
           "$ref": "#/$defs/EmmyrcFormatConfigPrecedence",
@@ -2439,9 +2492,11 @@
       "type": "object"
     },
     "EmmyrcResource": {
+      "description": "Resource path settings.",
       "properties": {
         "paths": {
           "default": [],
+          "description": "File paths used to resolve document links (ctrl+click on string literals). Not used for module indexing.",
           "items": {
             "type": "string"
           },
@@ -2451,6 +2506,7 @@
       "type": "object"
     },
     "EmmyrcRuntime": {
+      "description": "Lua runtime settings.",
       "properties": {
         "extensions": {
           "default": [],
@@ -2501,6 +2557,7 @@
       "type": "object"
     },
     "EmmyrcSemanticToken": {
+      "description": "Semantic highlighting settings.",
       "properties": {
         "enable": {
           "default": true,
@@ -2529,6 +2586,7 @@
       "type": "string"
     },
     "EmmyrcStrict": {
+      "description": "Strictness settings for type matching and module resolution.",
       "properties": {
         "allowNullableAsNonNullable": {
           "default": true,
@@ -2574,6 +2632,7 @@
       "type": "object"
     },
     "EmmyrcWorkspace": {
+      "description": "Workspace roots, libraries, ignores and file handling.",
       "properties": {
         "enableIsolation": {
           "default": false,
@@ -2723,11 +2782,14 @@
       "type": "object"
     },
     "EmmyrcWorkspaceModuleMap": {
+      "description": "A require path rewrite rule.",
       "properties": {
         "pattern": {
+          "description": "Regex matched against the require path.",
           "type": "string"
         },
         "replace": {
+          "description": "Replacement path; may use capture groups such as `$1`.",
           "type": "string"
         }
       },
