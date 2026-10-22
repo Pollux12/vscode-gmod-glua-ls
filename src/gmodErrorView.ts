@@ -121,6 +121,8 @@ export class GmodErrorTreeItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('warning');
         this.tooltip = [
             error.message,
+            ...(error.stackTrace ?? []).map((frame) => `    ${frame}`),
+            '',
             `Source: ${error.source}`,
             `Fingerprint: ${error.fingerprint}`,
             `First seen: ${error.firstSeen.toLocaleString()}`,

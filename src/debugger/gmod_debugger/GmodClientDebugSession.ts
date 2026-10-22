@@ -18,6 +18,7 @@ import { readFileSync } from 'fs'
 import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
+import { parseGmodLuaError } from './GmodLuaError'
 import {
   EvalRequest,
   ExitNotify,
@@ -950,16 +951,12 @@ export class GmodClientDebugSession extends DebugSession {
         }
 
         case 'error': {
-          const message = typeof event.params.message === 'string' && event.params.message.trim().length > 0
-            ? event.params.message
-            : 'Unknown Lua error'
+          const { message, stackTrace } = parseGmodLuaError(event.params.message, event.params.raw_message)
           const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
             ? event.params.fingerprint
             : `error:${message}`
           const source = event.params.source === 'console' ? 'console' : 'lua'
           const count = Number.isFinite(event.params.count) ? Math.max(1, Math.floor(event.params.count)) : 1
-          const rawMessage = typeof event.params.raw_message === 'string' ? event.params.raw_message : ''
-          const stackTrace = this.parseGmodErrorStackTrace(rawMessage)
 
           this.sendEvent(new OutputEvent(`[Client] [${source} error ${count}x] ${message}\n`, 'stderr'))
           this.sendEvent(new DebugEvent('gmod.error', {
@@ -1049,18 +1046,5 @@ export class GmodClientDebugSession extends DebugSession {
     }
 
     return undefined
-  }
-
-  private parseGmodErrorStackTrace(rawMessage: string): string[] {
-    if (rawMessage.trim().length === 0) return []
-    const frames: string[] = []
-    const lines = rawMessage.split(/\r?\n/)
-    for (const rawLine of lines) {
-      const line = rawLine.trim()
-      if (line.length === 0) continue
-      if (line === '[ERROR]' || /^stack traceback:\s*$/i.test(line)) continue
-      if (/^\d+\.\s+/.test(line)) frames.push(line)
-    }
-    return frames
   }
 }
