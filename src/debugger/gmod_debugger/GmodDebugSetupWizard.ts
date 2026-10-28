@@ -21,25 +21,21 @@ const LEGACY_LOADER_START_MARKER = '-- gm_rdb debugger loader (added by GLuaLS)'
 const LEGACY_LOADER_END_MARKER = '-- end gm_rdb';
 const MAC_GMOD_APP_BUNDLE_NAMES = ['garrysmod.app', 'garrys mod.app'] as const;
 
-const GM_RDB_PLATFORM_DLLS: Record<string, string> = {
-    'Windows 64-bit': 'gmsv_rdb_win64.dll',
-    'Windows 32-bit': 'gmsv_rdb_win32.dll',
-    'Linux 64-bit': 'gmsv_rdb_linux64.dll',
-    'Linux 32-bit': 'gmsv_rdb_linux.dll',
-    'macOS 64-bit (experimental)': 'gmsv_rdb_osx64.dll',
+const GM_RDB_PLATFORM_DLLS: Record<string, readonly string[]> = {
+    'Windows (64-bit & 32-bit)': ['gmsv_rdb_win64.dll', 'gmsv_rdb_win32.dll'],
+    'Linux (64-bit & 32-bit)': ['gmsv_rdb_linux64.dll', 'gmsv_rdb_linux.dll'],
+    'macOS 64-bit (experimental)': ['gmsv_rdb_osx64.dll'],
 };
 
-const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS);
+const ALL_RDB_DLLS = Object.values(GM_RDB_PLATFORM_DLLS).flat();
 
-const GM_RDB_CLIENT_PLATFORM_DLLS: Record<string, string> = {
-    'Windows 64-bit': 'gmcl_rdb_win64.dll',
-    'Windows 32-bit': 'gmcl_rdb_win32.dll',
-    'Linux 64-bit': 'gmcl_rdb_linux64.dll',
-    'Linux 32-bit': 'gmcl_rdb_linux.dll',
-    'macOS 64-bit (experimental)': 'gmcl_rdb_osx64.dll',
+const GM_RDB_CLIENT_PLATFORM_DLLS: Record<string, readonly string[]> = {
+    'Windows (64-bit & 32-bit)': ['gmcl_rdb_win64.dll', 'gmcl_rdb_win32.dll'],
+    'Linux (64-bit & 32-bit)': ['gmcl_rdb_linux64.dll', 'gmcl_rdb_linux.dll'],
+    'macOS 64-bit (experimental)': ['gmcl_rdb_osx64.dll'],
 };
 
-export const ALL_RDB_CLIENT_DLLS = Object.values(GM_RDB_CLIENT_PLATFORM_DLLS);
+export const ALL_RDB_CLIENT_DLLS = Object.values(GM_RDB_CLIENT_PLATFORM_DLLS).flat();
 
 interface DebugConfig {
     type: string;
@@ -225,10 +221,10 @@ function detectWorkspaceSrcdsLayout(workspaceFolder: vscode.WorkspaceFolder): Wo
     return undefined;
 }
 
-export function detectGmRdb(garrysmodPath: string): string | undefined {
+export function detectInstalledGmRdbModules(garrysmodPath: string): string[] {
     const binDir = path.join(garrysmodPath, 'lua', 'bin');
     if (!fs.existsSync(binDir)) {
-        return undefined;
+        return [];
     }
 
     const candidates = process.platform === 'linux'
@@ -237,32 +233,38 @@ export function detectGmRdb(garrysmodPath: string): string | undefined {
             ? ['gmsv_rdb_osx64.dll', 'gmsv_rdb_osx.dll']
             : ALL_RDB_DLLS;
 
-    for (const candidate of candidates) {
-        if (fs.existsSync(path.join(binDir, candidate))) {
-            return candidate;
-        }
-    }
-
-    return undefined;
+    return candidates.filter((candidate) => fs.existsSync(path.join(binDir, candidate)));
 }
 
-export function detectGarrysmodBranchName(garrysmodPath: string): string | undefined {
-    const versionFilePath = path.join(garrysmodPath, 'garrysmod.ver');
-    if (!fs.existsSync(versionFilePath)) {
-        return undefined;
+export function hasAllExpectedGmRdbModules(garrysmodPath: string): boolean {
+    const binDir = path.join(garrysmodPath, 'lua', 'bin');
+    if (!fs.existsSync(binDir)) {
+        return false;
     }
 
-    try {
-        const content = fs.readFileSync(versionFilePath, 'utf8');
-        const lines = content.split(/\r?\n/);
-        return lines[2]?.trim();
-    } catch {
-        return undefined;
+    if (process.platform === 'win32') {
+        return fs.existsSync(path.join(binDir, 'gmsv_rdb_win64.dll'))
+            && fs.existsSync(path.join(binDir, 'gmsv_rdb_win32.dll'));
     }
+
+    if (process.platform === 'linux') {
+        const has64 = fs.existsSync(path.join(binDir, 'gmsv_rdb_linux64.so'))
+            || fs.existsSync(path.join(binDir, 'gmsv_rdb_linux64.dll'));
+        const has32 = fs.existsSync(path.join(binDir, 'gmsv_rdb_linux.so'))
+            || fs.existsSync(path.join(binDir, 'gmsv_rdb_linux.dll'));
+        return has64 && has32;
+    }
+
+    if (process.platform === 'darwin') {
+        return fs.existsSync(path.join(binDir, 'gmsv_rdb_osx64.dll'))
+            || fs.existsSync(path.join(binDir, 'gmsv_rdb_osx.dll'));
+    }
+
+    return detectInstalledGmRdbModules(garrysmodPath).length > 0;
 }
 
-export function isGarrysmodX64(garrysmodPath: string): boolean {
-    return detectGarrysmodBranchName(garrysmodPath) === 'x86-64';
+export function detectGmRdb(garrysmodPath: string): string | undefined {
+    return detectInstalledGmRdbModules(garrysmodPath)[0];
 }
 
 export function hasSrcdsExecutable(srcdsRoot: string): boolean {
@@ -284,10 +286,10 @@ export function hasSrcdsExecutable(srcdsRoot: string): boolean {
     return false;
 }
 
-export function detectGmRdbClient(garrysmodPath: string): string | undefined {
+export function detectInstalledGmRdbClientModules(garrysmodPath: string): string[] {
     const binDir = path.join(garrysmodPath, 'lua', 'bin');
     if (!fs.existsSync(binDir)) {
-        return undefined;
+        return [];
     }
 
     const candidates = process.platform === 'linux'
@@ -296,13 +298,38 @@ export function detectGmRdbClient(garrysmodPath: string): string | undefined {
             ? ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll']
             : ALL_RDB_CLIENT_DLLS;
 
-    for (const candidate of candidates) {
-        if (fs.existsSync(path.join(binDir, candidate))) {
-            return candidate;
-        }
+    return candidates.filter((candidate) => fs.existsSync(path.join(binDir, candidate)));
+}
+
+export function hasAllExpectedGmRdbClientModules(garrysmodPath: string): boolean {
+    const binDir = path.join(garrysmodPath, 'lua', 'bin');
+    if (!fs.existsSync(binDir)) {
+        return false;
     }
 
-    return undefined;
+    if (process.platform === 'win32') {
+        return fs.existsSync(path.join(binDir, 'gmcl_rdb_win64.dll'))
+            && fs.existsSync(path.join(binDir, 'gmcl_rdb_win32.dll'));
+    }
+
+    if (process.platform === 'linux') {
+        const has64 = fs.existsSync(path.join(binDir, 'gmcl_rdb_linux64.so'))
+            || fs.existsSync(path.join(binDir, 'gmcl_rdb_linux64.dll'));
+        const has32 = fs.existsSync(path.join(binDir, 'gmcl_rdb_linux.so'))
+            || fs.existsSync(path.join(binDir, 'gmcl_rdb_linux.dll'));
+        return has64 && has32;
+    }
+
+    if (process.platform === 'darwin') {
+        return fs.existsSync(path.join(binDir, 'gmcl_rdb_osx64.dll'))
+            || fs.existsSync(path.join(binDir, 'gmcl_rdb_osx.dll'));
+    }
+
+    return detectInstalledGmRdbClientModules(garrysmodPath).length > 0;
+}
+
+export function detectGmRdbClient(garrysmodPath: string): string | undefined {
+    return detectInstalledGmRdbClientModules(garrysmodPath)[0];
 }
 
 function normalizeClientInstallInput(rawPath: string): ResolvedClientInstallPath {
@@ -423,7 +450,11 @@ function detectClientGarrysmodInstallPath(): string | undefined {
             continue;
         }
 
-        if (process.platform === 'win32' && !fs.existsSync(path.join(gameRoot, 'gmod.exe'))) {
+        if (
+            process.platform === 'win32'
+            && !fs.existsSync(path.join(gameRoot, 'gmod.exe'))
+            && !fs.existsSync(path.join(gameRoot, 'gmod_win64.exe'))
+        ) {
             continue;
         }
 
@@ -490,7 +521,8 @@ export function validateClientInstallPath(inputPath: string): ClientInstallPathV
     const gameRoot = normalized.gameRoot;
     const garrysmodPath = normalized.garrysmodPath;
     const hasSrcdsExe = hasSrcdsExecutable(gameRoot);
-    const hasGmodExe = process.platform === 'win32' && fs.existsSync(path.join(gameRoot, 'gmod.exe'));
+    const hasGmodExe = process.platform === 'win32'
+        && (fs.existsSync(path.join(gameRoot, 'gmod.exe')) || fs.existsSync(path.join(gameRoot, 'gmod_win64.exe')));
     const hasGmodApp = process.platform === 'darwin' && hasGarrysModAppBundle(gameRoot);
 
     if (!fs.existsSync(garrysmodPath)) {
@@ -818,32 +850,30 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
         return;
     }
 
-    const platformItems = Object.entries(GM_RDB_PLATFORM_DLLS).map(([label, dll]) => ({
+    const platformItems = Object.entries(GM_RDB_PLATFORM_DLLS).map(([label, dlls]) => ({
         label,
-        description: dll,
+        description: dlls.join(', '),
+        dlls,
     }));
 
-    if (process.platform === 'win32' || process.platform === 'linux') {
-        const detectedIsX64 = isGarrysmodX64(garrysmodPath);
-        const detectedIndex = platformItems.findIndex((item) =>
-            process.platform === 'win32'
-                ? item.description === (detectedIsX64 ? 'gmsv_rdb_win64.dll' : 'gmsv_rdb_win32.dll')
-                : item.description === (detectedIsX64 ? 'gmsv_rdb_linux64.dll' : 'gmsv_rdb_linux.dll')
-        );
-        if (detectedIndex >= 0) {
-            const [detectedItem] = platformItems.splice(detectedIndex, 1);
-            detectedItem.label = `${detectedItem.label} (detected from garrysmod.ver)`;
-            platformItems.unshift(detectedItem);
-        }
-    }
+    const defaultPlatformLabel = process.platform === 'win32'
+        ? 'Windows (64-bit & 32-bit)'
+        : process.platform === 'linux'
+            ? 'Linux (64-bit & 32-bit)'
+            : process.platform === 'darwin'
+                ? 'macOS 64-bit (experimental)'
+                : undefined;
 
-    if (process.platform === 'darwin') {
-        const detectedIndex = platformItems.findIndex((item) => item.description === 'gmsv_rdb_osx64.dll');
+    if (defaultPlatformLabel) {
+        const detectedIndex = platformItems.findIndex((item) => item.label === defaultPlatformLabel);
         if (detectedIndex >= 0) {
             const [detectedItem] = platformItems.splice(detectedIndex, 1);
             detectedItem.label = `${detectedItem.label} (detected)`;
             platformItems.unshift(detectedItem);
         }
+    }
+
+    if (process.platform === 'darwin') {
         vscode.window.showWarningMessage(
             'macOS gm_rdb support is experimental. Install only if you are using a compatible macOS Garry\'s Mod/SRCDS setup; Windows/Linux behavior is unchanged.'
         );
@@ -854,13 +884,11 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
         placeHolder: 'Which platform is your SRCDS (server) running on? (NOT your client)',
         ignoreFocusOut: true,
     });
-    if (!platformChoice?.description) {
+    if (!platformChoice?.dlls?.length) {
         return;
     }
 
-    const dllName = platformChoice.description;
     const binDir = path.join(garrysmodPath, 'lua', 'bin');
-    const destinationPath = path.join(binDir, dllName);
 
     await vscode.window.withProgress(
         {
@@ -877,15 +905,21 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
                 );
             }
 
-            const asset = release.assets.find((entry) => entry.name === dllName);
-            if (!asset) {
-                const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
-                throw new Error(`Release ${release.tag_name} does not include ${dllName}. Available assets: ${available}`);
-            }
+            const assetsToDownload = platformChoice.dlls.map((dllName) => {
+                const asset = release.assets.find((entry) => entry.name === dllName);
+                if (!asset) {
+                    const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
+                    throw new Error(`Release ${release.tag_name} does not include ${dllName}. Available assets: ${available}`);
+                }
+                return asset;
+            });
 
-            progress.report({ message: `Downloading ${dllName} (${release.tag_name})…` });
             fs.mkdirSync(binDir, { recursive: true });
-            await downloadFile(asset.browser_download_url, destinationPath, progress);
+            for (const asset of assetsToDownload) {
+                const destinationPath = path.join(binDir, asset.name);
+                progress.report({ message: `Downloading ${asset.name} (${release.tag_name})…` });
+                await downloadFile(asset.browser_download_url, destinationPath, progress);
+            }
 
             progress.report({ message: 'Writing shared debugger autorun file…' });
             writeAutorunFile(garrysmodPath, port, DEFAULT_RDB_CLIENT_PORT);
@@ -898,7 +932,7 @@ async function runGmRdbInstaller(garrysmodPath: string, port: number): Promise<v
     );
 
     const macNote = process.platform === 'darwin' ? ' macOS debugger support is experimental; restart SRCDS and verify manually before relying on it.' : '';
-    vscode.window.showInformationMessage(`gm_rdb installed to ${destinationPath}.${macNote}`);
+    vscode.window.showInformationMessage(`gm_rdb (${platformChoice.dlls.join(', ')}) installed to ${binDir}.${macNote}`);
 }
 
 function getLaunchFileUri(workspaceFolder: vscode.WorkspaceFolder): vscode.Uri {
@@ -1403,8 +1437,9 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         ? workspaceDetection.srcdsRootExpression
         : undefined;
 
-    const existingDll = detectGmRdb(srcdsSelection.garrysmodPath);
-    if (!existingDll) {
+    const existingDlls = detectInstalledGmRdbModules(srcdsSelection.garrysmodPath);
+    const existingDll = existingDlls[0];
+    if (existingDlls.length === 0) {
         const installChoice = await vscode.window.showWarningMessage(
             'gm_rdb debugger module was not found in garrysmod/lua/bin/. Install it now?',
             { modal: false },
@@ -1423,7 +1458,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         const latestRelease = await fetchReleaseForCurrentExtensionChannel().catch(() => null);
         const versionInfo = latestRelease ? ` Latest release: ${latestRelease.tag_name}.` : '';
         const updateChoice = await vscode.window.showInformationMessage(
-            `gm_rdb (${existingDll}) is already installed.${versionInfo} Update to the latest release?`,
+            `gm_rdb (${existingDlls.join(', ')}) is already installed.${versionInfo} Update to the latest release?`,
             { modal: false },
             'Update',
             'Skip'

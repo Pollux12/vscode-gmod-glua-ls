@@ -38,7 +38,7 @@ export interface ActiveUpdateState {
 interface InstallHookContext {
     readonly progress: vscode.Progress<{ message?: string; increment?: number; }>;
     readonly release: GmRdbRelease;
-    readonly asset: ReleaseAsset;
+    readonly assets: readonly ReleaseAsset[];
     readonly garrysmodPath: string;
 }
 
@@ -51,7 +51,7 @@ interface InstallReleaseOptions {
     readonly tempDirPrefix: string;
     readonly successMessage: string;
     readonly failurePrefix: string;
-    readonly selectAsset: (release: GmRdbRelease) => ReleaseAsset | undefined;
+    readonly selectAssets: (release: GmRdbRelease) => ReleaseAsset[];
     readonly afterInstall?: (context: InstallHookContext) => Promise<void>;
 }
 
@@ -354,6 +354,20 @@ export function findAssetByNameCandidates(release: GmRdbRelease, candidates: rea
     return undefined;
 }
 
+export function findAssetsForArchGroups(
+    release: GmRdbRelease,
+    archCandidateGroups: readonly (readonly string[])[]
+): ReleaseAsset[] {
+    const assets: ReleaseAsset[] = [];
+    for (const group of archCandidateGroups) {
+        const match = findAssetByNameCandidates(release, group);
+        if (match && !assets.some((existing) => existing.name === match.name)) {
+            assets.push(match);
+        }
+    }
+    return assets;
+}
+
 export async function downloadAndInstallRelease(options: InstallReleaseOptions): Promise<GmRdbRelease | undefined> {
     let installedRelease: GmRdbRelease | undefined;
     const binDir = path.join(options.garrysmodPath, 'lua', 'bin');
@@ -372,59 +386,66 @@ export async function downloadAndInstallRelease(options: InstallReleaseOptions):
                     throw new Error(options.missingReleaseMessage);
                 }
 
-                const asset = options.selectAsset(release);
-                if (!asset) {
+                const assets = options.selectAssets(release);
+                if (assets.length === 0) {
                     const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
                     throw new Error(`No compatible ${options.incompatibleBinaryLabel} binary found for ${os.platform()} (${os.arch()}). Available assets: ${available}`);
                 }
 
-                progress.report({ message: `Downloading ${asset.name} (${release.tag_name})...` });
                 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), options.tempDirPrefix));
-                const safeName = path.basename(asset.name);
-                if (safeName !== asset.name) {
-                    throw new Error(`Release asset name contains path separators: ${asset.name}`);
-                }
-                const tempFilePath = path.join(tempDir, safeName);
-                const destinationPath = path.join(binDir, safeName);
 
                 try {
-                    await downloadFile(asset.browser_download_url, tempFilePath, progress);
+                    const stagedDownloads: Array<{ asset: ReleaseAsset; safeName: string; tempFilePath: string; destinationPath: string }> = [];
+                    for (const asset of assets) {
+                        const safeName = path.basename(asset.name);
+                        if (safeName !== asset.name) {
+                            throw new Error(`Release asset name contains path separators: ${asset.name}`);
+                        }
+                        const tempFilePath = path.join(tempDir, safeName);
+                        const destinationPath = path.join(binDir, safeName);
+                        progress.report({ message: `Downloading ${asset.name} (${release.tag_name})...` });
+                        await downloadFile(asset.browser_download_url, tempFilePath, progress);
+                        stagedDownloads.push({ asset, safeName, tempFilePath, destinationPath });
+                    }
 
-                    progress.report({ message: `Installing ${asset.name}...` });
                     await fs.promises.mkdir(binDir, { recursive: true });
-                    await cleanupStaleBackups(binDir, safeName);
-                    const stagingPath = destinationPath + '.installing';
-                    let backupPath: string | undefined;
-                    try {
-                        await fs.promises.copyFile(tempFilePath, stagingPath);
 
-                        if (process.platform === 'win32' && fs.existsSync(destinationPath)) {
-                            backupPath = `${destinationPath}.old-${Date.now()}`;
-                            await fs.promises.rename(destinationPath, backupPath);
+                    for (const { asset, safeName, tempFilePath, destinationPath } of stagedDownloads) {
+                        progress.report({ message: `Installing ${asset.name}...` });
+                        await cleanupStaleBackups(binDir, safeName);
+                        const stagingPath = destinationPath + '.installing';
+                        let backupPath: string | undefined;
+                        try {
+                            await fs.promises.copyFile(tempFilePath, stagingPath);
+
+                            if (process.platform === 'win32' && fs.existsSync(destinationPath)) {
+                                backupPath = `${destinationPath}.old-${Date.now()}`;
+                                await fs.promises.rename(destinationPath, backupPath);
+                            }
+
+                            await fs.promises.rename(stagingPath, destinationPath);
+
+                            await makeInstalledModuleUsable(destinationPath);
+                            await writeModuleVersionSidecar(destinationPath, release.tag_name).catch(() => {});
+
+                            if (backupPath) {
+                                await fs.promises.unlink(backupPath).catch(() => {});
+                            }
+                        } catch (error) {
+                            if (backupPath && !fs.existsSync(destinationPath)) {
+                                await fs.promises.rename(backupPath, destinationPath).catch(() => {});
+                            }
+                            throw toInstallError(error, asset.name);
+                        } finally {
+                            await fs.promises.unlink(stagingPath).catch(() => {});
                         }
-
-                        await fs.promises.rename(stagingPath, destinationPath);
-
-                        await makeInstalledModuleUsable(destinationPath);
-                        await writeModuleVersionSidecar(destinationPath, release.tag_name).catch(() => {});
-
-                        if (backupPath) {
-                            await fs.promises.unlink(backupPath).catch(() => {});
-                        }
-                    } catch (error) {
-                        if (backupPath && !fs.existsSync(destinationPath)) {
-                            await fs.promises.rename(backupPath, destinationPath).catch(() => {});
-                        }
-                        throw toInstallError(error, asset.name);
-                    } finally {
-                        await fs.promises.unlink(stagingPath).catch(() => {});
                     }
 
                     if (options.afterInstall) {
                         await options.afterInstall({
                             progress,
                             release,
-                            asset,
+                            assets,
                             garrysmodPath: options.garrysmodPath,
                         });
                     }
@@ -434,7 +455,8 @@ export async function downloadAndInstallRelease(options: InstallReleaseOptions):
                     fs.rmSync(tempDir, { recursive: true, force: true });
                 }
 
-                progress.report({ message: `Installed ${asset.name} to garrysmod/lua/bin.` });
+                const installedNames = assets.map((entry) => entry.name).join(', ');
+                progress.report({ message: `Installed ${installedNames} to garrysmod/lua/bin.` });
                 installedRelease = release;
             }
         );

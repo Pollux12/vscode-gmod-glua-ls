@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
 import {
-    ALL_RDB_CLIENT_DLLS,
-    detectGarrysmodBranchName,
     detectGmRdbClient,
+    detectInstalledGmRdbClientModules,
     getStoredClientGarrysmodPath,
-    isGarrysmodX64,
+    hasAllExpectedGmRdbClientModules,
     GmRdbRelease,
     promptForClientGarrysmodPath,
     ReleaseAsset,
@@ -15,7 +14,7 @@ import {
     ActiveUpdateState,
     downloadAndInstallRelease,
     ExpectedVersionCacheState,
-    findAssetByNameCandidates,
+    findAssetsForArchGroups,
     normalizeComparableVersion,
     recordInstalledModuleState,
     resolveExpectedVersionWithCache,
@@ -62,8 +61,8 @@ export class GmodClientRdbUpdater {
      * Called by GmodUpdateScheduler. Does not prompt or update if the binary is absent.
      */
     public async runBootTimeCheck(garrysmodPath: string): Promise<void> {
-        const detected = detectGmRdbClient(garrysmodPath);
-        if (!detected) {
+        const installedModules = detectInstalledGmRdbClientModules(garrysmodPath);
+        if (installedModules.length === 0) {
             return;
         }
 
@@ -76,16 +75,23 @@ export class GmodClientRdbUpdater {
             return;
         }
 
-        const installedVersion = await this.resolveInstalledVersion(garrysmodPath, detected);
-        if (!installedVersion) {
+        const versions = await Promise.all(
+            installedModules.map((moduleName) => this.resolveInstalledVersion(garrysmodPath, moduleName))
+        );
+        const knownVersions = versions.filter((v): v is string => typeof v === 'string');
+        if (knownVersions.length === 0) {
             return;
         }
 
-        if (this.normalizeVersion(installedVersion) === expectedVersion) {
+        const mismatchedVersion = knownVersions.find((v) => this.normalizeVersion(v) !== expectedVersion);
+        if (mismatchedVersion) {
+            await this.promptForUpdate(mismatchedVersion, expectedVersion);
             return;
         }
 
-        await this.promptForUpdate(installedVersion, expectedVersion);
+        if (!hasAllExpectedGmRdbClientModules(garrysmodPath)) {
+            await this.promptForUpdate(knownVersions[0], expectedVersion);
+        }
     }
 
     public async runManualUpdateCommand(): Promise<void> {
@@ -101,8 +107,8 @@ export class GmodClientRdbUpdater {
             return;
         }
 
-        const detected = detectGmRdbClient(garrysmodPath);
-        if (!detected) {
+        const installedModules = detectInstalledGmRdbClientModules(garrysmodPath);
+        if (installedModules.length === 0) {
             const action = await vscode.window.showInformationMessage(
                 'gm_rdb (client): gm_rdb client binary was not found in your Garry\'s Mod folder. Click Setup to install it.',
                 'Setup'
@@ -113,18 +119,24 @@ export class GmodClientRdbUpdater {
             return;
         }
 
-        const [expectedVersion, installedVersion] = await Promise.all([
+        const [expectedVersion, ...installedVersions] = await Promise.all([
             this.resolveExpectedVersion(),
-            this.resolveInstalledVersion(garrysmodPath, detected),
+            ...installedModules.map((moduleName) => this.resolveInstalledVersion(garrysmodPath, moduleName)),
         ]);
 
-        if (installedVersion && this.normalizeVersion(installedVersion) === expectedVersion) {
+        const knownVersions = installedVersions.filter((v): v is string => typeof v === 'string');
+        const allMatch = knownVersions.length === installedModules.length
+            && knownVersions.every((v) => this.normalizeVersion(v) === expectedVersion)
+            && hasAllExpectedGmRdbClientModules(garrysmodPath);
+
+        if (allMatch) {
             vscode.window.showInformationMessage(`gm_rdb client binary is up to date (${expectedVersion}).`);
             return;
         }
 
-        const versionInfo = installedVersion
-            ? `(installed: ${installedVersion}, latest: ${expectedVersion})`
+        const displayInstalled = knownVersions.find((v) => this.normalizeVersion(v) !== expectedVersion) ?? knownVersions[0];
+        const versionInfo = displayInstalled
+            ? `(installed: ${displayInstalled}, latest: ${expectedVersion})`
             : `(latest: ${expectedVersion})`;
         const action = await vscode.window.showInformationMessage(
             `gm_rdb client binary update available ${versionInfo}.`,
@@ -219,7 +231,7 @@ export class GmodClientRdbUpdater {
             tempDirPrefix: 'gluals-gmrdb-client-',
             successMessage: 'rdb_client updated successfully. Restart your GMod client to load the new module.',
             failurePrefix: 'Failed to update rdb_client',
-            selectAsset: (release) => this.findAssetForUpdate(release, installGarrysmodPath),
+            selectAssets: (release) => this.findAssetsForCurrentPlatform(release),
         });
 
         if (!installedRelease) {
@@ -230,50 +242,29 @@ export class GmodClientRdbUpdater {
         await this.recordInstall(installGarrysmodPath, installedRelease);
     }
 
-    private findAssetForCurrentPlatform(release: GmRdbRelease): ReleaseAsset | undefined {
-        return findAssetByNameCandidates(release, this.getAssetCandidatesForCurrentPlatform());
+    private findAssetsForCurrentPlatform(release: GmRdbRelease): ReleaseAsset[] {
+        return findAssetsForArchGroups(release, this.getArchCandidateGroupsForCurrentPlatform());
     }
 
-    private findAssetForUpdate(release: GmRdbRelease, garrysmodPath: string): ReleaseAsset | undefined {
-        const isX64 = isGarrysmodX64(garrysmodPath);
-        const preferredCandidates: string[] = process.platform === 'win32'
-            ? [isX64 ? 'gmcl_rdb_win64.dll' : 'gmcl_rdb_win32.dll']
-            : process.platform === 'linux'
-                ? (isX64
-                    ? ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux64.dll']
-                    : ['gmcl_rdb_linux.so', 'gmcl_rdb_linux.dll'])
-                : process.platform === 'darwin'
-                    ? ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll']
-                    : [];
-
-        const preferredAsset = findAssetByNameCandidates(release, preferredCandidates);
-        if (preferredAsset) {
-            return preferredAsset;
-        }
-
-        // If branch architecture is known, avoid silently falling back to a mismatched binary.
-        if (detectGarrysmodBranchName(garrysmodPath)) {
-            return undefined;
-        }
-
-        return this.findAssetForCurrentPlatform(release);
-    }
-
-    private getAssetCandidatesForCurrentPlatform(): string[] {
+    private getArchCandidateGroupsForCurrentPlatform(): readonly (readonly string[])[] {
         if (process.platform === 'win32') {
-            return ALL_RDB_CLIENT_DLLS.filter((name) => name.endsWith('.dll') && name.includes('win'));
+            return [
+                ['gmcl_rdb_win64.dll'],
+                ['gmcl_rdb_win32.dll'],
+            ];
         }
 
         if (process.platform === 'linux') {
             return [
-                'gmcl_rdb_linux64.so',
-                'gmcl_rdb_linux.so',
-                ...ALL_RDB_CLIENT_DLLS.filter((name) => name.includes('linux')),
+                ['gmcl_rdb_linux64.so', 'gmcl_rdb_linux64.dll'],
+                ['gmcl_rdb_linux.so', 'gmcl_rdb_linux.dll'],
             ];
         }
 
         if (process.platform === 'darwin') {
-            return ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll'];
+            return [
+                ['gmcl_rdb_osx64.dll', 'gmcl_rdb_osx.dll'],
+            ];
         }
 
         return [];
@@ -314,6 +305,7 @@ export class GmodClientRdbUpdater {
     }
 
     private async resolveInstalledVersion(garrysmodPath: string, binaryName: string): Promise<string | undefined> {
+        void detectGmRdbClient;
         return resolveInstalledModuleVersion(
             this.context,
             this.INSTALLED_STATE_KEY,
