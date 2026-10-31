@@ -36,6 +36,27 @@ export function clientPathToGamePath(
   return mapping.sourceRoot === undefined ? undefined : relativeWithin(mapping.sourceRoot, clientPath, pathApi)
 }
 
+/** Maps a garrysmod-relative path to a local file through the most specific `sourceFileMap` folder, then `sourceRoot`. */
+export function gamePathToClientPath(
+  gamePath: string,
+  mapping: GmodSourceMapping,
+  pathApi: PathApi = path
+): string | undefined {
+  const anchored = (gameRelative: string) => pathApi.resolve(pathApi.sep, gameRelative)
+  let best: { rootLength: number; clientPath: string } | undefined
+  for (const [source, target] of Object.entries(mapping.sourceFileMap ?? {})) {
+    const relative = relativeWithin(anchored(target), anchored(gamePath), pathApi)
+    const rootLength = anchored(target).length
+    if (relative !== undefined && (!best || rootLength > best.rootLength)) {
+      best = { rootLength, clientPath: pathApi.join(source, relative) }
+    }
+  }
+  if (best) {
+    return best.clientPath
+  }
+  return mapping.sourceRoot === undefined ? undefined : pathApi.join(mapping.sourceRoot, gamePath)
+}
+
 /** Returns the Lua search path `include` takes for a garrysmod-relative file, or undefined when the file is not on it. */
 export function gamePathToLuaPath(gamePath: string): string | undefined {
   const segments = gamePath.split(/[\\/]+/).filter((segment) => segment.length > 0)

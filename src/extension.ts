@@ -42,6 +42,7 @@ import { GmodRunCommandTool } from './tools/gmodRunCommandTool';
 import { GmodRunFileTool } from './tools/gmodRunFileTool';
 import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
+import { gamePathToClientPath } from './debugger/gmod_debugger/GmodSourcePaths';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
 import { GmodUpdateScheduler } from './debugger/gmod_debugger/GmodUpdateScheduler';
 import { detectGamemodeBaseLibraries } from './gmodGamemodeBaseDetector';
@@ -1790,18 +1791,13 @@ async function openGmodErrorLocation(location?: GmodErrorLocation | string): Pro
     const line = Math.max(1, resolvedLocation.line);
     const column = Math.max(1, resolvedLocation.column ?? 1);
 
-    let targetPath = resolvedLocation.filePath;
-    if (!path.isAbsolute(targetPath)) {
-        const folders = vscode.workspace.workspaceFolders ?? [];
-        const matchedFolder = folders.find((folder) =>
-            fs.existsSync(path.join(folder.uri.fsPath, targetPath))
-        );
-
-        if (matchedFolder) {
-            targetPath = path.join(matchedFolder.uri.fsPath, targetPath);
-        } else if (folders.length > 0) {
-            targetPath = path.join(folders[0].uri.fsPath, targetPath);
-        }
+    const sessionConfig = vscode.debug.activeDebugSession?.configuration;
+    const targetPath = path.isAbsolute(resolvedLocation.filePath)
+        ? resolvedLocation.filePath
+        : gamePathToClientPath(resolvedLocation.filePath, { sourceRoot: sessionConfig?.sourceRoot, sourceFileMap: sessionConfig?.sourceFileMap });
+    if (!targetPath) {
+        vscode.window.showWarningMessage(`Could not map ${resolvedLocation.filePath} to a local file without an active GMod debug session.`);
+        return;
     }
 
     const targetUri = vscode.Uri.file(path.normalize(targetPath));

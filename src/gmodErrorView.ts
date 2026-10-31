@@ -32,7 +32,8 @@ export function parseGmodErrorLocation(text: string): GmodErrorLocation | undefi
         return undefined;
     }
 
-    const match = line.match(/@?((?:[A-Za-z]:)?[^:\r\n]+\.lua):(\d+)(?::(\d+))?/i);
+    const frameLocation = line.match(/^\d+\.\s+.*?\s-\s+(.+)$/)?.[1] ?? line;
+    const match = frameLocation.match(/@?((?:[A-Za-z]:)?[^:\r\n]+\.lua):(\d+)(?::(\d+))?/i);
     if (!match) {
         return undefined;
     }

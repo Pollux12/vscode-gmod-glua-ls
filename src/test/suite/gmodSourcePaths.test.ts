@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 
-import { clientPathToGamePath, gamePathToLuaPath, relativeWithin } from '../../debugger/gmod_debugger/GmodSourcePaths';
+import { clientPathToGamePath, gamePathToClientPath, gamePathToLuaPath, relativeWithin } from '../../debugger/gmod_debugger/GmodSourcePaths';
 
 suite('GMod Source Paths', () => {
     test('treats Windows roots as contained regardless of drive-letter or path casing', () => {
@@ -49,6 +49,30 @@ suite('GMod Source Paths', () => {
             'lua\\autorun\\server\\x.lua'
         );
         assert.strictEqual(clientPathToGamePath('D:/Elsewhere/x.lua', mapping, path.win32), undefined);
+    });
+
+    test('maps garrysmod-relative files back through the most specific sourceFileMap folder before sourceRoot', () => {
+        const mapping = {
+            sourceRoot: 'D:/Servers/GMod/garrysmod',
+            sourceFileMap: {
+                'D:/Servers/GMod/garrysmod/addons': 'addons',
+                'D:/Source/Repos/cityrp': 'addons/cityrp_dev',
+                'D:/Source/Repos/sandbox': 'gamemodes/sandbox',
+            },
+        };
+        assert.strictEqual(
+            gamePathToClientPath('addons/cityrp_dev/lua/autorun/x.lua', mapping, path.win32),
+            'D:\\Source\\Repos\\cityrp\\lua\\autorun\\x.lua'
+        );
+        assert.strictEqual(
+            gamePathToClientPath('Gamemodes/Sandbox/gamemode/balloon_report.lua', mapping, path.win32),
+            'D:\\Source\\Repos\\sandbox\\gamemode\\balloon_report.lua'
+        );
+        assert.strictEqual(
+            gamePathToClientPath('lua/autorun/server/x.lua', mapping, path.win32),
+            'D:\\Servers\\GMod\\garrysmod\\lua\\autorun\\server\\x.lua'
+        );
+        assert.strictEqual(gamePathToClientPath('lua/x.lua', {}, path.win32), undefined);
     });
 
     test('maps garrysmod-relative files to the Lua search path include takes', () => {
