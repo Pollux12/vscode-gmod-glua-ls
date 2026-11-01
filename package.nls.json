@@ -87,7 +87,7 @@
     "debug.gmod.port": "Debugger port to connect to",
     "debug.gmod.program": "Program to launch before connecting to gm_rdb",
     "debug.gmod.sourceFileMap": "Optional source file mappings from local path to remote Lua path",
-    "debug.gmod.sourceRoot": "Lua source root directory",
+    "debug.gmod.sourceRoot": "Local garrysmod directory (the folder containing lua/, gamemodes/ and addons/) that game file paths are resolved against",
     "debug.gmod.stopOnEntry": "Stop when the debuggee emits entry pause",
     "debug.gmod.stopOnError": "Pause execution when gm_rdb reports a Lua runtime error",
     "view.gmodEntityExplorer.title": "Entity Explorer",
