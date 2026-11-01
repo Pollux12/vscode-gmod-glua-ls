@@ -11,9 +11,9 @@ import {
     Vec3,
 } from './debugger/gmod_debugger/lrdb/Client';
 import { extensionContext } from './extension';
-import { fetchLsScriptedClasses } from './gmodExplorer';
+import { fetchLsScriptedClasses, LsScriptedClassEntry } from './gmodExplorer';
 
-const ENTITY_PAGE_SIZE = 50;
+const ENTITY_PAGE_SIZE = 200;
 const SEARCH_DEBOUNCE_MS = 300;
 const ENTITY_POLL_INTERVAL_MS = 1000;
 const ENTITY_POLL_MAX_INTERVAL_MS = 30000;
@@ -80,9 +80,6 @@ type EntityTreeItemData =
         entityIndex: number;
     }
     | {
-        kind: 'loadMore';
-    }
-    | {
         kind: 'info';
         message: string;
         id?: string;
@@ -92,6 +89,10 @@ type EntityTreeItemData =
             title: string;
         };
     };
+
+function fetchWorkspaceScriptedClasses(): Promise<LsScriptedClassEntry[]> {
+    return extensionContext?.client ? fetchLsScriptedClasses() : Promise.resolve([]);
+}
 
 export class EntityTreeItem extends vscode.TreeItem {
     constructor(public readonly data: EntityTreeItemData) {
@@ -130,7 +131,10 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
     private readonly loadingEntityNetworkVars = new Set<number>();
     private readonly entityNetworkVarFilters = new Map<number, string>();
 
-    constructor(private readonly getActiveSession: () => vscode.DebugSession | undefined) {
+    constructor(
+        private readonly getActiveSession: () => vscode.DebugSession | undefined,
+        private readonly fetchScriptedClasses: () => Promise<LsScriptedClassEntry[]> = fetchWorkspaceScriptedClasses,
+    ) {
         this.startPolling();
     }
 
@@ -288,16 +292,6 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 }
                 return element;
             }
-            case 'loadMore':
-                element.id = 'entities:loadMore';
-                element.label = 'Load more...';
-                element.iconPath = new vscode.ThemeIcon('ellipsis');
-                element.contextValue = 'gmodEntityLoadMore';
-                element.command = {
-                    command: 'gmodEntityExplorer.loadMore',
-                    title: 'Load More Entities',
-                };
-                return element;
             case 'info':
                 element.id = element.data.id ?? `entities:info:${element.data.severity}:${element.data.message}`;
                 element.label = element.data.message;
@@ -422,12 +416,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
     async loadEntities(): Promise<void> {
         this.resumePollingAfterRetry();
-        await this.loadEntityPage(true, false);
-    }
-
-    async loadMore(): Promise<void> {
-        this.resumePollingAfterRetry();
-        await this.loadEntityPage(false, false);
+        await this.loadAllEntities(false);
     }
 
     async editProperty(entityIndex: number, property: string, currentValue: unknown): Promise<void> {
@@ -656,7 +645,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         let nextDelay = ENTITY_POLL_INTERVAL_MS;
 
         try {
-            const loadResult = await this.loadEntityPage(true, true);
+            const loadResult = await this.loadAllEntities(true);
             if (loadResult === 'failure') {
                 this.consecutiveFailures += 1;
                 if (this.consecutiveFailures >= ENTITY_POLL_FAILURE_THRESHOLD) {
@@ -788,10 +777,6 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 entities: group.entities,
             })
         );
-
-        if (this.entities.length < this.totalCount) {
-            items.push(new EntityTreeItem({ kind: 'loadMore' }));
-        }
 
         if (this.lastError) {
             items.push(
@@ -1123,10 +1108,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         return '<value>';
     }
 
-    private async loadEntityPage(
-        reset: boolean,
-        backgroundRefresh: boolean,
-    ): Promise<'success' | 'failure' | 'skipped'> {
+    private async loadAllEntities(backgroundRefresh: boolean): Promise<'success' | 'failure' | 'skipped'> {
         const session = this.requireActiveSession();
         if (!session) {
             this.clear();
@@ -1139,7 +1121,7 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
 
         const previousState = this.getRootStateKey();
         const shouldShowInitialLoading =
-            !backgroundRefresh && reset && this.entities.length === 0 && !this.hasLoadedOnce;
+            !backgroundRefresh && this.entities.length === 0 && !this.hasLoadedOnce;
 
         this.loading = true;
         if (shouldShowInitialLoading) {
@@ -1147,17 +1129,11 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
 
         try {
-            const requestedLimit = reset
-                ? Math.max(ENTITY_PAGE_SIZE, this.entities.length || ENTITY_PAGE_SIZE)
-                : ENTITY_PAGE_SIZE;
-            const params = this.buildEntityQuery(reset ? 0 : this.entities.length, requestedLimit);
-            const result = await this.sendRequest<GetEntitiesResult>('gmod.entity.getEntities', params);
-            if (reset) {
-                this.replaceEntities(result.entities, result.total);
-            } else {
-                this.appendEntities(result.entities);
-                this.totalCount = result.total;
-            }
+            let pages: { entities: EntitySummary[]; total: number } | undefined;
+            do {
+                pages = await this.fetchEntityPages(this.filterText);
+            } while (pages === undefined);
+            this.replaceEntities(pages.entities, pages.total);
             this.hasLoadedOnce = true;
             this.lastError = undefined;
             return 'success';
@@ -1171,6 +1147,30 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 this.onDidChangeTreeDataEmitter.fire();
             }
         }
+    }
+
+    private async fetchEntityPages(filterText: string): Promise<{ entities: EntitySummary[]; total: number } | undefined> {
+        const byIndex = new Map<number, EntitySummary>();
+        let offset = 0;
+        let total = 0;
+        do {
+            const result = await this.sendRequest<GetEntitiesResult>(
+                'gmod.entity.getEntities',
+                this.buildEntityQuery(filterText, offset, ENTITY_PAGE_SIZE),
+            );
+            if (filterText !== this.filterText) {
+                return undefined;
+            }
+            total = result.total;
+            if (result.entities.length === 0) {
+                break;
+            }
+            offset += result.entities.length;
+            for (const entity of result.entities) {
+                byIndex.set(entity.index, entity);
+            }
+        } while (offset < total);
+        return { entities: [...byIndex.values()], total };
     }
 
     private replaceEntities(items: EntitySummary[], total: number): void {
@@ -1217,28 +1217,6 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         this.entityNetworkVars.delete(index);
         this.loadingEntityNetworkVars.delete(index);
         this.entityNetworkVarFilters.delete(index);
-    }
-
-    private appendEntities(items: EntitySummary[]): void {
-        const indexByEntityId = new Map<number, number>();
-        this.entities.forEach((entity, index) => {
-            indexByEntityId.set(entity.index, index);
-        });
-
-        for (const entity of items) {
-            if (!this.isDisplayableEntity(entity)) {
-                continue;
-            }
-
-            const existingIndex = indexByEntityId.get(entity.index);
-            if (existingIndex === undefined) {
-                this.entities.push(entity);
-                indexByEntityId.set(entity.index, this.entities.length - 1);
-            } else {
-                this.entities[existingIndex] = entity;
-            }
-            this.syncDetailFromSummary(entity);
-        }
     }
 
     private async groupEntitiesByClass(entities: EntitySummary[]): Promise<EntityClassGroup[]> {
@@ -1309,13 +1287,8 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
             return this.luaDefinedClassNames;
         }
 
-        if (!extensionContext?.client) {
-            this.luaDefinedClassNames = new Set<string>();
-            return this.luaDefinedClassNames;
-        }
-
         try {
-            const entries = await fetchLsScriptedClasses();
+            const entries = await this.fetchScriptedClasses();
             this.luaDefinedClassNames = new Set(
                 entries
                     .map((entry) => entry.className?.trim().toLowerCase())
@@ -1366,8 +1339,8 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         });
     }
 
-    private buildEntityQuery(offset: number, limit: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
-        const trimmed = this.filterText.trim();
+    private buildEntityQuery(filterText: string, offset: number, limit: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
+        const trimmed = filterText.trim();
         const numericFilter = /^\d+$/.test(trimmed) ? Number(trimmed) : 0;
         const filterClass = numericFilter > 0 ? '' : trimmed;
 

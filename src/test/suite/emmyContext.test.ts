@@ -3,6 +3,15 @@ import * as vscode from 'vscode';
 
 import { DIAGNOSING_WORKSPACE_MESSAGE, EmmyContext } from '../../emmyContext';
 
+/**
+ * A context with its own stand-in log channel: VS Code hands every caller the same
+ * channel for a name, so a real one would be the extension's, closed with the context.
+ */
+function createContext(): EmmyContext {
+    const outputChannel = { dispose: () => undefined } as unknown as vscode.LogOutputChannel;
+    return new EmmyContext(false, {} as vscode.ExtensionContext, outputChannel);
+}
+
 function getStatusBarItem(context: EmmyContext): vscode.StatusBarItem {
     return (context as any)._statusBar as vscode.StatusBarItem;
 }
@@ -15,7 +24,7 @@ function getTooltipMarkdown(context: EmmyContext): string {
 
 suite('Emmy Context', () => {
     test('treats diagnosing startup as connected but still starting', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerStarting();
             assert.strictEqual(context.isServerRunning, false);
@@ -30,7 +39,7 @@ suite('Emmy Context', () => {
     });
 
     test('treats diagnostics progress messages as connected regardless of text', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerDiagnosing('Preparing workspace diagnostics');
 
@@ -42,7 +51,7 @@ suite('Emmy Context', () => {
     });
 
     test('shows workspace loading progress in status bar and tooltip', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerStarting('Collecting Lua files');
 
@@ -55,7 +64,7 @@ suite('Emmy Context', () => {
     });
 
     test('shows diagnosing progress as a connected diagnostics status', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerDiagnosing('Preparing workspace diagnostics');
 
@@ -69,7 +78,7 @@ suite('Emmy Context', () => {
     });
 
     test('uses short default status labels when running or stopped', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerRunning();
             assert.strictEqual(getStatusBarItem(context).text, '$(check) GLuaLS: Running');
@@ -84,7 +93,7 @@ suite('Emmy Context', () => {
     });
 
     test('shows active server and annotation versions in the tooltip', () => {
-        const context = new EmmyContext(false, {} as vscode.ExtensionContext);
+        const context = createContext();
         try {
             context.setServerRunning();
             context.setServerVersions({
@@ -94,7 +103,8 @@ suite('Emmy Context', () => {
 
             const tooltip = getTooltipMarkdown(context);
             assert.match(tooltip, /Language Server: 1\.2\.3/);
-            assert.match(tooltip, /Annotations: 2026-07-13T12:00:00\.000Z/);
+            const annotationText = new vscode.MarkdownString().appendText('Annotations: 2026-07-13T12:00:00.000Z').value.replace(/&nbsp;/g, ' ');
+            assert.ok(tooltip.includes(annotationText));
         } finally {
             context.dispose();
         }

@@ -8,7 +8,7 @@ function showToast() {
     setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
-function setupSearch() {
+function setupSearch(onFilterChanged) {
     const input = document.getElementById("searchInput");
     const clearBtn = document.getElementById("searchClear");
     if (!input || !clearBtn || input.dataset.searchBound === "true") {
@@ -21,6 +21,7 @@ function setupSearch() {
         const query = input.value;
         updateFilter(query);
         clearBtn.style.display = query ? "block" : "none";
+        onFilterChanged();
     });
 
     clearBtn.addEventListener("click", () => {
@@ -28,6 +29,7 @@ function setupSearch() {
         updateFilter("");
         clearBtn.style.display = "none";
         input.focus();
+        onFilterChanged();
     });
 }
 

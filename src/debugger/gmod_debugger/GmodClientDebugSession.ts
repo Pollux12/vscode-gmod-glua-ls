@@ -18,6 +18,7 @@ import { readFileSync } from 'fs'
 import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
+import { parseGmodLuaError } from './GmodLuaError'
 import {
   EvalRequest,
   ExitNotify,
@@ -29,7 +30,7 @@ import {
   RunningNotify,
   SetVarRequest,
 } from './lrdb/Client'
-import { formatGmodConsoleOutput } from './GmodDebugControlService'
+import { GmodConsoleLineAssembler } from './GmodConsoleOutput'
 
 export interface ClientAttachRequestArguments
   extends DebugProtocol.AttachRequestArguments {
@@ -132,6 +133,16 @@ export class GmodClientDebugSession extends DebugSession {
 
   private _stopOnEntry?: boolean
   private _stopOnError = false
+  private readonly _consoleOutput = new GmodConsoleLineAssembler((line) => {
+    this.sendEvent(new OutputEvent(line.ansi, 'stdout'))
+    this.sendEvent(new DebugEvent('gmod.output', {
+      message: line.text,
+      source: line.source,
+      severity: line.severity,
+      timestamp: line.timestamp,
+      realm: 'client',
+    }))
+  })
 
   private _debuggee_protocol_version?: string
   private _debuggee_module_version?: string
@@ -254,6 +265,7 @@ export class GmodClientDebugSession extends DebugSession {
       })
 
       this._debug_client.onClose.on(() => {
+        this._consoleOutput.flush()
         this.sendEvent(new OutputEvent(`[Client] Debugger disconnected.\n`))
         this.sendEvent(new TerminatedEvent())
       })
@@ -302,6 +314,7 @@ export class GmodClientDebugSession extends DebugSession {
     _args: DebugProtocol.DisconnectArguments
   ): void {
     try {
+      this._consoleOutput.flush()
       if (this._debug_client) {
         this._debug_client.end()
         delete this._debug_client
@@ -930,36 +943,17 @@ export class GmodClientDebugSession extends DebugSession {
           )
           break
 
-        case 'output': {
-          const formatted = formatGmodConsoleOutput(event.params)
-          const color = event.params.color ?? { r: 255, g: 255, b: 255, a: 255 }
-          this.sendEvent(
-            new OutputEvent(
-              `\u001b[38;2;${color.r};${color.g};${color.b}m${formatted}\u001b[0m`,
-              'stdout'
-            )
-          )
-          this.sendEvent(new DebugEvent('gmod.output', {
-            message: formatted,
-            source: event.params.source ?? event.params.group ?? 'console',
-            severity: event.params.severity,
-            timestamp: event.params.timestamp,
-            realm: 'client',
-          }))
+        case 'output':
+          this._consoleOutput.push(event.params)
           break
-        }
 
         case 'error': {
-          const message = typeof event.params.message === 'string' && event.params.message.trim().length > 0
-            ? event.params.message
-            : 'Unknown Lua error'
+          const { message, stackTrace } = parseGmodLuaError(event.params.message, event.params.raw_message)
           const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
             ? event.params.fingerprint
             : `error:${message}`
           const source = event.params.source === 'console' ? 'console' : 'lua'
           const count = Number.isFinite(event.params.count) ? Math.max(1, Math.floor(event.params.count)) : 1
-          const rawMessage = typeof event.params.raw_message === 'string' ? event.params.raw_message : ''
-          const stackTrace = this.parseGmodErrorStackTrace(rawMessage)
 
           this.sendEvent(new OutputEvent(`[Client] [${source} error ${count}x] ${message}\n`, 'stderr'))
           this.sendEvent(new DebugEvent('gmod.error', {
@@ -1049,18 +1043,5 @@ export class GmodClientDebugSession extends DebugSession {
     }
 
     return undefined
-  }
-
-  private parseGmodErrorStackTrace(rawMessage: string): string[] {
-    if (rawMessage.trim().length === 0) return []
-    const frames: string[] = []
-    const lines = rawMessage.split(/\r?\n/)
-    for (const rawLine of lines) {
-      const line = rawLine.trim()
-      if (line.length === 0) continue
-      if (line === '[ERROR]' || /^stack traceback:\s*$/i.test(line)) continue
-      if (/^\d+\.\s+/.test(line)) frames.push(line)
-    }
-    return frames
   }
 }

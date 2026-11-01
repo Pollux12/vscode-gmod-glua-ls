@@ -22,6 +22,7 @@ prepare-version.js
 .idea/**
 .actrc
 test-fixtures/**
+media/**
 **/.github/**
 **/.git/**
 **/.gitignore

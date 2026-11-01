@@ -81,6 +81,22 @@ const shouldUnderlineAnnotatorType = (
     }
 };
 
+const REFERENCE_ANNOTATOR_TYPES = [
+    AnnotatorType.ReadOnlyParam,
+    AnnotatorType.Global,
+    AnnotatorType.ReadOnlyLocal,
+    AnnotatorType.MutLocal,
+    AnnotatorType.MutParam,
+];
+
+/** Whether any reference annotation is drawn: only underlined ones have a style. */
+const drawsReferences = (config: vscode.WorkspaceConfiguration): boolean =>
+    REFERENCE_ANNOTATOR_TYPES.some((type) => shouldUnderlineAnnotatorType(config, type));
+
+/** Whether documentation emphasis is drawn; unset leaves it to the server's default, which draws it. */
+const drawsDocumentationMarkup = (config: vscode.WorkspaceConfiguration): boolean =>
+    get<boolean | null>(config, "gluals.semanticTokens.renderDocumentationMarkup", null) !== false;
+
 const createDecorationDocEm = (): vscode.TextEditorDecorationType => {
     const cacheKey = `decoration:doc.em`;
     if (decorationCache.has(cacheKey)) {
@@ -211,8 +227,18 @@ const requestAnnotatorsImpl = async (editor: vscode.TextEditor, client: Language
         updateDecorations();
     }
 
+    const config = vscode.workspace.getConfiguration(undefined, editor.document.uri);
+    const references = drawsReferences(config);
+    if (!references && !drawsDocumentationMarkup(config)) {
+        for (const decoration of Object.values(decorations)) {
+            editor.setDecorations(decoration, []);
+        }
+        return;
+    }
+
     const params: notifications.AnnotatorParams = {
-        uri: editor.document.uri.toString()
+        uri: editor.document.uri.toString(),
+        references,
     };
 
     try {

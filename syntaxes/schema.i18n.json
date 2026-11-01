@@ -290,60 +290,6 @@
     "EmmyLibraryItem.anyOf.1": {
         "en": "Library configuration with path and ignore rules"
     },
-    "Emmyrc.$schema": {
-        "en": "$schema"
-    },
-    "Emmyrc.codeAction": {
-        "en": "codeAction"
-    },
-    "Emmyrc.codeLens": {
-        "en": "codeLens"
-    },
-    "Emmyrc.completion": {
-        "en": "completion"
-    },
-    "Emmyrc.diagnostics": {
-        "en": "diagnostics"
-    },
-    "Emmyrc.doc": {
-        "en": "doc"
-    },
-    "Emmyrc.documentColor": {
-        "en": "documentColor"
-    },
-    "Emmyrc.format": {
-        "en": "format"
-    },
-    "Emmyrc.gmod": {
-        "en": "gmod"
-    },
-    "Emmyrc.hint": {
-        "en": "hint"
-    },
-    "Emmyrc.hover": {
-        "en": "hover"
-    },
-    "Emmyrc.inlineValues": {
-        "en": "inlineValues"
-    },
-    "Emmyrc.references": {
-        "en": "references"
-    },
-    "Emmyrc.resource": {
-        "en": "resource"
-    },
-    "Emmyrc.runtime": {
-        "en": "runtime"
-    },
-    "Emmyrc.semanticTokens": {
-        "en": "semanticTokens"
-    },
-    "Emmyrc.strict": {
-        "en": "strict"
-    },
-    "Emmyrc.workspace": {
-        "en": "workspace"
-    },
     "EmmyrcCodeAction.insertSpace": {
         "en": "Add space after `---` comments when inserting `@diagnostic disable-next-line`.",
         "zh-CN": "是否在 '---' 后插入空格。"
@@ -393,10 +339,6 @@
     "EmmyrcDiagnostic": {
         "en": "Represents the diagnostic configuration for Emmyrc.",
         "zh-CN": "Emmyrc 诊断配置。"
-    },
-    "EmmyrcDiagnostic.diagnosticInterval": {
-        "en": "Delay between opening/changing a file and scanning it for errors, in milliseconds.",
-        "zh-CN": "诊断间隔时间(毫秒)。"
     },
     "EmmyrcDiagnostic.disable": {
         "en": "A list of diagnostic codes that are disabled.",
@@ -686,73 +628,16 @@
         "en": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely."
     },
     "EmmyrcGmod.autoDetectGamemodeBase": {
-        "en": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\nSet to `false` to disable this detection."
+        "en": "Automatically detect and add the base gamemode as a library when a gamemode\nderives from another (via the `\"base\"` field in the gamemode `.txt` file).\n`base` and `sandbox` come from the GMod annotations and are never added.\nSet to `false` to disable this detection."
     },
     "EmmyrcGmod.autoLoadAnnotations": {
         "en": "Disable auto-loading of annotations (from VSCode or default path).\nThis takes precedence over extension settings."
     },
-    "EmmyrcGmod.defaultRealm": {
-        "en": "defaultRealm"
-    },
-    "EmmyrcGmod.detectRealmFromCalls": {
-        "en": "detectRealmFromCalls"
-    },
-    "EmmyrcGmod.detectRealmFromFilename": {
-        "en": "detectRealmFromFilename"
-    },
-    "EmmyrcGmod.dynamicFieldsGlobal": {
-        "en": "dynamicFieldsGlobal"
-    },
-    "EmmyrcGmod.enabled": {
-        "en": "enabled"
-    },
     "EmmyrcGmod.fileParamDefaults": {
         "en": "Parameter-name to type-name fallbacks for otherwise unresolved params."
     },
-    "EmmyrcGmod.hookMappings": {
-        "en": "hookMappings"
-    },
-    "EmmyrcGmod.inferDynamicFields": {
-        "en": "inferDynamicFields"
-    },
-    "EmmyrcGmod.network": {
-        "en": "network"
-    },
-    "EmmyrcGmod.outline": {
-        "en": "outline"
-    },
-    "EmmyrcGmod.scriptedClassScopes": {
-        "en": "scriptedClassScopes"
-    },
     "EmmyrcGmod.templatePath": {
         "en": "Path to a folder containing custom GLua scaffolding templates (`.lua` files).\nBuilt-in templates are used as fallback when a custom one is not found.\nAccepts an absolute path or a path relative to the workspace root."
-    },
-    "EmmyrcGmod.vgui": {
-        "en": "vgui"
-    },
-    "EmmyrcGmodHookMappings.emitterToHook": {
-        "en": "emitterToHook"
-    },
-    "EmmyrcGmodHookMappings.methodPrefixes": {
-        "en": "methodPrefixes"
-    },
-    "EmmyrcGmodHookMappings.methodToHook": {
-        "en": "methodToHook"
-    },
-    "EmmyrcGmodNetwork.codeLensEnabled": {
-        "en": "codeLensEnabled"
-    },
-    "EmmyrcGmodNetwork.completion": {
-        "en": "completion"
-    },
-    "EmmyrcGmodNetwork.enabled": {
-        "en": "enabled"
-    },
-    "EmmyrcGmodNetworkCompletion.mismatchHints": {
-        "en": "mismatchHints"
-    },
-    "EmmyrcGmodNetworkCompletion.smartReadSuggestions": {
-        "en": "smartReadSuggestions"
     },
     "EmmyrcGmodOutline.verbosity": {
         "en": "Controls how much detail the document outline shows.\n- `minimal`: functions, classes, hooks, net.Receive, timers, concommands only.\n- `normal` (default): same as minimal plus non-primitive variables and tables; hides\n  control-flow blocks.\n- `verbose`: everything including `if`, `for`, `do` blocks and all locals."
@@ -766,74 +651,11 @@
     "EmmyrcGmodOutlineVerbosity.verbose": {
         "en": "Show everything (legacy behavior, includes control-flow blocks and all locals)."
     },
-    "EmmyrcGmodScriptedClassDefinition.aliases": {
-        "en": "aliases"
-    },
-    "EmmyrcGmodScriptedClassDefinition.classGlobal": {
-        "en": "classGlobal"
-    },
     "EmmyrcGmodScriptedClassDefinition.classNamePrefix": {
         "en": "Optional prefix prepended to class names derived from the folder segment.\nFor example, gamemodes use `\"gamemode_\"` so a folder `sandbox` produces the\nclass name `gamemode_sandbox`, matching the runtime convention."
     },
-    "EmmyrcGmodScriptedClassDefinition.disabled": {
-        "en": "disabled"
-    },
-    "EmmyrcGmodScriptedClassDefinition.exclude": {
-        "en": "exclude"
-    },
-    "EmmyrcGmodScriptedClassDefinition.fixedClassName": {
-        "en": "fixedClassName"
-    },
     "EmmyrcGmodScriptedClassDefinition.hookOwner": {
         "en": "Whether this class global and its aliases define gamemode hooks."
-    },
-    "EmmyrcGmodScriptedClassDefinition.icon": {
-        "en": "icon"
-    },
-    "EmmyrcGmodScriptedClassDefinition.id": {
-        "en": "id"
-    },
-    "EmmyrcGmodScriptedClassDefinition.include": {
-        "en": "include"
-    },
-    "EmmyrcGmodScriptedClassDefinition.isGlobalSingleton": {
-        "en": "isGlobalSingleton"
-    },
-    "EmmyrcGmodScriptedClassDefinition.label": {
-        "en": "label"
-    },
-    "EmmyrcGmodScriptedClassDefinition.parentId": {
-        "en": "parentId"
-    },
-    "EmmyrcGmodScriptedClassDefinition.path": {
-        "en": "path"
-    },
-    "EmmyrcGmodScriptedClassDefinition.rootDir": {
-        "en": "rootDir"
-    },
-    "EmmyrcGmodScriptedClassDefinition.scaffold": {
-        "en": "scaffold"
-    },
-    "EmmyrcGmodScriptedClassDefinition.superTypes": {
-        "en": "superTypes"
-    },
-    "EmmyrcGmodScriptedClassScaffold.files": {
-        "en": "files"
-    },
-    "EmmyrcGmodScriptedClassScaffoldFile.path": {
-        "en": "path"
-    },
-    "EmmyrcGmodScriptedClassScaffoldFile.template": {
-        "en": "template"
-    },
-    "EmmyrcGmodScriptedClassScopes.include": {
-        "en": "include"
-    },
-    "EmmyrcGmodVgui.codeLensEnabled": {
-        "en": "codeLensEnabled"
-    },
-    "EmmyrcGmodVgui.inlayHintEnabled": {
-        "en": "inlayHintEnabled"
     },
     "EmmyrcHover.enable": {
         "en": "Enable showing documentation on hover.",
@@ -927,9 +749,6 @@
     "EmmyrcReformat.useDiff": {
         "en": "Whether to use the diff algorithm for formatting."
     },
-    "EmmyrcResource.paths": {
-        "en": "paths"
-    },
     "EmmyrcRuntime.extensions": {
         "en": "file Extensions. eg: .lua, .lua.txt",
         "zh-CN": "文件扩展名。例如：.lua, .lua.txt"
@@ -991,7 +810,7 @@
         "en": "Whether multi-root workspaces should remain isolated.\n\nWhen false, workspace configs are merged into one global baseline\n(first workspace config wins scalar conflicts, arrays are unioned), while\nlocal workspace configs can still override file-scoped behavior."
     },
     "EmmyrcWorkspace.enableReindex": {
-        "en": "Enable full project reindex after changing a file.",
+        "en": "After a save, once edits pause, drop the files deleted from disk\noutside the editor and compute every file's diagnostics again.",
         "zh-CN": "启用重新索引。"
     },
     "EmmyrcWorkspace.encoding": {
@@ -1021,7 +840,7 @@
         "en": "Package directories. Treat the parent directory as a `library`, but only add files from the specified directory.\neg: `/usr/local/share/lua/5.1/module`"
     },
     "EmmyrcWorkspace.reindexDuration": {
-        "en": "Delay between changing a file and full project reindex, in milliseconds.",
+        "en": "How long edits must pause before the recheck `enableReindex` runs, in\nmilliseconds (at least 1000).",
         "zh-CN": "当保存文件时，ls 将在指定毫秒后重新索引工作区。"
     },
     "EmmyrcWorkspace.useDefaultIgnores": {
@@ -1030,12 +849,6 @@
     "EmmyrcWorkspace.workspaceRoots": {
         "en": "Workspace roots. eg: [\"src\", \"test\"]",
         "zh-CN": "工作区根目录列表。例如：[\"src\", \"test\"]"
-    },
-    "EmmyrcWorkspaceModuleMap.pattern": {
-        "en": "pattern"
-    },
-    "EmmyrcWorkspaceModuleMap.replace": {
-        "en": "replace"
     },
     "IgnoreDirDefaultDefinition": {
         "en": "Object form for `workspace.ignoreDirDefaults` entries."

@@ -433,7 +433,6 @@ function camelToLabel(key: string): string {
         lua: 'Lua',
         luajit: 'LuaJIT',
         ide: 'IDE',
-        mcp: 'MCP',
     };
 
     return spaced
@@ -511,14 +510,17 @@ const GMOD_COMPOUND_REDISTRIBUTION: Record<string, Record<string, string>> = {
         'completion.mismatchHints': 'completion',
         'completion.smartReadSuggestions': 'completion',
     },
-    outline: {
-        verbosity: 'codeLens',
-    },
     vgui: {
         codeLensEnabled: 'codeLens',
         inlayHintEnabled: 'hint',
     },
 };
+
+/**
+ * Compound gmod fields shown as categories of their own, in place of the
+ * removed "gmod" category.
+ */
+const GMOD_CATEGORY_FIELDS = ['outline'];
 
 /**
  * Remove the "gmod" category and redistribute its fields into the
@@ -564,8 +566,13 @@ function redistributeGmodFields(categories: Category[]): Category[] {
         }
     }
 
-    // Remove gmod category
-    categories.splice(gmodIndex, 1);
+    const promotedCategories = GMOD_CATEGORY_FIELDS
+        .map(key => gmodCategory.fields.find(f => f.key === key))
+        .flatMap(field => field?.properties
+            ? [{ key: field.key, label: field.label, description: field.description, fields: field.properties }]
+            : []);
+
+    categories.splice(gmodIndex, 1, ...promotedCategories);
     return categories;
 }
 

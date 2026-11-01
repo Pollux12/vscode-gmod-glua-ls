@@ -173,26 +173,6 @@
                 "category": "GLuaLS"
             },
             {
-                "command": "gluals.gmod.mcp.startHost",
-                "title": "MCP: Start Host",
-                "category": "GLuaLS"
-            },
-            {
-                "command": "gluals.gmod.mcp.stopHost",
-                "title": "MCP: Stop Host",
-                "category": "GLuaLS"
-            },
-            {
-                "command": "gluals.gmod.mcp.restartHost",
-                "title": "MCP: Restart Host",
-                "category": "GLuaLS"
-            },
-            {
-                "command": "gluals.gmod.mcp.healthCheck",
-                "title": "MCP: Health Check",
-                "category": "GLuaLS"
-            },
-            {
                 "command": "gluals.gmod.explorer.refresh",
                 "title": "Explorer: Refresh",
                 "category": "GLuaLS",
@@ -263,11 +243,6 @@
                 "icon": "$(edit)"
             },
             {
-                "command": "gmodEntityExplorer.loadMore",
-                "title": "%command.gmodEntityExplorer.loadMore.title%",
-                "category": "GLuaLS"
-            },
-            {
                 "command": "gluals.gmod.explorer.copyRelativePath",
                 "title": "Explorer: Copy Relative Path",
                 "category": "GLuaLS",
@@ -290,167 +265,6 @@
                 "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
-            }
-        ],
-        "languageModelTools": [
-            {
-                "name": "search_glua_docs",
-                "displayName": "Search GLua API Documentation",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gluaDocs",
-                "icon": "$(book)",
-                "userDescription": "Search Garry's Mod GLua API documentation for functions, classes, and other symbols.",
-                "modelDescription": "Search the Garry's Mod GLua API documentation and local codebase index for functions, methods, classes, and constants. \n\nQuery syntax:\n- Type:method (e.g. \"Entity:GetPos\", \"Player:GetName\") searches for a specific method on a class\n- type.field (e.g. \"hook.Add\", \"math.max\") searches for global table members or static methods\n- Plain word (e.g. \"Player\", \"GetPos\", \"hook\") searches class names, globals, and all class methods with that name\n\nReturns full documentation including signatures, parameter names and types, return types, and description text - the same information shown when hovering over a symbol in the editor.\n\nUse this tool when: writing or reviewing GLua code and you need to know what arguments a function takes, what it returns, or whether it exists. Always prefer using this tool over guessing API signatures.\n\nDo not use for: general Lua language questions (only for Garry's Mod specific API and the current workspace's code).",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The API symbol or concept to search for. Examples: 'Entity:GetPos', 'hook.Add', 'ents', 'Player:GetName', 'physics'"
-                        },
-                        "limit": {
-                            "type": "number",
-                            "description": "Maximum number of results to return. Default is 10, maximum is 20."
-                        }
-                    },
-                    "required": [
-                        "query"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_lua",
-                "displayName": "Run Lua In GMod",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunLua",
-                "icon": "$(terminal)",
-                "userDescription": "Execute a Lua chunk in the active Garry's Mod debug session.",
-                "modelDescription": "Runs arbitrary Lua code in the currently active Garry's Mod debug session using the selected runtime realm (server, client, or shared). Use this when the user asks to test Lua behavior live in-game, query runtime state, or perform controlled debugger-side execution. This tool requires an active GMod debug session and returns a formatted summary including realm, success status, and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "lua": {
-                            "type": "string",
-                            "description": "Lua source code to execute in Garry's Mod."
-                        },
-                        "realm": {
-                            "type": "string",
-                            "enum": [
-                                "server",
-                                "client",
-                                "shared"
-                            ],
-                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
-                        }
-                    },
-                    "required": [
-                        "lua"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_command",
-                "displayName": "Run GMod Console Command",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunCommand",
-                "icon": "$(terminal)",
-                "userDescription": "Run a Garry's Mod console command in the active debug session.",
-                "modelDescription": "Executes a Garry's Mod console command through the active debugger transport. Use this when the user explicitly asks to run a console command (for example, convars, debug helpers, or command-driven runtime checks). Requires an active GMod debug session and returns a formatted result with realm context, status, and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Console command text to execute in Garry's Mod."
-                        }
-                    },
-                    "required": [
-                        "command"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_run_file",
-                "displayName": "Run Lua File In GMod",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodRunFile",
-                "icon": "$(terminal)",
-                "userDescription": "Run a Lua file in Garry's Mod.",
-                "modelDescription": "Runs a Lua file in Garry's Mod through debugger control (equivalent to MCP run_file behavior). Use this when the user wants to run an existing script file in server/client/shared realm without copying file contents into a command. Requires an active GMod debug session and returns formatted status and diagnostics.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "File path to run in Garry's Mod."
-                        },
-                        "realm": {
-                            "type": "string",
-                            "enum": [
-                                "server",
-                                "client",
-                                "shared"
-                            ],
-                            "description": "Optional runtime realm. If omitted, uses the extension's current selected GMod realm."
-                        }
-                    },
-                    "required": [
-                        "path"
-                    ]
-                }
-            },
-            {
-                "name": "gmod_get_output",
-                "displayName": "Get GMod Output Log",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetOutput",
-                "icon": "$(output)",
-                "userDescription": "Return recent buffered Garry's Mod output entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod output log entries captured by the extension's debugger event stream, including runtime output and control-command summaries. Use this when the user asks for runtime output or recent command activity. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 200,
-                            "description": "Maximum number of recent output entries to return. Default 50."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gmod_get_errors",
-                "displayName": "Get GMod Error Log",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetErrors",
-                "icon": "$(output)",
-                "userDescription": "Return recent buffered Garry's Mod error entries.",
-                "modelDescription": "Returns recent buffered Garry's Mod error log entries captured by backend/control error handling and command-rejection tracking. Use this when the user asks for failures, backend errors, or rejected control commands. Does not require an active debug session. The response includes formatted bullet entries with timestamp, source, level, and message.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "number",
-                            "minimum": 1,
-                            "maximum": 200,
-                            "description": "Maximum number of recent error entries to return. Default 50."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gmod_get_debug_state",
-                "displayName": "Get GMod Debug State",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "gmodGetDebugState",
-                "icon": "$(debug)",
-                "userDescription": "Return the current Garry's Mod debugger state snapshot.",
-                "modelDescription": "Returns the full debugger state snapshot, including active session presence, session metadata, selected realm, language server state, MCP host health, and buffered output/error counts. Use this tool to diagnose debugger connectivity and runtime state before attempting command execution. Does not require an active debug session and returns the state as JSON.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
             }
         ],
         "languages": [
@@ -495,12 +309,6 @@
                     "light": "./res/glua-file-light.svg",
                     "dark": "./res/glua-file-dark.svg"
                 }
-            }
-        ],
-        "snippets": [
-            {
-                "language": "glua",
-                "path": "./snippets/lua.json"
             }
         ],
         "grammars": [
@@ -593,7 +401,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -655,7 +463,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -692,10 +500,7 @@
                         "name": "%debug.gmod.attach.name%",
                         "host": "127.0.0.1",
                         "port": 21111,
-                        "sourceRoot": "${workspaceFolder}",
-                        "sourceFileMap": {
-                            "${workspaceFolder}": "."
-                        },
+                        "sourceRoot": "${workspaceFolder}/../..",
                         "stopOnEntry": true,
                         "stopOnError": false,
                         "realm": "server"
@@ -711,10 +516,7 @@
                             "name": "%debug.gmod.attach.name%",
                             "host": "127.0.0.1",
                             "port": 21111,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false,
                             "realm": "server"
@@ -732,10 +534,7 @@
                             "args": [],
                             "host": "127.0.0.1",
                             "port": 21111,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false,
                             "realm": "server"
@@ -770,7 +569,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -797,10 +596,7 @@
                         "name": "[CLIENT] Attach to Gmod",
                         "host": "127.0.0.1",
                         "port": 21112,
-                        "sourceRoot": "${workspaceFolder}",
-                        "sourceFileMap": {
-                            "${workspaceFolder}": "."
-                        },
+                        "sourceRoot": "${workspaceFolder}/../..",
                         "stopOnEntry": true,
                         "stopOnError": false
                     }
@@ -808,17 +604,14 @@
                 "configurationSnippets": [
                     {
                         "label": "GMod Client: Attach (rdb_client)",
-                        "description": "Attach the GLuaLS debugger to a running GMod client via rdb_client.",
+                        "description": "Attach the GLuaLS debugger to a running GMod client via rdb_client from a workspace inside garrysmod/addons or garrysmod/gamemodes; run GLuaLS: Configure Debugger for other layouts.",
                         "body": {
                             "type": "gluals_gmod_client",
                             "request": "attach",
                             "name": "[CLIENT] Attach to Gmod",
                             "host": "127.0.0.1",
                             "port": 21112,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false
                         }
@@ -928,10 +721,6 @@
                 }
             ],
             "commandPalette": [
-                {
-                    "command": "gluals.gmod.mcp.healthCheck",
-                    "when": "resourceExtname == .lua"
-                },
                 {
                     "command": "gluals.gmod.pauseSoft",
                     "when": "inDebugMode && debugType == gluals_gmod"
@@ -1287,23 +1076,8 @@
                 }
             },
             {
-                "title": "Diagnostics",
-                "order": 3,
-                "properties": {
-                    "gluals.diagnostics.diagnosticInterval": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "editPresentation": "singlelineText",
-                        "default": null,
-                        "markdownDescription": "%config.gluals.diagnostics.diagnosticInterval.description%"
-                    }
-                }
-            },
-            {
                 "title": "Document Color",
-                "order": 4,
+                "order": 3,
                 "properties": {
                     "gluals.documentColor.enable": {
                         "type": [
@@ -1332,7 +1106,7 @@
             },
             {
                 "title": "Hint",
-                "order": 5,
+                "order": 4,
                 "properties": {
                     "gluals.hint.enable": {
                         "type": [
@@ -1554,7 +1328,7 @@
             },
             {
                 "title": "Hover",
-                "order": 6,
+                "order": 5,
                 "properties": {
                     "gluals.hover.enable": {
                         "type": [
@@ -1583,7 +1357,7 @@
             },
             {
                 "title": "Inline Values",
-                "order": 7,
+                "order": 6,
                 "properties": {
                     "gluals.inlineValues.enable": {
                         "type": [
@@ -1612,7 +1386,7 @@
             },
             {
                 "title": "References",
-                "order": 8,
+                "order": 7,
                 "properties": {
                     "gluals.references.enable": {
                         "type": [
@@ -1687,7 +1461,7 @@
             },
             {
                 "title": "Semantic Tokens",
-                "order": 9,
+                "order": 8,
                 "properties": {
                     "gluals.semanticTokens.enable": {
                         "type": [
@@ -1739,7 +1513,7 @@
             },
             {
                 "title": "Workspace",
-                "order": 10,
+                "order": 9,
                 "properties": {
                     "gluals.workspace.enableReindex": {
                         "type": [
@@ -1823,7 +1597,7 @@
             },
             {
                 "title": "Strict",
-                "order": 11,
+                "order": 10,
                 "properties": {
                     "gluals.strict.inferredTypeMismatch": {
                         "type": [
@@ -1852,7 +1626,7 @@
             },
             {
                 "title": "GMod",
-                "order": 12,
+                "order": 11,
                 "properties": {
                     "gluals.gmod.autoLoadAnnotations": {
                         "type": "boolean",
@@ -1942,40 +1716,12 @@
                         "type": "boolean",
                         "default": true,
                         "markdownDescription": "%config.gmod.debugger.autoUpdateRdb.description%"
-                    },
-                    "gluals.gmod.mcp.enabled": {
-                        "type": "boolean",
-                        "default": true,
-                        "scope": "machine",
-                        "markdownDescription": "Enable the authenticated MCP host for GMod debug tool execution."
-                    },
-                    "gluals.gmod.mcp.port": {
-                        "type": "integer",
-                        "default": 0,
-                        "minimum": 0,
-                        "maximum": 65535,
-                        "scope": "machine",
-                        "markdownDescription": "Port for the MCP host (`0` chooses a random ephemeral port)."
-                    },
-                    "gluals.gmod.mcp.authToken": {
-                        "type": "string",
-                        "default": "",
-                        "scope": "machine",
-                        "markdownDescription": "Optional MCP auth token override. Leave empty to generate a secure token automatically."
-                    },
-                    "gluals.gmod.mcp.rateLimitPerMinute": {
-                        "type": "integer",
-                        "default": 60,
-                        "minimum": 1,
-                        "maximum": 600,
-                        "scope": "machine",
-                        "markdownDescription": "Maximum authenticated MCP requests accepted per minute per client address."
                     }
                 }
             },
             {
                 "title": "Decorations",
-                "order": 13,
+                "order": 12,
                 "properties": {
                     "gluals.decorations.globalUnderline": {
                         "type": "boolean",
@@ -2006,7 +1752,7 @@
             },
             {
                 "title": "Misc",
-                "order": 14,
+                "order": 13,
                 "properties": {
                     "gluals.language.completeAnnotation": {
                         "type": "boolean",
@@ -2023,7 +1769,7 @@
             },
             {
                 "title": "Language Server",
-                "order": 15,
+                "order": 14,
                 "properties": {
                     "gluals.ls.startParameters": {
                         "type": "array",
@@ -2048,16 +1794,15 @@
                         "default": "",
                         "markdownDescription": "%config.emmylua.ls.globalConfigPath.description%"
                     },
-                    "lua.trace.server": {
+                    "glua.trace.server": {
                         "type": "string",
                         "enum": [
-                            "off",
                             "messages",
                             "verbose"
                         ],
-                        "default": "off",
+                        "default": "messages",
                         "scope": "window",
-                        "markdownDescription": "%config.lua.trace.server.description%"
+                        "markdownDescription": "%config.glua.trace.server.description%"
                     },
                     "gluals.ls.debugPort": {
                         "type": [
@@ -2529,6 +2274,7 @@
         "test:grammar": "node ./build/grammar-test.cjs",
         "test:parity": "yarn run compile && node ./build/gmod-debug-parity-test.js",
         "test:extension": "yarn run compile && node ./out/test/runTest.js",
+        "test:e2e": "yarn run compile && node ./out/test/runTest.js --e2e",
         "test:all": "yarn run test:schema && yarn run test:grammar && yarn run test:parity && yarn run test:extension",
         "test": "yarn run test:all",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",

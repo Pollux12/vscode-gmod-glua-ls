@@ -281,11 +281,6 @@ function assertManifest(packageJson) {
     );
     assert.ok(grammarContribution, "expected a GLua grammar contribution");
     assert.deepEqual(
-        packageJson.contributes?.snippets?.map((snippet) => snippet.language),
-        ["glua"],
-        "expected snippets to target glua"
-    );
-    assert.deepEqual(
         packageJson.contributes?.breakpoints?.map((breakpoint) => breakpoint.language),
         ["glua"],
         "expected breakpoints to target glua"

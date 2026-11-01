@@ -71,9 +71,15 @@ export class EmmyContext implements vscode.Disposable {
     private readonly _statusBar: vscode.StatusBarItem;
     private readonly _disposables: vscode.Disposable[] = [];
 
+    /**
+     * @param outputChannel The server's log channel, which this context owns. VS Code
+     * hands every caller the same log channel for a name, so one is created once,
+     * at activation, and passed in.
+     */
     constructor(
         public readonly debugMode: boolean,
         public readonly vscodeContext: vscode.ExtensionContext,
+        public readonly outputChannel: vscode.LogOutputChannel,
     ) {
         this._serverStatus = { state: ServerState.Stopped };
         this._statusBar = vscode.window.createStatusBarItem(
@@ -85,6 +91,7 @@ export class EmmyContext implements vscode.Disposable {
         this._statusBar.command = 'gluals.showServerMenu';
 
         this._disposables.push(this._statusBar);
+        this._disposables.push(this.outputChannel);
         this.updateStatusBar();
     }
 

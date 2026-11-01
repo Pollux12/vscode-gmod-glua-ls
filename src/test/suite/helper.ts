@@ -15,7 +15,6 @@ export function getFixtureUri(relativePath: string): vscode.Uri {
 export async function activateExtension(docUri?: vscode.Uri): Promise<vscode.Extension<unknown>> {
     const gmodConfig = vscode.workspace.getConfiguration('gluals.gmod');
     await gmodConfig.update('autoLoadAnnotations', false, vscode.ConfigurationTarget.Global);
-    await gmodConfig.update('mcp.enabled', false, vscode.ConfigurationTarget.Global);
 
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     if (!extension) {

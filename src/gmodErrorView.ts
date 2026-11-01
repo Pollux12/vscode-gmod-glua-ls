@@ -32,7 +32,8 @@ export function parseGmodErrorLocation(text: string): GmodErrorLocation | undefi
         return undefined;
     }
 
-    const match = line.match(/@?((?:[A-Za-z]:)?[^:\r\n]+\.lua):(\d+)(?::(\d+))?/i);
+    const frameLocation = line.match(/^\d+\.\s+.*?\s-\s+(.+)$/)?.[1] ?? line;
+    const match = frameLocation.match(/@?((?:[A-Za-z]:)?[^:\r\n]+\.lua):(\d+)(?::(\d+))?/i);
     if (!match) {
         return undefined;
     }
@@ -57,13 +58,21 @@ export function parseGmodErrorLocation(text: string): GmodErrorLocation | undefi
 
 export class GmodErrorStore implements vscode.Disposable {
     private readonly errors = new Map<string, GmodError>();
+    private readonly latestTotals = new Map<string, number>();
+    private baselines = new Map<string, number>();
     private readonly changeEmitter = new vscode.EventEmitter<void>();
 
     readonly onDidChange = this.changeEmitter.event;
 
     addError(params: GmodErrorNotificationParams): void {
         const now = new Date();
-        const safeCount = Number.isFinite(params.count) ? Math.max(1, Math.floor(params.count)) : 1;
+        const total = Number.isFinite(params.count) ? Math.max(1, Math.floor(params.count)) : 1;
+        const baseline = this.baselines.get(params.fingerprint) ?? 0;
+        if (total <= baseline) {
+            this.baselines.delete(params.fingerprint);
+        }
+        this.latestTotals.set(params.fingerprint, total);
+        const safeCount = total > baseline ? total - baseline : total;
         const existing = this.errors.get(params.fingerprint);
         if (existing) {
             existing.message = params.message;
@@ -87,6 +96,7 @@ export class GmodErrorStore implements vscode.Disposable {
     }
 
     clear(): void {
+        this.baselines = new Map(this.latestTotals);
         if (this.errors.size === 0) {
             return;
         }
@@ -121,6 +131,8 @@ export class GmodErrorTreeItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('warning');
         this.tooltip = [
             error.message,
+            ...(error.stackTrace ?? []).map((frame) => `    ${frame}`),
+            '',
             `Source: ${error.source}`,
             `Fingerprint: ${error.fingerprint}`,
             `First seen: ${error.firstSeen.toLocaleString()}`,

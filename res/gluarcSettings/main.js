@@ -31,6 +31,7 @@ import { createSettingRow } from "./components/settingRow.js";
 import { showConfirmDialog } from "./components/dialog.js";
 
 const vscode = acquireVsCodeApi();
+const SECTION_READING_OFFSET = 48;
 
 const currentState = {
     categories: [],
@@ -40,7 +41,7 @@ const currentState = {
 
 let formatAutoSwitchedToCustom = false;
 let searchInitialized = false;
-let sectionObserver;
+let clickedCategoryId;
 let isDirty = false;
 let dirtyTimer;
 let savedDisplayTimer;
@@ -64,9 +65,13 @@ window.addEventListener("message", (event) => {
             updateAutoSaveEnabled(message.autoSaveEnabled);
             clearDirty();
             renderSettings();
-            setupObservers();
+            updateActiveCategory();
             if (!searchInitialized) {
-                setupSearch();
+                setupSearch(() => {
+                    clickedCategoryId = undefined;
+                    updateActiveCategory();
+                });
+                setupActiveCategoryTracking();
                 searchInitialized = true;
             }
             break;
@@ -422,13 +427,11 @@ function renderSettings() {
         item.textContent = category.label;
         item.dataset.target = categoryId;
         item.onclick = () => {
+            clickedCategoryId = categoryId;
             document.getElementById(categoryId)?.scrollIntoView({
                 block: "start",
             });
-            document
-                .querySelectorAll(".category-item")
-                .forEach((entry) => entry.classList.remove("active"));
-            item.classList.add("active");
+            setActiveCategory(categoryId);
         };
         categoryList.appendChild(item);
 
@@ -790,35 +793,44 @@ function generateInput(field, value, onChange) {
 
 function updateAllWidgetValues() {
     renderSettings();
-    setupObservers();
+    updateActiveCategory();
 }
 
-function setupObservers() {
-    if (sectionObserver) {
-        sectionObserver.disconnect();
+function setActiveCategory(categoryId) {
+    document.querySelectorAll(".category-item").forEach((item) => {
+        item.classList.toggle("active", item.dataset.target === categoryId);
+    });
+}
+
+function updateActiveCategory() {
+    if (clickedCategoryId) {
+        setActiveCategory(clickedCategoryId);
+        return;
     }
 
-    sectionObserver = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (!entry.isIntersecting) {
-                    return;
-                }
+    const body = document.getElementById("mainContent");
+    const readingLine = body.getBoundingClientRect().top + SECTION_READING_OFFSET;
+    let activeId;
+    for (const section of document.querySelectorAll("#settingsSections > section")) {
+        if (section.offsetHeight === 0) {
+            continue;
+        }
+        if (activeId && section.getBoundingClientRect().top > readingLine) {
+            break;
+        }
+        activeId = section.id;
+    }
+    setActiveCategory(activeId);
+}
 
-                const id = entry.target.id;
-                document.querySelectorAll(".category-item").forEach((item) => {
-                    if (item.dataset.target === id) {
-                        item.classList.add("active");
-                    } else {
-                        item.classList.remove("active");
-                    }
-                });
-            });
-        },
-        { threshold: 0.2 },
-    );
-
-    document.querySelectorAll("section").forEach((section) => {
-        sectionObserver.observe(section);
+function setupActiveCategoryTracking() {
+    const body = document.getElementById("mainContent");
+    body.addEventListener("scroll", () => requestAnimationFrame(updateActiveCategory), {
+        passive: true,
     });
+    for (const userScroll of ["wheel", "pointerdown", "keydown"]) {
+        body.addEventListener(userScroll, () => {
+            clickedCategoryId = undefined;
+        }, { passive: true });
+    }
 }

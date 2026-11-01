@@ -2,8 +2,6 @@ import {
     readSchema,
     readLocaleDefault,
     writeLocaleDefault,
-    readLocaleZhCn,
-    writeLocaleZhCn,
     readPackage,
     writePackage,
 } from "./util.js";
@@ -66,7 +64,6 @@ export function main() {
 
     dumpPackageJson(rendered);
     dumpLocalesEn(descriptions);
-    dumpLocalesZhCn(descriptions);
 }
 
 function extractSettings(
@@ -194,26 +191,6 @@ function dumpLocalesEn(descriptions) {
         });
 
     writeLocaleDefault(newLocaleSorted);
-}
-
-function dumpLocalesZhCn(descriptions) {
-    const locale = readLocaleZhCn();
-
-    for (const [key, value] of Object.entries(descriptions)) {
-        if (!locale[key]) {
-            console.warn(`Missing translation for ${key}`);
-            locale[key] = value;
-        }
-    }
-
-    const newLocaleSorted = {};
-    Object.keys(locale)
-        .sort()
-        .forEach((key) => {
-            newLocaleSorted[key] = locale[key];
-        });
-
-    writeLocaleZhCn(newLocaleSorted);
 }
 
 function dumpPackageJson(rendered) {

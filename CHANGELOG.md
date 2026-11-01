@@ -2,14 +2,107 @@
 
 ---
 
-## [1.2.2] [Pre-Release] - 2026-08-24
-> Various regression fixes and improvements
+## [1.3.0] [Pre-Release] - 2026-11-01
+> Incremental Analysis System + Fixes
 
 ## VS Code Extension
 
+- Add a setting for outline verbosity.
+- Improve startup responsiveness by no longer requesting symbols for every open file while the workspace loads.
+- Improve responsiveness by only requesting local, parameter and global highlighting when it is shown.
+- Improve the descriptions of the workspace recheck settings so they explain what the settings do.
+- Improve the Entity Explorer to load every page so grouping and filtering include all entities.
+- Improve debugger console output by joining fragments into whole lines without channel tags.
+- Improve debugger error reporting by labelling Lua errors by their first line and keeping the stack in frames.
+- Remove static Lua snippets that duplicate keyword completions.
+- Remove the GitHub Copilot tools and the MCP host.
 - Fix the colour swatch missing from completions for colours with an alpha value.
+- Fix language server logs being lost from the Output panel after the server restarts.
+- Fix the server trace setting having no effect. It is now `glua.trace.server`, and its messages show in the `GLua Language Server` output when that output's log level is set to `Trace`.
+- Fix debugger "Run File" and "Refresh File" not using source mappings for gamemode and addon files.
+- Fix debugger path matching failing on Windows when casing differs.
 
 ## Language Server
+
+- Refactor analysis into an incremental system that re-analyses only what an edit affects, significantly improving edit performance in large codebases at the cost of initial run performance and memory usage.
+- Add automatic updates to `include`, `AddCSLuaFile` and `require` paths when a file is renamed or moved.
+- Add a `--gmod-annotations` option to `glua_doc_cli`, so documentation exports can use GMod annotations.
+- Add hook documentation inherited from parent classes to hovers.
+- Add enum values to type mismatch messages, and accept a literal where an enum with that value is expected.
+- Add narrowing of `Entity` to `Player` when it is compared with `LocalPlayer()`.
+- Improve typing responsiveness by sending only the changed text, and answering hovers, completions and other requests while re-analysis is still running.
+- Improve diagnostic speed by sending diagnostics as soon as they are ready and only checking files whose results could have changed.
+- Improve indexing speed on large workspaces by analysing files in parallel.
+- Improve memory usage on large workspaces.
+- Improve handling of files changed, created, deleted, or renamed outside the editor by re-analysing them in the background.
+- Improve config reloads, so a change to `.gluarc.json` applies to every file and only re-analyses what the changed settings affect.
+- Improve stability by recovering from internal errors instead of leaving analysis or diagnostics stuck.
+- Improve inferred types for tables, globals and members built across several files, including guarded, conditional, looped and late writes.
+- Improve scripted class and VGUI support, including inline-registered panels, `DEFINE_BASECLASS`, `scripted_ents.Register` bases, `AccessorFunc` getters and panels that inherit from other panels.
+- Improve type narrowing for nil checks, truthiness, `IsValid` and other guard functions, unions, and code that cannot run in the current realm.
+- Improve type inference for `pairs`, `ipairs`, multi-return values, generic calls, overloads, and optional or default parameters.
+- Improve the warning for a field only ever used as one subclass, so it is reported once per use, shows the narrowed type, and no longer suggests anonymous panel classes.
+- Improve realm mismatch diagnostics by showing the evidence for each side.
+- Improve overload mismatch messages to report only surplus arguments when leading parameters match.
+- Fix diagnostics and types changing after an edit to code they do not depend on, or differing from a fresh start.
+- Fix diagnostics being missing, stale, or cleared after edits, cancellations, file changes, deletions and renames.
+- Fix diagnostics from an older version of a file being shown on newer text.
+- Fix hovers, completions, go to definition, references, code lenses, semantic highlighting and inlay hints returning stale, empty or duplicated results while the workspace is re-analysed.
+- Fix positions being off on lines that contain non-ASCII characters.
+- Fix a moved or renamed file keeping its diagnostics at the old path.
+- Fix requests made while the workspace is loading failing instead of being retried.
+- Fix the server not shutting down cleanly when the editor closes.
+- Fix code style checks reporting nothing in files that use GLua-only syntax.
+- Fix crashes on startup in some workspaces, and on deeply nested code.
+- Fix rare analysis hangs caused by values that update themselves across files, such as `t.k = t.k + 1`, or tables that contain themselves.
+- Fix `glua_check` hanging or succeeding with incomplete results when a worker fails.
+- Fix `include` picking a file with the same name elsewhere instead of the one next to the including file.
+- Fix dynamic field definitions and references resolving to the wrong table, member, file or position.
+- Fix incorrect `undefined-field`, `undefined-method`, `missing-fields`, `need-check-nil`, `param-type-mismatch` and `assign-type-mismatch` diagnostics caused by incomplete or unstable inference.
+- Fix realm and load-order resolution when globals, tables and classes are defined across several files or realms.
+- Fix scripted class members leaking between realms and files, and one file's `PANEL` class appearing in other files.
+- Fix `AccessorFunc` and `NetworkVar` calls in gamemode files adding members to `GM` instead of the table they target.
+- Fix net message diagnostics becoming stale when related code changes, and net senders being picked in a different order on different platforms.
+- Fix false `missing-fields` warnings when a function call or `...` at the end of a table fills the remaining fields.
+- Fix false `duplicate-field` warnings for fields that are not declared with doc tags.
+- Fix method overrides being reported as incompatible when they accept every form of the base method or keep its return type.
+- Fix a table with an `__index` metatable not matching the class it implements.
+- Fix calls on values typed `any` not returning `any`.
+- Fix `IsValid` checks keeping `true` in a value's type instead of narrowing it to the valid value.
+- Fix `~= nil` checks narrowing untyped fields to `never` instead of a non-nil value.
+- Fix truthiness checks failing to remove `nil` from unknown fields.
+- Fix `infer-unknown` being reported for arithmetic results with a known numeric type.
+- Fix undefined-field diagnostics for namespaces built across files with `X = X or {}` and used through an alias.
+- Fix multi-return values containing `unknown` not spreading correctly into function arguments.
+- Fix fields assigned to container elements inside loops or conditional blocks being treated as required class fields.
+- Fix empty table writes being rejected for declared callback fields shared by closures.
+- Fix a doc comment applying to code after the function it documents.
+- Fix user-defined type aliases being replaced when a library uses the same name.
+- Fix type errors being reported inside unreachable code.
+- Fix "type not found" errors staying after the type is defined.
+- Fix `true` and `false` not being read as booleans in attribute arguments, and nullable attribute parameters being treated as required.
+- Fix hovers on unresolved names showing `unknown` instead of the token name.
+- Fix keyword completions showing after `.` and `:`.
+- Fix hook and net message completions including the half-typed name.
+- Fix string completions replacing the wrong range after an opening quote.
+- Fix missing-parameter warnings when directly calling a hook without trailing engine arguments.
+- Fix `tonumber` not reading binary literals (`0b...`), hexadecimal fractions or exponents.
+- Fix `break` and `continue` flow and unreachable code detection in `repeat ... until` loops.
+- Fix various false positives identified in common gamemodes and addons.
+
+## Annotations
+
+- Add engine weapon, vehicle and NPC classes.
+- Add GM methods and fields from base and sandbox gamemode source code.
+- Improve `Player:GetWeapon` to return the weapon class requested.
+- Improve Derma panel inheritance so `DTextEntry`, `DCheckBoxLabel`, `DFileBrowser` and `DNumPad` derive from their real base controls.
+- Improve Derma skin paint hooks by typing them for the controls they paint.
+- Fix `Entity:SetCreator`, `SetNWEntity`, `SetGroundEntity` and `Player:SpectateEntity` rejecting `nil` and `NULL` to clear a value.
+- Fix `table.Copy` losing the copied table's type.
+
+## Debugger
+
+- Update for latest Garry's Mod (both x64 and x32)
 
 ---
 
