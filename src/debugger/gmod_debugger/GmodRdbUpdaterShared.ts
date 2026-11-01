@@ -361,7 +361,11 @@ export function findAssetsForArchGroups(
     const assets: ReleaseAsset[] = [];
     for (const group of archCandidateGroups) {
         const match = findAssetByNameCandidates(release, group);
-        if (match && !assets.some((existing) => existing.name === match.name)) {
+        if (!match) {
+            const available = release.assets.map((entry) => entry.name).join(', ') || '(none)';
+            throw new Error(`Release ${release.tag_name} has no ${group.join(' or ')}. Available assets: ${available}`);
+        }
+        if (!assets.some((existing) => existing.name === match.name)) {
             assets.push(match);
         }
     }
