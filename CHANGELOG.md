@@ -15,6 +15,7 @@
 - Improve debugger console output by joining fragments into whole lines without channel tags.
 - Improve debugger error reporting by labelling Lua errors by their first line and keeping the stack in frames.
 - Remove static Lua snippets that duplicate keyword completions.
+- Remove the GitHub Copilot tools and the MCP host.
 - Fix the colour swatch missing from completions for colours with an alpha value.
 - Fix language server logs being lost from the Output panel after the server restarts.
 - Fix the server trace setting having no effect. It is now `glua.trace.server`, and its messages show in the `GLua Language Server` output when that output's log level is set to `Trace`.

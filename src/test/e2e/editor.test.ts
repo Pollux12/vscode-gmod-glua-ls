@@ -85,7 +85,6 @@ suite('Real language server editor workflows', function () {
             savedSettings.set(key, config.inspect(key)?.workspaceValue);
             await config.update(key, value, vscode.ConfigurationTarget.Workspace);
         }
-        await config.update('gmod.mcp.enabled', false, vscode.ConfigurationTarget.Global);
         await extension.activate();
         console.log(`REAL_SERVER ${JSON.stringify({ executable, annotations, vscode: vscode.version })}`);
         const started = performance.now();

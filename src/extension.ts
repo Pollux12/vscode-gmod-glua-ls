@@ -19,7 +19,6 @@ import { registerUndefinedGlobalCodeActions } from './undefinedGlobalCodeActions
 import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
-import { GmodMcpHost } from './gmodMcpHost';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
@@ -34,13 +33,6 @@ import { EntityClassGroupFilter, EntityTreeItem, GmodEntityExplorerProvider } fr
 import { GluarcSettingsPanel } from './gluarcSettingsPanel';
 import { ensureGluarcExists, getNestedValue, readGluarcConfig, setNestedValue, writeGluarcConfig } from './gluarcConfig';
 import { scaffoldNewScriptedClass } from './gmodScaffolding';
-import { GluaDocSearchTool } from './tools/gluaDocSearchTool';
-import { GmodGetDebugStateTool } from './tools/gmodGetDebugStateTool';
-import { GmodGetErrorsTool } from './tools/gmodGetErrorsTool';
-import { GmodGetOutputTool } from './tools/gmodGetOutputTool';
-import { GmodRunCommandTool } from './tools/gmodRunCommandTool';
-import { GmodRunFileTool } from './tools/gmodRunFileTool';
-import { GmodRunLuaTool } from './tools/gmodRunLuaTool';
 import { GmodRdbUpdater } from './debugger/gmod_debugger/GmodRdbUpdater';
 import { gamePathToClientPath } from './debugger/gmod_debugger/GmodSourcePaths';
 import { GmodClientRdbUpdater } from './debugger/gmod_debugger/GmodClientRdbUpdater';
@@ -115,7 +107,6 @@ let syntaxTreeManager: SyntaxTreeManager | undefined;
 let gmodAnnotationManager: GmodAnnotationManager | undefined;
 let gmodRdbUpdater: GmodRdbUpdater;
 let gmodClientRdbUpdater: GmodClientRdbUpdater;
-let gmodMcpHost: GmodMcpHost | undefined;
 let gmodExplorerProvider: GmodExplorerProvider | undefined;
 let gmodRealmProvider: GmodRealmStatusBar | undefined;
 const gmodErrorStores = new Map<string, GmodErrorStore>();
@@ -128,7 +119,6 @@ const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
 const GMOD_DEBUG_CONFIG_CONTEXT_KEY = 'gluals.gmod.hasDebugConfig';
 const GMOD_DEBUG_SETUP_CONTEXT_KEY = 'gluals.gmod.needsDebugSetup';
-const GMOD_TOOL_LOG_MAX_SIZE = 1000;
 const SERVER_STATUS_NOTIFICATION = 'gluals/serverStatus';
 const LSP_PROGRESS_NOTIFICATION = '$/progress';
 const STARTUP_COMPLETE_TIMEOUT_MS = 60000;
@@ -151,17 +141,6 @@ interface StartupStateHandlerRegistration {
     isDiagnosticsInProgress(): boolean;
     dispose(error?: Error): void;
 }
-
-interface GmodToolLogEntry {
-    readonly timestamp: string;
-    readonly source: string;
-    readonly level: 'info' | 'error';
-    readonly message: string;
-    readonly metadata?: Record<string, unknown>;
-}
-
-const gmodToolOutputEntries: GmodToolLogEntry[] = [];
-const gmodToolErrorEntries: GmodToolLogEntry[] = [];
 
 /**
  * Extension activation entry point
@@ -207,11 +186,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * Extension deactivation
  */
 export async function deactivate(): Promise<void> {
-    if (gmodMcpHost) {
-        await gmodMcpHost.stop();
-        gmodMcpHost.dispose();
-        gmodMcpHost = undefined;
-    }
     disposeHoverProviderRegistration();
     try {
         await extensionContext?.stopServer();
@@ -262,10 +236,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
         { id: 'gluals.gmod.explorer.refresh', handler: refreshGmodExplorer },
         { id: 'gluals.gmod.scaffold.new', handler: (treeItemOrUri?: any) => scaffoldNewScriptedClass(treeItemOrUri, context) },
         { id: 'gluals.openDocumentation', handler: openDocumentation },
-        { id: 'gluals.gmod.mcp.startHost', handler: startGmodMcpHost },
-        { id: 'gluals.gmod.mcp.stopHost', handler: stopGmodMcpHost },
-        { id: 'gluals.gmod.mcp.restartHost', handler: restartGmodMcpHost },
-        { id: 'gluals.gmod.mcp.healthCheck', handler: healthCheckGmodMcpHost },
         { id: 'gluals.gmod.configureDebugger', handler: configureGmodDebugger },
         { id: 'gmodErrors.clear', handler: clearGmodErrors },
         { id: 'gmodErrors.openLocation', handler: openGmodErrorLocation },
@@ -455,57 +425,9 @@ async function initializeExtension(): Promise<void> {
     // Set up client getter for syntax tree provider
     setClientGetter(() => extensionContext.client);
 
-    initializeGmodMcpHost(extensionContext.vscodeContext);
-    await startGmodMcpHost(false);
 }
 
 function registerNonLanguageFeatures(context: vscode.ExtensionContext): void {
-    if (typeof vscode.lm.registerTool === 'function') {
-        const controlToolCallbacks = {
-            executeControlCommand: executeGmodControlCommand,
-            getDebugState: getGmodDebugState,
-            getCurrentRealm: getPersistedGmodRealm,
-        };
-        context.subscriptions.push(
-            vscode.lm.registerTool(
-                'search_glua_docs',
-                new GluaDocSearchTool(
-                    () => extensionContext.client,
-                    ensureServerStarted
-                )
-            ),
-            vscode.lm.registerTool(
-                'gmod_run_lua',
-                new GmodRunLuaTool(controlToolCallbacks)
-            ),
-            vscode.lm.registerTool(
-                'gmod_run_command',
-                new GmodRunCommandTool(controlToolCallbacks)
-            ),
-            vscode.lm.registerTool(
-                'gmod_run_file',
-                new GmodRunFileTool(controlToolCallbacks)
-            ),
-            vscode.lm.registerTool(
-                'gmod_get_output',
-                new GmodGetOutputTool({
-                    getOutput: getRecentGmodOutputEntries,
-                })
-            ),
-            vscode.lm.registerTool(
-                'gmod_get_errors',
-                new GmodGetErrorsTool({
-                    getErrors: getRecentGmodErrorEntries,
-                })
-            ),
-            vscode.lm.registerTool(
-                'gmod_get_debug_state',
-                new GmodGetDebugStateTool(getGmodDebugStateForTool)
-            )
-        );
-    } else {
-        console.warn('vscode.lm.registerTool is unavailable; skipping GLua docs tool registration.');
-    }
     registerDebuggers();
     initializeGmodExplorer(context);
     initializeGmodRealmView(context);
@@ -524,9 +446,6 @@ function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
     }
     if (e.affectsConfiguration('gluals.language.completeAnnotation')) {
         refreshLanguageConfiguration();
-    }
-    if (e.affectsConfiguration('gluals.gmod.mcp')) {
-        void restartGmodMcpHost(false);
     }
 }
 
@@ -1969,213 +1888,6 @@ async function openDocumentation(): Promise<void> {
     await vscode.env.openExternal(vscode.Uri.parse(url));
 }
 
-function initializeGmodMcpHost(context: vscode.ExtensionContext): void {
-    if (gmodMcpHost) {
-        return;
-    }
-
-    gmodMcpHost = new GmodMcpHost({
-        executeControlCommand: executeGmodControlCommand,
-        getDebugState: getGmodDebugState,
-        getCurrentRealm: getPersistedGmodRealm,
-    });
-    context.subscriptions.push(gmodMcpHost);
-}
-
-async function startGmodMcpHost(showNotification: boolean = true): Promise<void> {
-    if (!gmodMcpHost) {
-        initializeGmodMcpHost(extensionContext.vscodeContext);
-    }
-    if (!gmodMcpHost) {
-        return;
-    }
-
-    try {
-        await gmodMcpHost.start();
-        if (showNotification) {
-            const health = gmodMcpHost.getHealth();
-            vscode.window.showInformationMessage(`GMod MCP host listening on ${health.host}:${health.port}.`);
-        }
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to start GMod MCP host: ${errorMessage}`);
-    }
-}
-
-async function stopGmodMcpHost(showNotification: boolean = true): Promise<void> {
-    if (!gmodMcpHost) {
-        return;
-    }
-
-    try {
-        await gmodMcpHost.stop();
-        if (showNotification) {
-            vscode.window.showInformationMessage('GMod MCP host stopped.');
-        }
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to stop GMod MCP host: ${errorMessage}`);
-    }
-}
-
-async function restartGmodMcpHost(showNotification: boolean = true): Promise<void> {
-    if (!gmodMcpHost) {
-        initializeGmodMcpHost(extensionContext.vscodeContext);
-    }
-    if (!gmodMcpHost) {
-        return;
-    }
-
-    try {
-        await gmodMcpHost.restart();
-        if (showNotification) {
-            const health = gmodMcpHost.getHealth();
-            vscode.window.showInformationMessage(`GMod MCP host restarted on ${health.host}:${health.port}.`);
-        }
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to restart GMod MCP host: ${errorMessage}`);
-    }
-}
-
-function healthCheckGmodMcpHost(): void {
-    if (!gmodMcpHost) {
-        vscode.window.showWarningMessage('GMod MCP host is not ready yet. Please wait a moment or reload the window.');
-        return;
-    }
-
-    const health = gmodMcpHost.getHealth();
-    void vscode.window.showInformationMessage(`GMod MCP host: ${health.running ? 'running' : 'stopped'} at ${health.host}:${health.port}.`);
-}
-
-function getGmodDebugState(): Record<string, unknown> {
-    const session = getActiveGmodDebugSession();
-    return {
-        hasActiveSession: !!session,
-        sessionId: session?.id,
-        sessionName: session?.name,
-        sessionType: session?.type,
-        realm: getPersistedGmodRealm(),
-        serverState: extensionContext.serverStatus.state,
-    };
-}
-
-function getGmodDebugStateForTool(): Record<string, unknown> {
-    return {
-        ...getGmodDebugState(),
-        mcpHost: gmodMcpHost?.getHealth(),
-        outputCount: gmodToolOutputEntries.length,
-        errorCount: gmodToolErrorEntries.length,
-    };
-}
-
-function getRecentGmodOutputEntries(limit: number): { total: number; items: GmodToolLogEntry[]; } {
-    const safeLimit = resolveGmodToolLogLimit(limit, 200, 50);
-    return {
-        total: gmodToolOutputEntries.length,
-        items: gmodToolOutputEntries.slice(-safeLimit),
-    };
-}
-
-function getRecentGmodErrorEntries(limit: number): { total: number; items: GmodToolLogEntry[]; } {
-    const safeLimit = resolveGmodToolLogLimit(limit, 200, 50);
-    return {
-        total: gmodToolErrorEntries.length,
-        items: gmodToolErrorEntries.slice(-safeLimit),
-    };
-}
-
-function resolveGmodToolLogLimit(rawLimit: unknown, max: number, fallback: number): number {
-    if (typeof rawLimit !== 'number' || !Number.isFinite(rawLimit)) {
-        return fallback;
-    }
-    return Math.max(1, Math.min(max, Math.floor(rawLimit)));
-}
-
-function recordGmodToolDebugOutput(payload: Record<string, unknown>): void {
-    const rawMessage = typeof payload.message === 'string' ? payload.message : '';
-    if (rawMessage.trim().length === 0) {
-        return;
-    }
-
-    pushGmodToolEntry(gmodToolOutputEntries, {
-        timestamp: coerceGmodToolTimestamp(payload.timestamp),
-        source: typeof payload.source === 'string' ? payload.source : 'debug',
-        level: 'info',
-        message: rawMessage,
-        metadata: {
-            severity: typeof payload.severity === 'number' ? payload.severity : undefined,
-            realm: normalizeGmodRealm(payload.realm),
-        },
-    });
-}
-
-function recordGmodToolControlResult(result: GmodControlResult): void {
-    const runFilePath = result.command === 'runFile'
-        ? result.diagnostics
-            .find((diagnostic) => diagnostic.message.startsWith('File dispatched: '))
-            ?.message.slice('File dispatched: '.length)
-        : undefined;
-    const summary = runFilePath
-        ? `command=${result.command} correlationId=${result.correlationId} file=${runFilePath}`
-        : `command=${result.command} correlationId=${result.correlationId}`;
-
-    pushGmodToolEntry(gmodToolOutputEntries, {
-        timestamp: new Date().toISOString(),
-        source: 'control',
-        level: result.ok ? 'info' : 'error',
-        message: summary,
-        metadata: {
-            realm: result.realm,
-            request: result.request,
-            diagnostics: result.diagnostics,
-            ok: result.ok,
-        },
-    });
-
-    if (!result.ok) {
-        pushGmodToolEntry(gmodToolErrorEntries, {
-            timestamp: new Date().toISOString(),
-            source: 'control',
-            level: 'error',
-            message: `Control command rejected: ${result.command}`,
-            metadata: {
-                diagnostics: result.diagnostics,
-                correlationId: result.correlationId,
-            },
-        });
-    }
-}
-
-function recordGmodToolBackendError(message: string, details?: unknown): void {
-    pushGmodToolEntry(gmodToolErrorEntries, {
-        timestamp: new Date().toISOString(),
-        source: 'backend',
-        level: 'error',
-        message,
-        metadata: details && typeof details === 'object'
-            ? details as Record<string, unknown>
-            : undefined,
-    });
-}
-
-function pushGmodToolEntry(target: GmodToolLogEntry[], entry: GmodToolLogEntry): void {
-    target.push(entry);
-    if (target.length > GMOD_TOOL_LOG_MAX_SIZE) {
-        target.splice(0, target.length - GMOD_TOOL_LOG_MAX_SIZE);
-    }
-}
-
-function coerceGmodToolTimestamp(value: unknown): string {
-    if (typeof value === 'string' && value.trim().length > 0) {
-        return value;
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return new Date(value).toISOString();
-    }
-    return new Date().toISOString();
-}
-
 interface GmodConnectedBody {
     moduleVersion?: unknown;
 }
@@ -2194,13 +1906,6 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
     if (event.event === 'gmod.rdb.client.versionMismatch' && event.session.type === 'gluals_gmod_client') {
         // Keep legacy event for compatibility, but avoid double prompts.
         // Active version checks are handled on `gmod.client.connected`.
-        return;
-    }
-
-    if (event.event === 'gmod.output' && event.body && typeof event.body === 'object') {
-        const outputBody = event.body as Record<string, unknown>;
-        recordGmodToolDebugOutput(outputBody);
-        gmodMcpHost?.recordDebugOutput(outputBody);
         return;
     }
 
@@ -2234,16 +1939,6 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
         const params = coerceGmodErrorNotificationParams(event.body);
         if (params) {
             gmodErrorStores.get(event.session.id)?.addError(params);
-            pushGmodToolEntry(gmodToolErrorEntries, {
-                timestamp: new Date().toISOString(),
-                source: params.source,
-                level: 'error',
-                message: params.message,
-                metadata: {
-                    fingerprint: params.fingerprint,
-                    count: params.count,
-                },
-            });
         }
         return;
     }
@@ -2253,16 +1948,6 @@ function onDidReceiveDebugSessionCustomEvent(event: vscode.DebugSessionCustomEve
         if (result.command === 'setRealm') {
             gmodSessionRealms.set(event.session.id, normalizeGmodRealm(result.realm));
         }
-        recordGmodToolControlResult(result);
-        gmodMcpHost?.recordControlResult(result);
-        return;
-    }
-
-    if (event.event === 'gmod.controlError') {
-        const body = event.body as { message?: unknown; details?: unknown } | undefined;
-        const message = typeof body?.message === 'string' ? body.message : 'Unknown control error';
-        recordGmodToolBackendError(message, body?.details);
-        gmodMcpHost?.recordBackendError(message, body?.details);
     }
 }
 

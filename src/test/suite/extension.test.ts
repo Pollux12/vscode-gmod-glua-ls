@@ -206,7 +206,7 @@ suite('Extension Integration', () => {
         const registeredCommands = await vscode.commands.getCommands(true);
         assert.ok(registeredCommands.includes('gluals.useGluaLanguageMode'));
         assert.ok(
-            vscode.lm.tools.some((tool) => tool.name === 'search_glua_docs'),
+            registeredCommands.includes('gluals.gmod.showRealmMenu'),
             'Non-language providers must register during lightweight activation.'
         );
 
@@ -251,27 +251,6 @@ suite('Extension Integration', () => {
         try {
             await assertStopCancelsLazyInitialization();
             await assertStopCancelsRestartCleanup();
-
-            let toolFailureMessage = '';
-            await assert.rejects(
-                async () => await vscode.lm.invokeTool(
-                    'search_glua_docs',
-                    {
-                        toolInvocationToken: undefined,
-                        input: { query: 'Entity:GetPos' },
-                    }
-                ),
-                (error: unknown) => {
-                    toolFailureMessage = error instanceof Error ? error.message : String(error);
-                    return true;
-                }
-            );
-            const startupFailureDetails = extensionContext.serverStatus.details;
-            assert.ok(startupFailureDetails, 'Expected the failed tool startup to record its reason.');
-            assert.ok(
-                toolFailureMessage.includes(startupFailureDetails),
-                `Expected the tool caller to receive "${startupFailureDetails}", got "${toolFailureMessage}".`
-            );
 
             assert.strictEqual(
                 await countFailedStartupAttempts('gluals.startServer'),

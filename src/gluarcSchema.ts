@@ -433,7 +433,6 @@ function camelToLabel(key: string): string {
         lua: 'Lua',
         luajit: 'LuaJIT',
         ide: 'IDE',
-        mcp: 'MCP',
     };
 
     return spaced
