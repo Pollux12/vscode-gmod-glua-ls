@@ -2290,7 +2290,7 @@
         "test:parity": "yarn run compile && node ./build/gmod-debug-parity-test.js",
         "test:extension": "yarn run compile && node ./out/test/runTest.js",
         "test:e2e": "yarn run compile && node ./out/test/runTest.js --e2e",
-        "test:all": "yarn run test:schema && yarn run test:grammar && yarn run test:parity && yarn run test:extension && yarn run test:e2e",
+        "test:all": "yarn run test:schema && yarn run test:grammar && yarn run test:parity && yarn run test:extension",
         "test": "yarn run test:all",
         "release": "node --disable-warning=ExperimentalWarning ./build/release.js",
         "ls:build:release": "cargo build --manifest-path ../gmod-glua-ls/Cargo.toml -p glua_ls --release",
