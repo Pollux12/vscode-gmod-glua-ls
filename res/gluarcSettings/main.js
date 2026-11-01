@@ -67,7 +67,10 @@ window.addEventListener("message", (event) => {
             renderSettings();
             updateActiveCategory();
             if (!searchInitialized) {
-                setupSearch();
+                setupSearch(() => {
+                    clickedCategoryId = undefined;
+                    updateActiveCategory();
+                });
                 setupActiveCategoryTracking();
                 searchInitialized = true;
             }
