@@ -800,13 +800,12 @@ function setActiveCategory(categoryId) {
 }
 
 function updateActiveCategory() {
-    const body = document.getElementById("mainContent");
-    const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1;
-    if (atBottom && clickedCategoryId) {
+    if (clickedCategoryId) {
         setActiveCategory(clickedCategoryId);
         return;
     }
 
+    const body = document.getElementById("mainContent");
     const readingLine = body.getBoundingClientRect().top + SECTION_READING_OFFSET;
     let activeId;
     for (const section of document.querySelectorAll("#settingsSections > section")) {
