@@ -2,7 +2,7 @@
 
 ---
 
-## [1.3.0] [Pre-Release] - 2026-10-30
+## [1.3.0] [Pre-Release] - 2026-11-01
 > Incremental Analysis System + Fixes
 
 ## VS Code Extension

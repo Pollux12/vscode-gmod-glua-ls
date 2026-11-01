@@ -61,15 +61,15 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 ## ⚡ Performance & Overview
 
 * **Rust-Powered Backend:** Delivers full workspace indexing and diagnosis in seconds with a minimal memory footprint - over 10x quicker on large projects while delivering more features.
-* **Full Language Server**: Includes everything you'd expect from a language server and more, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
-* **Easy Setup:** Designed to "just work", the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy manual configuration.
+* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
+* **Easy Setup:** Designed to "just work" in common gamemodes/addons, the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy configuration.
 
 ## 🧠 Designed for Garry's Mod
 
 * **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. NetworkVars, AccessorFuncs and VGUI panels are all registered as well.
 * **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Intellisense filters by realm to only deliver relevant suggestions.
 * **Network Validation:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
-* **Smart Hook Integration:** Intelligent autocomplete and signatures for all hooks, `GM:` functions, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
+* **Hook Support:** Intelligent autocomplete and signatures for all hooks, `GM:` functions, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
 * **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a configurable template system for easy creation.
 
 ## 🐞 Integrated Server (SRCDS) Debugger
@@ -79,12 +79,6 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 * **Lua Execution:** Run selected code, entire files (including refresh), or execute engine commands straight from the editor.
 * **Lua Error Tracking:** Catch and view runtime Lua errors in a dedicated panel and click through to the precise source code location, helping you easily identify and fix problems. Debugger pause on errors can be configured (default off) for better insight.
 * **Live Entity Explorer:** Browse all spawned entities, inspect runtime table values, and monitor NetworkVars in real-time through the debugger panel. You can even edit these values with the debugger paused, allowing for easier testing.
-
-## ✨ Advanced Code Intelligence
-
-* **Self-Updating Wiki Annotations:** The latest annotations, generated from the Garry's Mod wiki, will be automatically downloaded and setup for you.
-* **VGUI & Entity Assistance:** Dynamic CodeLens and inlay hints specifically for VGUI elements - designed to prevent you from getting lost in massive derma files.
-* **Workspace-Wide Refactoring:** Reliable symbol renaming, finding all references, and jumping straight to definitions. Find anything with ease with proper symbol mapping and outline view.
 
 ## 🛠 Workspace Tooling & Configuration
 
@@ -100,27 +94,9 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 
 ## Troubleshooting
 
-This extension uses the dedicated `glua` language mode. Standard Lua extensions can be installed alongside it: GLuaLS only attaches to files using `glua`, while a Lua language server can attach to files using `lua`. Extensions that also provide GLua tooling can still conflict because they target the same `glua` documents. If GLua Enhanced is enabled, GLuaLS blocks language-server startup and reports a conflict error. Disable GLua Enhanced before starting GLuaLS.
+This extension uses the dedicated `glua` language mode. Make sure this is set for any Garry's Mod Lua files in the bottom right of VSCode (language selection). The extension will offer to do this if it detects a Garry's Mod file open without it being set to `glua`.
 
-The language mode separates editor providers and open-document synchronization. A language server that indexes files directly from the workspace may still scan every `.lua` file under that workspace root, so mixed GLua/Lua workspaces can also require exclude rules in each language server.
-
-VS Code cannot infer whether a `.lua` file contains standard Lua or Garry's Mod GLua. This extension makes `.lua` files use GLua by default. To treat selected files as standard Lua, click the language mode in the status bar, choose **Lua**, and configure a file association. For example, workspace settings can keep build scripts on the standard Lua language server:
-
-```json
-{
-    "files.associations": {
-        "premake5.lua": "lua",
-        "BuildProjects.lua": "lua",
-        "premake5_create_project.lua": "lua"
-    }
-}
-```
-
-The extension also associates conventional Garry's Mod paths and filenames with `glua`, including `lua`, `gamemode`, `autorun`, `entities`, `weapons`, `vgui`, `init.lua`, `cl_init.lua`, `shared.lua`, and the `cl_`, `sv_`, and `sh_` realm prefixes. These patterns work for standalone addon and gamemode repositories; the project does not need to be inside the Garry's Mod installation. If a likely Garry's Mod file is using the standard `lua` mode, the extension reports that GLuaLS is inactive and offers to switch that file to `glua`.
-
-Language-specific editor settings for this extension now belong under `[glua]`. Keep settings intended for a standard Lua extension under `[lua]`.
-
-The debugger is only designed to be used on local development servers - please do not install the binary module on production servers. `gm_rdb` only accepts localhost connections by default. If you need remote attach, start Garry's Mod or SRCDS with `-rdb_allow_remote`. `rdb.activate(...)` keeps the server running by default. If you want it to pause on the next hook event instead, add `-rdb_pause_on_activate`. This extension has only been tested with VSCode and may not work with forks.
+The debugger is only designed to be used on local development servers, please do not install the binary module on production servers. `gm_rdb` only accepts localhost connections by default. If you need remote attach, start Garry's Mod or SRCDS with `-rdb_allow_remote`. `rdb.activate(...)` keeps the server running by default. If you want it to pause on the next hook event instead, add `-rdb_pause_on_activate`. This extension has only been tested with VSCode and may not work with forks.
 
 This extension is primarily designed and tested for addon and/or gamemode development setup within an SRCDS server. If you're doing something outside of this structure, some features may not work or may require manual configuration. The extension currently expects each added workspace folder root to be within either `garrysmod/addons` or `garrysmod/gamemodes`. If you need to edit multiple folders at the same time (such as gamemode alongside addons), I'd recommend adding each individual gamemode or addon as a folder within a [multi-root workspace,](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces) rather than opening the entire garrysmod folder within VSCode.
 
