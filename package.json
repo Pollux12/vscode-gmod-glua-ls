@@ -401,7 +401,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -463,7 +463,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -500,10 +500,7 @@
                         "name": "%debug.gmod.attach.name%",
                         "host": "127.0.0.1",
                         "port": 21111,
-                        "sourceRoot": "${workspaceFolder}",
-                        "sourceFileMap": {
-                            "${workspaceFolder}": "."
-                        },
+                        "sourceRoot": "${workspaceFolder}/../..",
                         "stopOnEntry": true,
                         "stopOnError": false,
                         "realm": "server"
@@ -519,10 +516,7 @@
                             "name": "%debug.gmod.attach.name%",
                             "host": "127.0.0.1",
                             "port": 21111,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false,
                             "realm": "server"
@@ -540,10 +534,7 @@
                             "args": [],
                             "host": "127.0.0.1",
                             "port": 21111,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false,
                             "realm": "server"
@@ -578,7 +569,7 @@
                             "sourceRoot": {
                                 "type": "string",
                                 "description": "%debug.gmod.sourceRoot%",
-                                "default": "${workspaceFolder}"
+                                "default": "${workspaceFolder}/../.."
                             },
                             "sourceFileMap": {
                                 "type": "object",
@@ -605,10 +596,7 @@
                         "name": "[CLIENT] Attach to Gmod",
                         "host": "127.0.0.1",
                         "port": 21112,
-                        "sourceRoot": "${workspaceFolder}",
-                        "sourceFileMap": {
-                            "${workspaceFolder}": "."
-                        },
+                        "sourceRoot": "${workspaceFolder}/../..",
                         "stopOnEntry": true,
                         "stopOnError": false
                     }
@@ -616,17 +604,14 @@
                 "configurationSnippets": [
                     {
                         "label": "GMod Client: Attach (rdb_client)",
-                        "description": "Attach the GLuaLS debugger to a running GMod client via rdb_client.",
+                        "description": "Attach the GLuaLS debugger to a running GMod client via rdb_client from a workspace inside garrysmod/addons or garrysmod/gamemodes; run GLuaLS: Configure Debugger for other layouts.",
                         "body": {
                             "type": "gluals_gmod_client",
                             "request": "attach",
                             "name": "[CLIENT] Attach to Gmod",
                             "host": "127.0.0.1",
                             "port": 21112,
-                            "sourceRoot": "${workspaceFolder}",
-                            "sourceFileMap": {
-                                "${workspaceFolder}": "."
-                            },
+                            "sourceRoot": "${workspaceFolder}/../..",
                             "stopOnEntry": true,
                             "stopOnError": false
                         }
