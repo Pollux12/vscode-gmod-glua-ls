@@ -10,15 +10,23 @@ function entity(index: number, className: string): EntitySummary {
     return { index, class: className, model: '', valid: true, pos: [0, 0, 0], angles: [0, 0, 0] };
 }
 
-function fakeSession(entities: EntitySummary[], requestedOffsets: number[]): vscode.DebugSession {
+type EntityQuery = { offset: number; limit: number; filter_class: string };
+
+function fakeSession(
+    entities: EntitySummary[],
+    requestedOffsets: number[],
+    onRequest: (params: EntityQuery) => void = () => {},
+): vscode.DebugSession {
     return {
         type: 'gluals_gmod',
-        customRequest: async (_command: string, params: { offset: number; limit: number }) => {
+        customRequest: async (_command: string, params: EntityQuery) => {
             requestedOffsets.push(params.offset);
+            onRequest(params);
+            const matching = entities.filter((entry) => entry.class.includes(params.filter_class));
             const limit = Math.min(params.limit, SERVER_PAGE_LIMIT);
             return {
-                entities: entities.slice(params.offset, params.offset + limit),
-                total: entities.length,
+                entities: matching.slice(params.offset, params.offset + limit),
+                total: matching.length,
                 offset: params.offset,
                 limit,
             };
@@ -56,6 +64,28 @@ suite('GMod Entity Explorer', () => {
 
             provider.setClassGroupFilter('luaDefined');
             assert.deepStrictEqual(classGroups(await provider.getChildren()), [{ className: 'gmod_balloon', count: 3 }]);
+        } finally {
+            provider.dispose();
+        }
+    });
+
+    test('restarts paging when the search changes mid-load instead of mixing filters', async () => {
+        const entities = [
+            ...Array.from({ length: 300 }, (_, i) => entity(i + 1, 'prop_physics')),
+            ...Array.from({ length: 250 }, (_, i) => entity(i + 301, 'gmod_balloon')),
+        ];
+        const requestedOffsets: number[] = [];
+        let provider: GmodEntityExplorerProvider | undefined;
+        const session = fakeSession(entities, requestedOffsets, (params) => {
+            if (params.offset === 0 && params.filter_class === '') {
+                provider?.setFilter('gmod_balloon');
+            }
+        });
+        provider = new GmodEntityExplorerProvider(() => session, async () => []);
+
+        try {
+            assert.deepStrictEqual(classGroups(await provider.getChildren()), [{ className: 'gmod_balloon', count: 250 }]);
+            assert.deepStrictEqual(requestedOffsets, [0, 0, 200]);
         } finally {
             provider.dispose();
         }

@@ -1129,24 +1129,11 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         }
 
         try {
-            const byIndex = new Map<number, EntitySummary>();
-            let offset = 0;
-            let total = 0;
+            let pages: { entities: EntitySummary[]; total: number } | undefined;
             do {
-                const result = await this.sendRequest<GetEntitiesResult>(
-                    'gmod.entity.getEntities',
-                    this.buildEntityQuery(offset, ENTITY_PAGE_SIZE),
-                );
-                total = result.total;
-                if (result.entities.length === 0) {
-                    break;
-                }
-                offset += result.entities.length;
-                for (const entity of result.entities) {
-                    byIndex.set(entity.index, entity);
-                }
-            } while (offset < total);
-            this.replaceEntities([...byIndex.values()], total);
+                pages = await this.fetchEntityPages(this.filterText);
+            } while (pages === undefined);
+            this.replaceEntities(pages.entities, pages.total);
             this.hasLoadedOnce = true;
             this.lastError = undefined;
             return 'success';
@@ -1160,6 +1147,30 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
                 this.onDidChangeTreeDataEmitter.fire();
             }
         }
+    }
+
+    private async fetchEntityPages(filterText: string): Promise<{ entities: EntitySummary[]; total: number } | undefined> {
+        const byIndex = new Map<number, EntitySummary>();
+        let offset = 0;
+        let total = 0;
+        do {
+            const result = await this.sendRequest<GetEntitiesResult>(
+                'gmod.entity.getEntities',
+                this.buildEntityQuery(filterText, offset, ENTITY_PAGE_SIZE),
+            );
+            if (filterText !== this.filterText) {
+                return undefined;
+            }
+            total = result.total;
+            if (result.entities.length === 0) {
+                break;
+            }
+            offset += result.entities.length;
+            for (const entity of result.entities) {
+                byIndex.set(entity.index, entity);
+            }
+        } while (offset < total);
+        return { entities: [...byIndex.values()], total };
     }
 
     private replaceEntities(items: EntitySummary[], total: number): void {
@@ -1328,8 +1339,8 @@ export class GmodEntityExplorerProvider implements vscode.TreeDataProvider<Entit
         });
     }
 
-    private buildEntityQuery(offset: number, limit: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
-        const trimmed = this.filterText.trim();
+    private buildEntityQuery(filterText: string, offset: number, limit: number): { offset: number; limit: number; filter_id: number; filter_class: string } {
+        const trimmed = filterText.trim();
         const numericFilter = /^\d+$/.test(trimmed) ? Number(trimmed) : 0;
         const filterClass = numericFilter > 0 ? '' : trimmed;
 
