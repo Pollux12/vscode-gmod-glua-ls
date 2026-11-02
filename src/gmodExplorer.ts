@@ -612,7 +612,7 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
     private resourceCache?: Map<ResourceCategory, Map<string, vscode.Uri[]>>;
 
     constructor(private readonly loadedFolders?: GmodLoadedFolders) {
-        this.loadedFoldersListener = loadedFolders?.onDidChange(() => this.onDidChangeTreeDataEmitter.fire());
+        this.loadedFoldersListener = loadedFolders?.onDidChange(() => this.refresh());
     }
 
     private readonly loadedFoldersListener?: vscode.Disposable;
