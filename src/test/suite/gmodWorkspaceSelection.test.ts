@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as vscode from 'vscode';
 
 import {
     buildBuiltinItems,
@@ -9,6 +10,7 @@ import {
     statusText,
     statusTooltip,
 } from '../../gmodWorkspaceSelection';
+import { GmodWorkspaceSelection } from '../../gmodWorkspaceSelectionController';
 
 function makeRoot(overrides: Partial<GmodRoot> = {}): GmodRoot {
     return {
@@ -104,5 +106,25 @@ suite('GMod Workspace Selection', () => {
             statusTooltip([first]),
             'GarrysMod: helix\n  ulx\nClick to select the gamemode',
         );
+    });
+
+    test('keeps the automatic prompt open when focus moves away, unlike a picker the user opened', async () => {
+        const originalShowQuickPick = vscode.window.showQuickPick;
+        const keptOpen: (boolean | undefined)[] = [];
+        (vscode.window as any).showQuickPick = async (_items: unknown, options?: vscode.QuickPickOptions) => {
+            keptOpen.push(options?.ignoreFocusOut);
+            return undefined;
+        };
+        const selection = new GmodWorkspaceSelection();
+        try {
+            selection.handleProjectsChanged({ roots: [makeRoot()] });
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await selection.selectGamemode();
+        } finally {
+            (vscode.window as any).showQuickPick = originalShowQuickPick;
+            selection.dispose();
+        }
+
+        assert.deepStrictEqual(keptOpen, [true, false]);
     });
 });

@@ -107,7 +107,7 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
         for (const root of this.currentRoots) {
             if (root.needsPick && !this.prompted.has(root.folderUri)) {
                 this.prompted.add(root.folderUri);
-                this.promptQueue = this.promptQueue.then(() => this.pickAndSave(root));
+                this.promptQueue = this.promptQueue.then(() => this.pickAndSave(root, true));
             }
         }
     }
@@ -126,7 +126,7 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
 
         const root = roots.length === 1 ? roots[0] : await this.pickRoot(roots);
         if (root) {
-            await this.pickAndSave(root);
+            await this.pickAndSave(root, false);
         }
     }
 
@@ -154,18 +154,20 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
         return picked?.root;
     }
 
-    private async pickChoice(root: GmodRoot): Promise<GamemodeChoice | undefined> {
+    private async pickChoice(root: GmodRoot, keepOpen: boolean): Promise<GamemodeChoice | undefined> {
         const folderName = uriBasename(root.folderUri);
         const picked = await this.showItems(
             buildPickItems(root),
             `Select Gamemode (${folderName})`,
             'Gamemode to load with the addons',
+            keepOpen,
         );
         if (picked?.showBuiltins) {
             const builtin = await this.showItems(
                 buildBuiltinItems(root),
                 `Built-in gamemodes (${folderName})`,
                 'Built-in gamemode to load with the addons',
+                keepOpen,
             );
             return builtin?.choice;
         }
@@ -176,12 +178,13 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
         items: GamemodePickItem[],
         title: string,
         placeHolder: string,
+        keepOpen: boolean,
     ): Thenable<GamemodePickItem | undefined> {
-        return vscode.window.showQuickPick(items, { title, placeHolder });
+        return vscode.window.showQuickPick(items, { title, placeHolder, ignoreFocusOut: keepOpen });
     }
 
-    private async pickAndSave(root: GmodRoot): Promise<void> {
-        const choice = await this.pickChoice(root);
+    private async pickAndSave(root: GmodRoot, keepOpen: boolean): Promise<void> {
+        const choice = await this.pickChoice(root, keepOpen);
         if (!choice) {
             return;
         }
