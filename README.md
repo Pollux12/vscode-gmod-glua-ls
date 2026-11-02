@@ -59,13 +59,15 @@ Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gm
 Write GLua with the Garry's Mod documentation built into your editor, and find mistakes there instead of on the server.
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hero.mp4" poster="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" controls muted width="100%">
+  <video src="https://github.com/user-attachments/assets/a60c55ed-2d9d-4536-8ecd-c12a62593b65" poster="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" controls muted width="100%">
     <a href="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hero.mp4">
       <img src="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" alt="Feature overview video" width="100%">
       <br>Click to view the video
     </a>
   </video>
 </p>
+
+
 
 ---
 
