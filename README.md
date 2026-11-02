@@ -114,7 +114,7 @@ Entities, weapons, tools, plugins (such as in Helix), VGUI panels and other scri
 
 ## Advanced Debugger
 
-Debug a local SRCDS server from VS Code instead of adding print statements. Set breakpoints, step through code and inspect variables, or run Lua and console commands on the server or client without leaving the editor.
+Debug a local SRCDS server (and/or gmod client) from VS Code instead of adding print statements. Set breakpoints, step through code and inspect variables, or run Lua and console commands on the server or client without leaving the editor.
 
 ![Debugger](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/debugger.gif)
 
