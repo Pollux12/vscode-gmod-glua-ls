@@ -74,7 +74,7 @@ async function saveToWorkspaceFolderSettings(folder: vscode.WorkspaceFolder, set
         }
         await config.update(
             'loadEverything',
-            settings.loadEverything || undefined,
+            settings.loadEverything,
             vscode.ConfigurationTarget.WorkspaceFolder,
         );
         return true;
