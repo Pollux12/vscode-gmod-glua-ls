@@ -21,8 +21,10 @@ export interface ProjectsChangedParams {
 }
 
 export const ALL_CUSTOM_GAMEMODES = '*';
+export const NO_GAMEMODE = '';
 
 export type GamemodeChoice =
+    | { kind: 'addonsOnly' }
     | { kind: 'gamemode'; name: string }
     | { kind: 'allCustom' }
     | { kind: 'everything' };
@@ -66,9 +68,20 @@ function gamemodeItem(gamemode: GmodGamemode): GamemodePickItem {
 }
 
 export function buildPickItems(root: GmodRoot): GamemodePickItem[] {
-    const items = root.gamemodes.filter((gamemode) => !gamemode.builtin).map(gamemodeItem);
+    const items: GamemodePickItem[] = [
+        {
+            label: 'Addons only',
+            description: 'no gamemode; the annotations cover base and sandbox',
+            choice: { kind: 'addonsOnly' },
+        },
+        ...root.gamemodes.filter((gamemode) => !gamemode.builtin).map(gamemodeItem),
+    ];
     if (root.gamemodes.some((gamemode) => gamemode.builtin)) {
-        items.push({ label: 'Show built-in gamemodes...', showBuiltins: true });
+        items.push({
+            label: 'Show built-in gamemodes...',
+            description: 'loads their source on top of the annotations',
+            showBuiltins: true,
+        });
     }
     items.push(
         { label: 'Load all custom', description: 'every custom gamemode', choice: { kind: 'allCustom' } },
@@ -87,6 +100,8 @@ export function buildBuiltinItems(root: GmodRoot): GamemodePickItem[] {
 
 export function choiceToSettings(choice: GamemodeChoice): GamemodeSettings {
     switch (choice.kind) {
+        case 'addonsOnly':
+            return { activeGamemode: NO_GAMEMODE, loadEverything: false };
         case 'gamemode':
             return { activeGamemode: choice.name, loadEverything: false };
         case 'allCustom':
@@ -113,6 +128,9 @@ export function rootLabel(root: GmodRoot): string {
     }
     if (root.activeGamemode === ALL_CUSTOM_GAMEMODES) {
         return 'all custom';
+    }
+    if (root.activeGamemode === NO_GAMEMODE) {
+        return 'addons only';
     }
     if (root.activeGamemode) {
         return root.activeGamemode;

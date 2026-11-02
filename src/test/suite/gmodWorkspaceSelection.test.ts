@@ -32,22 +32,24 @@ function makeRoot(overrides: Partial<GmodRoot> = {}): GmodRoot {
 }
 
 suite('GMod Workspace Selection', () => {
-    test('lists custom gamemodes first, then the built-in, load-all and load-everything entries', () => {
+    test('lists addons only and the custom gamemodes first, then the built-in, load-all and load-everything entries', () => {
         const items = buildPickItems(makeRoot());
 
         assert.deepStrictEqual(
             items.map((item) => [item.label, item.description]),
             [
+                ['Addons only', 'no gamemode; the annotations cover base and sandbox'],
                 ['helix', 'derives from sandbox'],
                 ['darkrp', undefined],
-                ['Show built-in gamemodes...', undefined],
+                ['Show built-in gamemodes...', 'loads their source on top of the annotations'],
                 ['Load all custom', 'every custom gamemode'],
                 ['Load all', 'the whole folder, lua/ and built-in gamemodes included'],
             ],
         );
-        assert.strictEqual(items[2].showBuiltins, true);
-        assert.deepStrictEqual(items[3].choice, { kind: 'allCustom' });
-        assert.deepStrictEqual(items[4].choice, { kind: 'everything' });
+        assert.deepStrictEqual(items[0].choice, { kind: 'addonsOnly' });
+        assert.strictEqual(items[3].showBuiltins, true);
+        assert.deepStrictEqual(items[4].choice, { kind: 'allCustom' });
+        assert.deepStrictEqual(items[5].choice, { kind: 'everything' });
     });
 
     test('omits the built-in entry when a root has no built-in gamemodes and lists built-ins separately', () => {
@@ -59,6 +61,10 @@ suite('GMod Workspace Selection', () => {
     });
 
     test('maps each choice to the settings it writes', () => {
+        assert.deepStrictEqual(choiceToSettings({ kind: 'addonsOnly' }), {
+            activeGamemode: '',
+            loadEverything: false,
+        });
         assert.deepStrictEqual(choiceToSettings({ kind: 'gamemode', name: 'helix' }), {
             activeGamemode: 'helix',
             loadEverything: false,
@@ -84,6 +90,7 @@ suite('GMod Workspace Selection', () => {
         assert.strictEqual(statusText([makeRoot({ activeGamemode: 'helix' })]), 'GLuaLS: helix');
         assert.strictEqual(statusText([makeRoot({ activeGamemode: '*' })]), 'GLuaLS: all custom');
         assert.strictEqual(statusText([makeRoot({ loadEverything: true })]), 'GLuaLS: everything');
+        assert.strictEqual(statusText([makeRoot({ activeGamemode: '' })]), 'GLuaLS: addons only');
         assert.strictEqual(statusText([makeRoot()]), 'GLuaLS: no gamemode');
     });
 

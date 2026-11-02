@@ -1681,7 +1681,7 @@
                         ],
                         "default": null,
                         "scope": "resource",
-                        "markdownDescription": "The gamemode a whole Garry's Mod folder loads with its addons, together with the custom gamemodes it derives from. Use `*` to load every custom gamemode. Leave unset to be asked when the folder has several custom gamemodes."
+                        "markdownDescription": "The gamemode a whole Garry's Mod folder loads with its addons, together with the custom gamemodes it derives from. Use `*` to load every custom gamemode, or an empty string for none when working on addons. Leave unset to be asked when the folder has several custom gamemodes."
                     },
                     "gluals.gmod.loadEverything": {
                         "type": "boolean",
