@@ -52,43 +52,94 @@
 > >
 > Report bugs or suggest features here: https://github.com/Pollux12/gmod-glua-ls/issues
 >
-> macOS support is currently experimental - expect issues!
+> macOS support is currently experimental, expect issues!
 
-Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)** - a lightning-fast, fully featured language server, debugger and toolkit for Garry's Mod GLua development.
+Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)**, a rust-based language server, debugger and toolkit for Garry's Mod GLua development.
+
+Write GLua with the Garry's Mod documentation built into your editor, and find mistakes there instead of on the server.
+
+<p align="center">
+  <video src="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hero.mp4" poster="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" controls muted width="100%">
+    <a href="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hero.mp4">
+      <img src="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" alt="Feature overview video" width="100%">
+      <br>Click to view the video
+    </a>
+  </video>
+</p>
 
 ---
 
-## ⚡ Performance & Overview
+## Core language server
 
-* **Rust-Powered Backend:** Delivers full workspace indexing and diagnosis in seconds with a minimal memory footprint - over 10x quicker on large projects while delivering more features.
-* **Full Language Server**: Includes everything you'd expect from a language server, such as syntax highlighting, diagnostics, symbol renaming, type resolution, goto, formatting and more.
-* **Easy Setup:** Designed to "just work" in common gamemodes/addons, the extension will take care of automatically downloading, installing and updating annotations and the debugger. A custom settings menu is also available for easy configuration.
+Full documentation, signatures, realm, and other important information for all Garry's mod functions, including your own code (even if not annotated). Diagnostics flag any potential mistakes, helping catch errors sooner. Go to definition, find references, rename, formatting and inlay hints work the way you would expect from any language server.
 
-## 🧠 Designed for Garry's Mod
+![Completion and hover](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/completion-hover.gif)
 
-* **Class Resolution:** Automatic mapping for classes such as `ENT`, `SWEP`, `TOOL`, `PLUGIN` and others. NetworkVars, AccessorFuncs and VGUI panels are all registered as well.
-* **Realm Awareness:** Analyses file prefixes (`sv_`, `cl_`, `sh_`) and `include()` chains. Generates real-time diagnostics for cross-realm function calls (e.g. calling a clientside method on the server). Intellisense filters by realm to only deliver relevant suggestions.
-* **Network Validation:** Parses and validates `net.Start`, `net.Receive` and other net library usages, catching mismatched payloads, read/write order errors, and delivering enhanced autocomplete.
-* **Hook Support:** Intelligent autocomplete and signatures for all hooks, `GM:` functions, and custom `---@hook` annotations. Automatically detects and registers new custom hooks in addition to those parsed from the wiki.
-* **Class Explorer & Templates:** Dedicated side-panel to easily reference key classes (Entities, Weapons, VGUI, Plugins) and workspace resources (Materials, Sounds) alongside a configurable template system for easy creation.
+![Completion with documentation](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/completion-docs.png)
 
-## 🐞 Integrated Server (SRCDS) Debugger
+## Realm awareness
 
-* **Binary Module:** Runtime debugger for (currently SRCDS server only), works alongside auto generated lua file for advanced debugging features.
-* **Easier Debugging:** Everything you'd expect from a modern debugger. Set visual breakpoints, pause code execution, inspect local variables, global tables, upvalues, and call stacks live within VS Code.
-* **Lua Execution:** Run selected code, entire files (including refresh), or execute engine commands straight from the editor.
-* **Lua Error Tracking:** Catch and view runtime Lua errors in a dedicated panel and click through to the precise source code location, helping you easily identify and fix problems. Debugger pause on errors can be configured (default off) for better insight.
-* **Live Entity Explorer:** Browse all spawned entities, inspect runtime table values, and monitor NetworkVars in real-time through the debugger panel. You can even edit these values with the debugger paused, allowing for easier testing.
+The extension knows whether each file and function is server, client or shared, gives you relevant warnings when using the wrong realm, and only shows valid suggestions for your current realm.
 
-## 🛠 Workspace Tooling & Configuration
+![Realm awareness](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/realm-check.gif)
 
-* **Interactive Configuration UI:** Built-in settings panel to easily toggle diagnostics, formatters, and workspace parameters saved to a workspace local `.gluarc.json`. Useful for if a specific diagnostic is giving too many false-positives in your codebase (please let me know if this happens!).
-* **Built-In Formatter:** Formatter configured with presets such as CFC, advanced customisation options available.
-* **Automatic File Resolution:** Automatically detects and parses addon and gamemode structures, enabling you to get started with all features and diagnostics without a ton of configuration.
-* **Automatic Setup & Updates:** Designed to work with minimal setup, the extension can handle updates for annotations and the debugger, alongside setting it all up for you on initial load.
-* **Multi-Root Workspace Support:** Designed to work in large codebases, especially with many different folders open within a workspace.  Perfect for working on complex gamemodes alongside many addons, such as within a [multi-root workspace.](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces)
-* **Configurable Templates:** Ability to create and easily use custom templates to scaffold classes via the class explorer, helping reduce boilerplate. Templates for entities and other common classes included, with options to easily add more such as for plugin systems.
-* **Detailed Documentation:** Everything you need to know, from annotations to features, is documented on the wiki: https://gluals.arnux.net/
+## Network validation
+
+The code that sends a net message and the code that receives it usually live in different files. The extension links them, warns when the two sides disagree, and helps you easily write them via autocomplete.
+
+![Net message validation](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/net-messages.gif)
+
+![Net read completion](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/net-read-completion.png)
+
+## Hooks
+
+The language server detects hooks, including your own custom hooks, to provide full information such as callers, autocomplete, annotations and more. Includes support for plugin hooks such as those in Helix.
+
+![Hook completion](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hooks.gif)
+
+![Hook documentation](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/hook-completion.png)
+
+![Plugin hook completion](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/helix-plugin-completion.png)
+
+## Scripted classes and references
+
+Entities, weapons, tools, plugins (such as in Helix), VGUI panels and other scripted classes are recognised from your folder layout. What `NetworkVar` and `AccessorFunc` create gets completion and find references like any other member. The class explorer lists your classes, materials and sounds, and templates create new ones.
+
+![Class explorer](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/scripted-classes.gif)
+
+![NetworkVar references](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/networkvars-references.gif)
+
+![Find references](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/find-references.png)
+
+## Advanced Debugger
+
+Debug a local SRCDS server from VS Code instead of adding print statements. Set breakpoints, step through code and inspect variables, or run Lua and console commands on the server or client without leaving the editor.
+
+![Debugger](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/debugger.gif)
+
+The entity explorer lists every entity in the game with its values and NetworkVars, and lets you edit them live.
+
+![Entity explorer](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/entity-explorer.gif)
+
+Runtime Lua errors from the game are collected in one place, and each one links to its source.
+
+![Runtime errors](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/runtime-errors.gif)
+
+![Runtime error and matching diagnostic](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/runtime-errors.png)
+
+## Configuration and formatting
+
+A settings panel lets you adjust or turn off any diagnostic that doesn't suit your codebase, without editing JSON. The built-in formatter has presets such as CFC, with the individual options available.
+
+![Settings panel](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/settings-panel.png)
+
+![Settings panel formatter options](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/settings-formatter.gif)
+
+## Workspace support
+
+Setup is automatic for most codebases. Addon and gamemode layouts are detected, and annotations and the debugger are installed and kept up to date for you. It is built for large codebases and [multi-root workspaces](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces), such as a gamemode open alongside its addons.
+
+Documentation is available at: https://gluals.arnux.net/
 
 ---
 
