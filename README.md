@@ -56,7 +56,6 @@
 
 Visual Studio Code extension for **[gmod-glua-ls](https://github.com/Pollux12/gmod-glua-ls)**, a rust-based language server, debugger and toolkit for Garry's Mod GLua development.
 
-Write GLua with the Garry's Mod documentation built into your editor, and find mistakes there instead of on the server.
 
 <p align="center">
   <video src="https://github.com/user-attachments/assets/a60c55ed-2d9d-4536-8ecd-c12a62593b65" poster="https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/poster.png" controls muted width="100%">
