@@ -13,6 +13,7 @@ import {
     GamemodeSettings,
     GmodRoot,
     ProjectsChangedParams,
+    statusBackground,
     statusText,
     statusTooltip,
     uriBasename,
@@ -141,6 +142,8 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
         } else {
             this.statusBar.text = `$(folder-library) ${statusText(this.currentRoots)}`;
             this.statusBar.tooltip = statusTooltip(this.currentRoots);
+            const background = statusBackground(this.currentRoots);
+            this.statusBar.backgroundColor = background ? new vscode.ThemeColor(background) : undefined;
             this.statusBar.show();
         }
         this.changeEmitter.fire();

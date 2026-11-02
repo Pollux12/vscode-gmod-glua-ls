@@ -129,6 +129,10 @@ export function statusText(roots: readonly GmodRoot[]): string {
     return `GLuaLS: ${roots.length} GMod folders`;
 }
 
+export function statusBackground(roots: readonly GmodRoot[]): string | undefined {
+    return roots.some((root) => root.needsPick) ? 'statusBarItem.warningBackground' : undefined;
+}
+
 export function statusTooltip(roots: readonly GmodRoot[]): string {
     const lines: string[] = [];
     for (const root of roots) {

@@ -7,6 +7,7 @@ import {
     choiceToSettings,
     chooseSaveTarget,
     GmodRoot,
+    statusBackground,
     statusText,
     statusTooltip,
 } from '../../gmodWorkspaceSelection';
@@ -106,6 +107,14 @@ suite('GMod Workspace Selection', () => {
             statusTooltip([first]),
             'GarrysMod: helix\n  ulx\nClick to select the gamemode',
         );
+    });
+
+    test('highlights the status bar while a GMod folder still needs a gamemode picked', () => {
+        const picked = makeRoot({ activeGamemode: 'helix', needsPick: false });
+
+        assert.strictEqual(statusBackground([makeRoot()]), 'statusBarItem.warningBackground');
+        assert.strictEqual(statusBackground([picked, makeRoot()]), 'statusBarItem.warningBackground');
+        assert.strictEqual(statusBackground([picked]), undefined);
     });
 
     test('keeps the automatic prompt open when focus moves away, unlike a picker the user opened', async () => {
