@@ -66,7 +66,7 @@ export class Client {
   get currentStatus(): RunningStatus | undefined {
     return this.currentStatus_
   }
-  send<T extends DebugRequest>(request: T): Promise<DebugResponseType<T>> {
+  send<T extends DebugRequest>(request: T, timeoutMs: number = Client.REQUEST_TIMEOUT_MS): Promise<DebugResponseType<T>> {
     const { onMessage, onError, onClose } = this.adapter
     return new Promise<DebugResponseType<T>>((resolve, reject) => {
       let settled = false
@@ -74,10 +74,10 @@ export class Client {
         cleanup()
         reject(
           Error(
-            `Request timed out (${Client.REQUEST_TIMEOUT_MS}ms): ${request.method}`
+            `Request timed out (${timeoutMs}ms): ${request.method}`
           )
         )
-      }, Client.REQUEST_TIMEOUT_MS)
+      }, timeoutMs)
 
       const cleanup = () => {
         if (settled) {
@@ -235,15 +235,17 @@ export class Client {
       params,
     })
 
+  /** `timeoutMs` lets a caller wait out a chunk that pauses on a breakpoint. */
   runLua = (
-    params: RunLuaRequest['params']
+    params: RunLuaRequest['params'],
+    timeoutMs?: number
   ): Promise<DebugResponseType<RunLuaRequest>> =>
     this.send({
       method: 'run_lua',
       jsonrpc: '2.0',
       id: this.seqId++,
       params,
-    })
+    }, timeoutMs)
 
   runFile = (
     params: RunFileRequest['params']
@@ -504,6 +506,8 @@ export interface RunLuaRequest extends JsonRpcRequest {
   params: {
     lua: string
     realm: 'server' | 'client' | 'shared'
+    /** Ask the bridge for a JSON report of return values, output and errors. */
+    capture?: boolean
   }
 }
 
@@ -669,7 +673,8 @@ type ResponseResultType = {
   clear_breakpoints: never
   set_var: boolean
   command: never
-  run_lua: never
+  /** What the `_GLUALS.runLua` bridge reported; older modules send nothing. */
+  run_lua: unknown
   run_file: never
   refresh_file: never
   get_entities: GetEntitiesResult

@@ -93,5 +93,11 @@
     "view.gmodEntityExplorer.title": "Entity Explorer",
     "view.gmodEntityExplorer.welcome": "Connect debugger to see entities.",
     "view.gmodErrors.title": "Errors",
-    "view.gmodErrors.welcome": "No errors detected in this debug session."
+    "view.gmodErrors.welcome": "No errors detected in this debug session.",
+    "command.mcp.setup.title": "Set Up AI Agent (MCP)",
+    "command.mcp.copyUrl.title": "Copy MCP Server URL",
+    "config.mcp.enabled.description": "Run a local [MCP](https://modelcontextprotocol.io) server so AI agents (Claude Code, Codex, GitHub Copilot, Cursor and others) can work with your Garry's Mod **server**: run Lua, read the console and Lua errors, set breakpoints and logpoints, step through code, and read GLuaLS diagnostics. Off by default. Listens on 127.0.0.1 only and only in trusted workspaces.\n\n[Set up an AI agent](command:gluals.mcp.setup)",
+    "config.mcp.port.description": "Port for the MCP server (`http://127.0.0.1:<port>/mcp`). Give each VS Code window that runs the MCP server its own port. Agent configs written by [Set Up AI Agent](command:gluals.mcp.setup) include this port, so run it again after changing it.",
+    "config.mcp.allowCodeExecution.description": "Let agents run Lua and console commands on the server and evaluate expressions in paused frames. Turn off to keep the read-only tools (console, errors, diagnostics, code lookup, breakpoints).",
+    "config.mcp.autoAttach.description": "Attach the VS Code debugger to the GMod server automatically when an agent uses a server tool. The attach never stops on entry, so the game keeps running."
 }

@@ -64,7 +64,7 @@ async function run() {
     'initializeCapabilities',
     'setExpressionUnsupported',
     'terminateDebuggeeUnsupported',
-    'logpointUnsupported',
+    'logpointAsCondition',
     'setVariableRoundTrip',
   ]
   assert.deepStrictEqual(fixture.mandatoryParityScenarios, expectedScenarios)
@@ -148,9 +148,13 @@ async function run() {
     const setBreakpointsResult = await session.nextResponse()
     assert.strictEqual(setBreakpointsResult.success, true)
     assert.strictEqual(setBreakpointsResult.body.breakpoints.length, 1)
-    assert.strictEqual(setBreakpointsResult.body.breakpoints[0].verified, false)
-    assert.match(setBreakpointsResult.body.breakpoints[0].message, /Logpoints are not supported/)
-    assert.strictEqual(addedBreakpoints.length, 0)
+    assert.strictEqual(setBreakpointsResult.body.breakpoints[0].verified, true)
+    assert.strictEqual(setBreakpointsResult.body.breakpoints[0].message, undefined)
+    // LRDB has no logpoints, so the message travels as a condition that prints and stays false
+    assert.strictEqual(addedBreakpoints.length, 1)
+    assert.strictEqual(addedBreakpoints[0].line, 1)
+    assert.strictEqual(addedBreakpoints[0].hit_condition, undefined)
+    assert.match(addedBreakpoints[0].condition, /^\(print\(".*\[logpoint sample\.lua:1\] " \.\. "log me"\) and false\)$/)
 
     const setVariableResponse = makeResponse('setVariable')
     session.setVariableRequest(setVariableResponse, {

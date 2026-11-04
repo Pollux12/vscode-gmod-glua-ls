@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getExtensionChannel } from '../../extensionChannel';
 import { fetchJson, downloadFile } from '../../netHelpers';
+import { GLUALS_MCP_BRIDGE_LUA } from './GmodMcpBridgeLua';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
 const LEGACY_GARRYSMOD_PATH_STATE_KEY = 'gluals.gmod.garrysmodPath';
@@ -653,9 +654,9 @@ function buildSharedAutorunLua(port: number, clientPort: number = DEFAULT_RDB_CL
         '    end',
         '',
         '    local function runServerChunk(code, chunkName)',
-        '        local fn, compileErr = CompileString(code, chunkName or "gluals_run_lua", false)',
+        '        local fn = CompileString(code, chunkName or "gluals_run_lua", false)',
         '        if not isfunction(fn) then',
-        '            return false, tostring(compileErr)',
+        '            return false, tostring(fn)',
         '        end',
         '        local ok, runtimeErr = xpcall(fn, debug.traceback)',
         '        if not ok then',
@@ -686,10 +687,16 @@ function buildSharedAutorunLua(port: number, clientPort: number = DEFAULT_RDB_CL
         '        return nil, "unable to read file for client execution: " .. filePath',
         '    end',
         '',
-        '    function _GLUALS.runLua(realm, code)',
+        GLUALS_MCP_BRIDGE_LUA.replace(/^\n/, '').replace(/\n$/, ''),
+        '',
+        '    function _GLUALS.runLua(realm, code, mode)',
         '        realm = normalizeRealm(realm)',
         '        if type(code) ~= "string" then',
         '            return false, "lua chunk must be a string"',
+        '        end',
+        '',
+        '        if mode == "capture" then',
+        '            return true, _GLUALS.runCaptured(code)',
         '        end',
         '',
         '        if realm == "server" or realm == "shared" then',
