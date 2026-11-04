@@ -41,8 +41,6 @@
     "main": "./out/extension",
     "activationEvents": [
         "onLanguage:lua",
-        "workspaceContains:.gluarc.json",
-        "workspaceContains:**/*.lua",
         "onMcpCollection:gluals.mcp"
     ],
     "contributes": {

@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
+import { describeMcpStatus, getMcpHost } from './mcp/mcpHost';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
@@ -153,7 +154,11 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     return;
                 }
 
-                const message = msg as { type?: unknown; path?: unknown; value?: unknown };
+                const message = msg as { type?: unknown; path?: unknown; value?: unknown; action?: unknown };
+                if (typeof message.type === 'string' && message.type.startsWith('mcp:')) {
+                    await this._handleMcpMessage(message.type, message.value, message.action);
+                    return;
+                }
                 if (message.type === 'ready') {
                     await this.panel.webview.postMessage({
                         type: 'init',
@@ -224,6 +229,10 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                 }
             });
             this._disposables.push(messageDisposable);
+            const mcpHost = getMcpHost();
+            if (mcpHost) {
+                this._disposables.push(mcpHost.onDidChangeStatus(() => void this._postMcpState()));
+            }
 
             if (!this.setWebviewContent()) {
                 return;
@@ -264,6 +273,50 @@ export class GluarcSettingsPanel implements vscode.Disposable {
             vscode.window.showErrorMessage(`Failed to open GLua settings: ${message}`);
             this.panel.dispose();
         }
+    }
+
+    private async _handleMcpMessage(type: string, value: unknown, action: unknown): Promise<void> {
+        const host = getMcpHost();
+        if (!host) {
+            return;
+        }
+        switch (type) {
+            case 'mcp:ready':
+                break;
+            case 'mcp:setEnabled':
+                await host.setEnabled(value === true);
+                break;
+            case 'mcp:setPort':
+                if (typeof value === 'number' && Number.isInteger(value) && value >= 1024 && value <= 65535) {
+                    await host.setPort(value);
+                }
+                break;
+            case 'mcp:action':
+                if (action === 'setup') {
+                    await vscode.commands.executeCommand('gluals.mcp.setup');
+                } else if (action === 'copyUrl') {
+                    await vscode.commands.executeCommand('gluals.mcp.copyUrl');
+                } else if (action === 'settings') {
+                    await vscode.commands.executeCommand('workbench.action.openSettings', 'gluals.mcp');
+                }
+                break;
+        }
+        await this._postMcpState();
+    }
+
+    private async _postMcpState(): Promise<void> {
+        const host = getMcpHost();
+        if (!host) {
+            return;
+        }
+        const status = host.currentStatus;
+        await this.panel.webview.postMessage({
+            type: 'mcpState',
+            enabled: host.settings.enabled,
+            port: host.settings.port,
+            statusKind: status.kind,
+            statusText: describeMcpStatus(status),
+        });
     }
 
     private _onExternalChange(): void {

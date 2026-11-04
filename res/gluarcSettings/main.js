@@ -29,6 +29,7 @@ import {
 import { renderFormatterSectionContent } from "./components/formatterSection.js";
 import { createSettingRow } from "./components/settingRow.js";
 import { showConfirmDialog } from "./components/dialog.js";
+import { setupMcpCard } from "./mcpCard.js";
 
 const vscode = acquireVsCodeApi();
 const SECTION_READING_OFFSET = 48;
@@ -126,6 +127,7 @@ if (saveButton) {
 }
 
 vscode.postMessage({ type: "ready" });
+setupMcpCard(vscode);
 
 function getValue(path, defaultValue) {
     if (!Array.isArray(path)) {

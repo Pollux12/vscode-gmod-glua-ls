@@ -51,6 +51,27 @@ function readSettings(): { enabled: boolean; port: number } & McpToolSettings {
     };
 }
 
+let activeHost: GmodMcpHost | undefined;
+
+/** The running host, for UI such as the GLuaLS settings panel. */
+export function getMcpHost(): GmodMcpHost | undefined {
+    return activeHost;
+}
+
+/** A one-line description of the host's state for UI. */
+export function describeMcpStatus(status: McpHostStatus): string {
+    switch (status.kind) {
+        case 'disabled':
+            return 'Off';
+        case 'untrusted':
+            return 'Waiting for workspace trust';
+        case 'running':
+            return `Running at ${mcpUrl(status.port)}`;
+        case 'error':
+            return status.message;
+    }
+}
+
 /**
  * Hosts the GLuaLS MCP server while `gluals.mcp.enabled` is on in a trusted workspace,
  * and tells VS Code (Copilot) and Cursor about it so they need no manual setup.
@@ -87,7 +108,26 @@ export class GmodMcpHost implements vscode.Disposable {
             vscode.commands.registerCommand('gluals.mcp.copyUrl', () => this.copy(mcpUrl(this.port), 'MCP server URL')),
         );
         this.registerVsCodeProvider();
+        activeHost = this;
         this.apply();
+    }
+
+    /** Turns the server on or off in this workspace's settings. */
+    async setEnabled(enabled: boolean): Promise<void> {
+        const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update('enabled', enabled, target);
+        await this.apply();
+    }
+
+    async setPort(port: number): Promise<void> {
+        const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update('port', port, target);
+        await this.apply();
+    }
+
+    get settings(): { enabled: boolean; port: number } {
+        const { enabled, port } = readSettings();
+        return { enabled, port };
     }
 
     get port(): number {
@@ -99,6 +139,9 @@ export class GmodMcpHost implements vscode.Disposable {
     }
 
     dispose(): void {
+        if (activeHost === this) {
+            activeHost = undefined;
+        }
         void this.stop();
         for (const disposable of this.disposables.splice(0)) {
             disposable.dispose();
@@ -254,12 +297,9 @@ export class GmodMcpHost implements vscode.Disposable {
     }
 
     private async enable(): Promise<boolean> {
-        if (readSettings().enabled) {
-            return true;
+        if (!readSettings().enabled) {
+            await this.setEnabled(true);
         }
-        const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update('enabled', true, target);
-        await this.apply();
         return this.status.kind === 'running';
     }
 
