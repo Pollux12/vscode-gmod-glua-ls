@@ -69,6 +69,21 @@ async function requireSession(context: McpToolContext): Promise<{ session: vscod
     return { session: result.session, state, attachedNote: result.attached ? 'Attached the VS Code debugger to the GMod server.' : undefined };
 }
 
+const BRIDGE_CHUNK = /(^|[\\/@])lua[\\/]autorun[\\/]debug\.lua$/i;
+
+/** Drops the frames of the GLuaLS bridge that ran the agent's code, and the [C] pcall frames around them. */
+function visibleFrames(stack: StackFrameInfo[]): { frames: StackFrameInfo[]; hidden: number } {
+    const bridgeAt = stack.findIndex((frame) => BRIDGE_CHUNK.test(frame.file) || (frame.localPath !== undefined && BRIDGE_CHUNK.test(frame.localPath)));
+    if (bridgeAt < 0) {
+        return { frames: stack, hidden: 0 };
+    }
+    let cut = bridgeAt;
+    while (cut > 0 && /^=?\[C\]$/.test(stack[cut - 1].file)) {
+        cut -= 1;
+    }
+    return { frames: stack.slice(0, cut), hidden: stack.length - cut };
+}
+
 function frameLocation(frame: StackFrameInfo | undefined): string {
     if (!frame) {
         return 'an unknown location';
@@ -76,7 +91,8 @@ function frameLocation(frame: StackFrameInfo | undefined): string {
     const where = frame.localPath && fs.existsSync(frame.localPath)
         ? `${displayPath(frame.localPath)}:${frame.line}`
         : `${frame.file.replace(/^[@=]/, '')}${frame.line > 0 ? `:${frame.line}` : ''}`;
-    return frame.func ? `${where} in ${frame.func}` : where;
+    // LRDB names frames it cannot name "Lua"; that says nothing.
+    return frame.func && frame.func !== 'Lua' ? `${where} in ${frame.func}` : where;
 }
 
 function breakpointOwnerAt(context: McpToolContext, frame: StackFrameInfo | undefined): string | undefined {
@@ -121,12 +137,16 @@ export async function describePause(context: McpToolContext, session: vscode.Deb
         }
     }
 
+    const { frames, hidden } = visibleFrames(stack);
     lines.push('', 'Stack:');
-    for (const entry of stack.slice(0, STACK_LIMIT)) {
+    for (const entry of frames.slice(0, STACK_LIMIT)) {
         lines.push(`  ${entry.index === frameIndex ? '*' : ' '}#${entry.index} ${frameLocation(entry)}`);
     }
-    if (stack.length > STACK_LIMIT) {
-        lines.push(`   ... ${stack.length - STACK_LIMIT} more frames`);
+    if (frames.length > STACK_LIMIT) {
+        lines.push(`   ... ${frames.length - STACK_LIMIT} more frames`);
+    }
+    if (hidden > 0) {
+        lines.push(`   (${hidden} frames of the server_run_lua call that started this are hidden)`);
     }
 
     try {
@@ -228,6 +248,32 @@ export function formatRunReport(report: RunReport | null, mapping: GmodSourceMap
     return { text: lines.join('\n'), isError: !report.ok };
 }
 
+/** Think has not run for this long: the server is hibernating and will not run a timer. */
+const NOT_TICKING_SECONDS = 1;
+
+function isRunReport(value: unknown): value is RunReport {
+    return !!value && typeof value === 'object' && typeof (value as RunReport).ok === 'boolean';
+}
+
+/** Polls a deferred run until it reports, for runs the agent stopped waiting on. */
+async function pollDeferred(context: McpToolContext, session: vscode.DebugSession, id: string): Promise<RunReport | null> {
+    const deadline = Date.now() + 10 * 60_000;
+    while (Date.now() < deadline) {
+        if (!context.bridge.isAlive(session)) {
+            throw new Error('the debug session ended before it finished');
+        }
+        const status = await context.bridge.runLua(session, id, 'take', 10_000);
+        if (isRunReport(status)) {
+            return status;
+        }
+        if ((status as { state?: string } | null)?.state === 'unknown') {
+            throw new Error('the server lost the run');
+        }
+        await new Promise((resolve) => setTimeout(resolve, Date.now() > deadline - 9.5 * 60_000 ? 500 : 100));
+    }
+    throw new Error('still running after 10 minutes');
+}
+
 function luaPathForFile(file: string, mapping: GmodSourceMapping): string {
     const gamePath = clientPathToGamePath(file, mapping);
     if (gamePath === undefined) {
@@ -324,43 +370,82 @@ function runLuaTool(context: McpToolContext): ToolSpec {
                 label = `include("${luaPath}")`;
             }
 
-            const pauseBefore = context.bridge.currentPauseCounter;
-            const wasPaused = context.bridge.pause !== undefined;
-            // The adapter request outlives our timeout so a late result can still be reported.
-            const run = context.bridge.runLua(session, lua, 10 * 60_000);
-            type Outcome = { kind: 'done'; report: RunReport | null } | { kind: 'failed'; error: unknown } | { kind: 'paused'; pause: PauseInfo } | { kind: 'timeout' };
-            const outcomes: Array<Promise<Outcome>> = [
-                run.then((report) => ({ kind: 'done', report }) as Outcome, (error) => ({ kind: 'failed', error }) as Outcome),
-                new Promise<Outcome>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs)),
-            ];
-            if (!wasPaused) {
-                outcomes.push(context.bridge.waitForPause(timeoutMs + 1000, pauseBefore, (listener) => signal.onAbort(listener))
-                    .then((pause) => pause ? { kind: 'paused', pause } as Outcome : { kind: 'timeout' } as Outcome));
-            }
-            const outcome = await Promise.race(outcomes);
-            switch (outcome.kind) {
-                case 'done': {
-                    const formatted = formatRunReport(outcome.report, mapping);
-                    return { text: prefix + formatted.text, isError: formatted.isError };
+            if (context.bridge.pause || state.paused) {
+                // Nothing runs on a paused server, so run inside the pause, in the global environment.
+                try {
+                    const report = await context.bridge.runLua(session, lua, 'capture', timeoutMs) as RunReport | null;
+                    const formatted = formatRunReport(report, mapping);
+                    return {
+                        text: `${prefix}Ran inside the paused server (global environment; breakpoints do not stop code run while paused).\n${formatted.text}`,
+                        isError: formatted.isError,
+                    };
+                } catch (error) {
+                    return { text: `${prefix}The server rejected the request: ${errorText(error)}`, isError: true };
                 }
-                case 'failed':
-                    return { text: `${prefix}The server rejected the request: ${errorText(outcome.error)}`, isError: true };
-                case 'paused': {
-                    context.bridge.followLateRun(label, run);
-                    const snapshot = await describePause(context, session, outcome.pause, 0);
+            }
+
+            // Run on the next server tick rather than inside gm_rdb's request handler, where
+            // LuaJIT runs no debug hooks; that way breakpoints inside the code can hit.
+            const pauseBefore = context.bridge.currentPauseCounter;
+            let scheduled: unknown;
+            try {
+                scheduled = await context.bridge.runLua(session, lua, 'defer', 10_000);
+            } catch (error) {
+                return { text: `${prefix}The server rejected the request: ${errorText(error)}`, isError: true };
+            }
+            const id = scheduled && typeof scheduled === 'object' && typeof (scheduled as { id?: unknown }).id === 'string'
+                ? (scheduled as { id: string }).id
+                : undefined;
+            if (!id) {
+                // An older bridge ignores the mode and has already run the code.
+                const formatted = formatRunReport(null, mapping);
+                return { text: prefix + formatted.text, isError: true };
+            }
+
+            const deadline = Date.now() + timeoutMs;
+            let note = '';
+            while (Date.now() < deadline && !signal.aborted) {
+                const pause = await context.bridge.waitForPause(40, pauseBefore, (listener) => signal.onAbort(listener));
+                if (pause) {
+                    context.bridge.followLateRun(label, pollDeferred(context, session, id));
+                    const snapshot = await describePause(context, session, pause, 0);
                     return {
                         text: `${prefix}The code hit a breakpoint and is still running inside the paused server. Its result will be reported after you continue.\n\n${snapshot}`,
                         describesPause: true,
                     };
                 }
-                case 'timeout':
-                    context.bridge.followLateRun(label, run);
-                    return {
-                        text: `${prefix}No result after ${timeoutMs} ms. The code may be stuck in a loop or waiting; the server is unresponsive while it runs.\n`
-                            + 'Use debugger {"action":"pause"} to see where it is. A late result will be reported in a later reply.',
-                        isError: true,
-                    };
+                let status: unknown;
+                try {
+                    status = await context.bridge.runLua(session, id, 'take', 10_000);
+                } catch (error) {
+                    return { text: `${prefix}Lost track of the run: ${errorText(error)}`, isError: true };
+                }
+                if (isRunReport(status)) {
+                    const formatted = formatRunReport(status, mapping);
+                    return { text: prefix + note + formatted.text, isError: formatted.isError };
+                }
+                const runState = (status as { state?: string } | null)?.state;
+                if (runState === 'unknown') {
+                    return { text: `${prefix}The server lost the scheduled run (it may have changed map).`, isError: true };
+                }
+                const sinceThink = (status as { sinceThink?: number } | null)?.sinceThink;
+                if (runState === 'scheduled' && typeof sinceThink === 'number' && sinceThink > NOT_TICKING_SECONDS) {
+                    // A hibernating server (no players, sv_hibernate_think 0) runs no timers.
+                    const cancelled = await context.bridge.runLua(session, id, 'cancel', 10_000).catch(() => undefined);
+                    if ((cancelled as { state?: string } | undefined)?.state === 'cancelled') {
+                        const report = await context.bridge.runLua(session, lua, 'capture', timeoutMs) as RunReport | null;
+                        const formatted = formatRunReport(report, mapping);
+                        note = 'The server is not ticking (it hibernates with no players unless sv_hibernate_think is 1), so the code ran directly; breakpoints in it will not hit.\n';
+                        return { text: prefix + note + formatted.text, isError: formatted.isError };
+                    }
+                }
             }
+            context.bridge.followLateRun(label, pollDeferred(context, session, id));
+            return {
+                text: `${prefix}No result after ${timeoutMs} ms. The code may be stuck in a loop or waiting, and the server does nothing else while it runs.\n`
+                    + 'Use debugger {"action":"pause"} to see where it is. A late result will be reported in a later reply.',
+                isError: true,
+            };
         },
     };
 }
@@ -438,6 +523,10 @@ function debuggerTool(context: McpToolContext): ToolSpec {
                     const fallback = action === 'continue' ? 0 : 5000;
                     const timeout = numberArg(args, 'timeout_ms', { min: 0, max: 55_000, fallback })!;
                     const pause = await context.bridge.step(session, action as StepKind, timeout, onAbort);
+                    if (!pause) {
+                        // A server_run_lua that was stopped at the breakpoint usually finishes right after resuming.
+                        await context.bridge.waitForLateRuns(1500);
+                    }
                     const note = action === 'continue'
                         ? (timeout > 0 ? `Resumed; no breakpoint hit within ${timeout} ms.` : 'Resumed. The server is running.')
                         : `Stepped, but the server did not stop again within ${timeout} ms (execution left Lua or ran on). It is running.`;

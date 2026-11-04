@@ -175,7 +175,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
     // Off unless gluals.mcp.enabled is set; see src/mcp/mcpHost.ts.
-    const mcpOutput = vscode.window.createOutputChannel('GLuaLS MCP');
+    const mcpOutput = vscode.window.createOutputChannel('GLuaLS MCP', { log: true });
     context.subscriptions.push(mcpOutput, new GmodMcpHost(context, mcpOutput));
     registerUndefinedGlobalCodeActions(context);
     registerNonLanguageFeatures(context);

@@ -5,11 +5,6 @@ import { GmodSourceMapping } from '../debugger/gmod_debugger/GmodSourcePaths';
 
 const QUIET_AFTER_COMMAND_MS = 350;
 
-function clock(time: number): string {
-    const date = new Date(time);
-    return [date.getHours(), date.getMinutes(), date.getSeconds()].map((part) => String(part).padStart(2, '0')).join(':');
-}
-
 async function currentMapping(context: McpToolContext): Promise<GmodSourceMapping | undefined> {
     const session = context.bridge.session;
     if (!session) {
@@ -25,7 +20,8 @@ function renderConsole(entries: ConsoleEntry[], omitted: number, cursor: number,
     }
     const header = `${entries.length} line(s)${omitted > 0 ? `, ${omitted} older matching line(s) not shown (raise limit or narrow search)` : ''}. `
         + `Cursor ${cursor}: pass after=${cursor} next time to get only newer lines.`;
-    const body = entries.map((entry) => `[${clock(entry.time)}] ${mapGamePathsInText(entry.text, mapping)}`).join('\n');
+    // Lines already start with the time the server printed them.
+    const body = entries.map((entry) => mapGamePathsInText(entry.text, mapping)).join('\n');
     return clampText(`${header}\n${body}`);
 }
 

@@ -1420,13 +1420,14 @@ export class GmodDebugSession extends DebugSession {
       }
       case 'gmod.mcp.runLua': {
         const lua = typeof raw.lua === 'string' ? raw.lua : ''
+        const mode = typeof raw.mode === 'string' ? raw.mode : 'capture'
         const timeoutMs = typeof raw.timeoutMs === 'number' && raw.timeoutMs > 0 ? raw.timeoutMs : undefined
         const readinessError = this.getConsoleCommandReadinessError()
         if (readinessError) {
           return Promise.reject(new Error(readinessError))
         }
         return this.requireDebugClient()
-          .runLua({ lua, realm: 'server', capture: true }, timeoutMs)
+          .runLua({ lua, realm: 'server', mode }, timeoutMs)
           .then((res) => ({ report: res.result ?? null }))
       }
       case 'gmod.mcp.command': {

@@ -506,8 +506,8 @@ export interface RunLuaRequest extends JsonRpcRequest {
   params: {
     lua: string
     realm: 'server' | 'client' | 'shared'
-    /** Ask the bridge for a JSON report of return values, output and errors. */
-    capture?: boolean
+    /** Passed to `_GLUALS.runLua` as its third argument; see GmodMcpBridgeLua.ts. */
+    mode?: string
   }
 }
 

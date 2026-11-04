@@ -53,6 +53,7 @@ export interface LateRun {
     startedAt: number;
     report?: RunReport | null;
     error?: string;
+    settled: Promise<void>;
 }
 
 interface TrackedSession {
@@ -98,12 +99,14 @@ export class GmodDebugBridge implements vscode.Disposable {
             }),
             vscode.debug.onDidStartDebugSession((session) => {
                 if (session.type === GMOD_SERVER_DEBUG_TYPE) {
+                    this.log(`Debug session started: ${session.name}`);
                     this.track(session);
                 }
             }),
             vscode.debug.onDidTerminateDebugSession((session) => {
                 const tracked = this.sessions.get(session.id);
                 if (tracked) {
+                    this.log(`Debug session ended: ${session.name}`);
                     tracked.terminated = true;
                     tracked.pause = undefined;
                     this.sessions.delete(session.id);
@@ -140,6 +143,10 @@ export class GmodDebugBridge implements vscode.Disposable {
         return newest?.session;
     }
 
+    isAlive(session: vscode.DebugSession): boolean {
+        return this.sessions.has(session.id);
+    }
+
     get sessionCount(): number {
         return this.sessions.size;
     }
@@ -165,9 +172,8 @@ export class GmodDebugBridge implements vscode.Disposable {
 
     /** Keeps following a run the agent stopped waiting for and reports it later. */
     followLateRun(label: string, run: Promise<RunReport | null>): void {
-        const entry: LateRun = { label, startedAt: Date.now() };
-        this.lateRuns.push(entry);
-        run.then(
+        const entry = { label, startedAt: Date.now() } as LateRun;
+        entry.settled = run.then(
             (report) => {
                 entry.report = report;
             },
@@ -175,6 +181,16 @@ export class GmodDebugBridge implements vscode.Disposable {
                 entry.error = error instanceof Error ? error.message : String(error);
             }
         );
+        this.lateRuns.push(entry);
+    }
+
+    /** Waits up to `timeoutMs` for followed runs to finish. */
+    async waitForLateRuns(timeoutMs: number): Promise<void> {
+        const pending = this.lateRuns.filter((run) => run.report === undefined && run.error === undefined);
+        if (pending.length === 0) {
+            return;
+        }
+        await Promise.race([Promise.all(pending.map((run) => run.settled)), delay(timeoutMs)]);
     }
 
     /**
@@ -203,37 +219,54 @@ export class GmodDebugBridge implements vscode.Disposable {
      * exists. Attach never stops on entry, so the game keeps running.
      */
     async ensureSession(autoAttach: boolean, timeoutMs = 10_000): Promise<{ session?: vscode.DebugSession; attached: boolean; problem?: string }> {
-        let session = this.session;
-        let attached = false;
-        if (!session) {
-            if (!autoAttach) {
-                return { attached, problem: 'No GMod server debug session is running. Call debugger with action "attach".' };
-            }
-            const started = await this.attach();
-            if (started.problem) {
-                return { attached, problem: started.problem };
-            }
-            attached = true;
-            session = this.session;
-        }
-        if (!session) {
-            return { attached, problem: 'The debug session did not start.' };
-        }
         const deadline = Date.now() + timeoutMs;
-        let state = await this.state(session);
-        while (state && !state.ready && Date.now() < deadline) {
-            await delay(250);
-            state = await this.state(session);
+        let attached = false;
+        let attempts = 0;
+        let lastReason: string | undefined;
+        while (true) {
+            let session = this.session;
+            if (!session) {
+                if (!autoAttach) {
+                    return { attached, problem: 'No GMod server debug session is running. Call debugger with action "attach".' };
+                }
+                attempts += 1;
+                const started = await this.attach();
+                if (started.problem) {
+                    return { attached, problem: started.problem };
+                }
+                attached = true;
+                session = this.session;
+            }
+            if (session) {
+                // Wait until the adapter has connected to gm_rdb and finished its handshake.
+                let state: SessionState | undefined;
+                while (this.sessions.has(session.id) && Date.now() < deadline) {
+                    state = await this.state(session).catch(() => undefined);
+                    if (state?.ready) {
+                        return { session, attached };
+                    }
+                    lastReason = state?.notReadyReason ?? lastReason;
+                    await delay(250);
+                }
+                if (this.sessions.has(session.id)) {
+                    return {
+                        session,
+                        attached,
+                        problem: `The debugger has not finished connecting to the game server (${lastReason ?? 'no response'}). Try again in a moment.`,
+                    };
+                }
+            }
+            // The session ended: usually nothing is listening on the debugger port yet.
+            if (Date.now() + 1000 >= deadline) {
+                break;
+            }
+            await delay(1000);
         }
-        if (!state?.ready) {
-            return {
-                session,
-                attached,
-                problem: `The debugger has not connected to the game server yet (${state?.notReadyReason ?? 'no state'}). `
-                    + 'Check that srcds is running with gm_rdb installed (GLuaLS: Setup Debugger) and listening on the configured port.',
-            };
-        }
-        return { session, attached };
+        return {
+            attached,
+            problem: `Could not connect to the GMod server debugger${attempts > 1 ? ` (${attempts} attempts)` : ''}: the debug session ended because nothing answered on the debugger port. `
+                + 'Check that srcds is running (it takes a few seconds to start) with gm_rdb installed and the GLuaLS autorun file in place, and that the port matches launch.json (default 21111).',
+        };
     }
 
     /** Starts the user's GMod attach configuration, or a default one on 127.0.0.1:21111. */
@@ -297,9 +330,10 @@ export class GmodDebugBridge implements vscode.Disposable {
         return Array.isArray(result.values) ? result.values : [];
     }
 
-    runLua(session: vscode.DebugSession, lua: string, timeoutMs: number): Promise<RunReport | null> {
-        return Promise.resolve(session.customRequest('gmod.mcp.runLua', { lua, timeoutMs }))
-            .then((result: { report?: RunReport | null }) => result?.report ?? null);
+    /** Calls the server bridge's `_GLUALS.runLua` in `mode`; see GmodMcpBridgeLua.ts. */
+    runLua(session: vscode.DebugSession, lua: string, mode: 'capture' | 'defer' | 'take' | 'cancel', timeoutMs: number): Promise<unknown> {
+        return Promise.resolve(session.customRequest('gmod.mcp.runLua', { lua, mode, timeoutMs }))
+            .then((result: { report?: unknown }) => result?.report ?? null);
     }
 
     async consoleCommand(session: vscode.DebugSession, command: string): Promise<void> {
@@ -389,9 +423,13 @@ export class GmodDebugBridge implements vscode.Disposable {
 
     private createTracker(session: vscode.DebugSession): vscode.DebugAdapterTracker {
         return {
-            onDidSendMessage: (message: { type?: string; event?: string; body?: { reason?: string } }) => {
+            onDidSendMessage: (message: { type?: string; event?: string; body?: { reason?: string; category?: string; output?: string } }) => {
                 if (message?.type !== 'event') {
                     return;
+                }
+                if (message.event === 'output' && message.body?.category !== 'stdout' && typeof message.body?.output === 'string') {
+                    // The adapter's own messages (connection, failures); game console lines are stdout.
+                    this.log(`Debugger: ${message.body.output.trim()}`);
                 }
                 const tracked = this.track(session);
                 if (message.event === 'stopped') {

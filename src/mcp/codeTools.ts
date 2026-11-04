@@ -189,8 +189,10 @@ function hoverText(hovers: vscode.Hover[] | undefined): string | undefined {
     for (const hover of hovers ?? []) {
         for (const content of hover.contents) {
             const value = typeof content === 'string' ? content : 'value' in content ? content.value : '';
-            if (value.trim().length > 0) {
-                parts.push(value.trim());
+            // Realm badges are images; the bold realm name next to them says the same.
+            const text = value.replace(/!\[[^\]]*\]\([^)]*\)\s*/g, '').trim();
+            if (text.length > 0) {
+                parts.push(text);
             }
         }
     }
@@ -223,6 +225,55 @@ function columnOf(lineText: string, name: string | undefined): number {
     }
     const firstCode = lineText.search(/\S/);
     return firstCode >= 0 ? firstCode : 0;
+}
+
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Finds where a member such as `MyAddon.Config` or `PLAYER:GetMoney` is written in the
+ * workspace, preferring its definition. The language server's workspace symbols only
+ * list globals, so members are found in the source and then asked about.
+ */
+async function findMemberInWorkspace(symbol: string): Promise<vscode.Location | undefined> {
+    const parts = symbol.split(/[.:]/).filter((part) => part.length > 0);
+    if (parts.length < 2) {
+        return undefined;
+    }
+    const pathPattern = parts.map(escapeRegExp).join('\\s*[.:]\\s*');
+    const definition = new RegExp(`function\\s+(${pathPattern})\\b|(${pathPattern})\\s*=(?!=)`);
+    const usage = new RegExp(`\\b(${pathPattern})\\b`);
+    const files = await vscode.workspace.findFiles('**/*.lua', '**/{node_modules,.git}/**', 20_000);
+    let firstUsage: vscode.Location | undefined;
+    for (const file of files) {
+        let text: string;
+        try {
+            text = fs.readFileSync(file.fsPath, 'utf8');
+        } catch {
+            continue;
+        }
+        if (!text.includes(parts[parts.length - 1])) {
+            continue;
+        }
+        const lines = text.split(/\r?\n/);
+        for (let index = 0; index < lines.length; index++) {
+            const defined = definition.exec(lines[index]);
+            if (defined) {
+                const matched = defined[1] ?? defined[2];
+                const column = lines[index].indexOf(matched) + matched.length - parts[parts.length - 1].length;
+                return new vscode.Location(file, new vscode.Position(index, column));
+            }
+            if (!firstUsage) {
+                const used = usage.exec(lines[index]);
+                if (used) {
+                    const column = used.index + used[1].length - parts[parts.length - 1].length;
+                    firstUsage = new vscode.Location(file, new vscode.Position(index, column));
+                }
+            }
+        }
+    }
+    return firstUsage;
 }
 
 function codeLookupTool(): ToolSpec {
@@ -274,27 +325,37 @@ function codeLookupTool(): ToolSpec {
             } else if (symbol) {
                 const found = await vscode.commands.executeCommand<vscode.SymbolInformation[]>('vscode.executeWorkspaceSymbolProvider', symbol) ?? [];
                 const lowered = symbol.toLowerCase();
-                const tail = (lowered.split(/[.:]/).pop() ?? lowered);
-                const ranked = found
-                    .filter((entry) => entry.location.uri.scheme === 'file')
-                    .sort((a, b) => score(b) - score(a));
-                function score(entry: vscode.SymbolInformation): number {
+                const tail = lowered.split(/[.:]/).pop() ?? lowered;
+                const score = (entry: vscode.SymbolInformation): number => {
                     const name = entry.name.toLowerCase();
                     const full = `${entry.containerName ?? ''}${entry.containerName ? '.' : ''}${entry.name}`.toLowerCase();
                     return (full === lowered.replace(':', '.') ? 4 : 0) + (name === tail ? 2 : 0) + (name.startsWith(tail) ? 1 : 0);
+                };
+                const ranked = found.filter((entry) => entry.location.uri.scheme === 'file').sort((a, b) => score(b) - score(a));
+                const exact = ranked.length > 0 && score(ranked[0]) >= 4;
+                if (!exact && /[.:]/.test(symbol)) {
+                    // Workspace symbols only list globals; find members in the source instead.
+                    const member = await findMemberInWorkspace(symbol);
+                    if (member) {
+                        uri = member.uri;
+                        position = member.range.start;
+                        lines.push(`Found "${symbol}" at ${oneLine(member)}`, '');
+                    }
                 }
-                if (ranked.length === 0) {
-                    return { text: `No workspace symbol matches "${symbol}". Try the last part of the name, or give file + line.` };
+                if (!position) {
+                    if (ranked.length === 0) {
+                        return { text: `Nothing in the workspace matches "${symbol}". Check the spelling, or give file + line.` };
+                    }
+                    lines.push(`Matches for "${symbol}" (${ranked.length}${ranked.length > 8 ? ', first 8 shown' : ''}):`);
+                    for (const entry of ranked.slice(0, 8)) {
+                        lines.push(`  ${entry.containerName ? `${entry.containerName}.` : ''}${entry.name} (${vscode.SymbolKind[entry.kind]})  ${oneLine(entry.location)}`);
+                    }
+                    uri = ranked[0].location.uri;
+                    const document = await vscode.workspace.openTextDocument(uri);
+                    const start = ranked[0].location.range.start;
+                    position = new vscode.Position(start.line, columnOf(document.lineAt(start.line).text, symbol));
+                    lines.push('', 'Details for the first match:');
                 }
-                lines.push(`Matches for "${symbol}" (${ranked.length}${ranked.length > 8 ? ', first 8 shown' : ''}):`);
-                for (const entry of ranked.slice(0, 8)) {
-                    lines.push(`  ${entry.containerName ? `${entry.containerName}.` : ''}${entry.name} (${vscode.SymbolKind[entry.kind]})  ${oneLine(entry.location)}`);
-                }
-                uri = ranked[0].location.uri;
-                const document = await vscode.workspace.openTextDocument(uri);
-                const start = ranked[0].location.range.start;
-                position = new vscode.Position(start.line, columnOf(document.lineAt(start.line).text, symbol));
-                lines.push('', `Details for the first match:`);
             } else {
                 throw new ToolInputError('Give "symbol", or "file" and "line".');
             }

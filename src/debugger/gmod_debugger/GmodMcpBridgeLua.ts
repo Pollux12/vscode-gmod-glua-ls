@@ -7,12 +7,17 @@
  * - `_GLUALS.formatAll(...)`: renders every value of a vararg list.
  * - `_GLUALS.formatNamed(names, ...)`: renders `name = value` lines for paused-frame locals.
  * - `_GLUALS.runCaptured(code)`: runs a chunk and returns a JSON report of its return
- *   values, printed output and error. `_GLUALS.runLua(realm, code, "capture")` calls it.
+ *   values, printed output and error.
+ * - `_GLUALS.bridgeModes`: what `_GLUALS.runLua(realm, code, mode)` does for each mode.
+ *   "capture" runs the chunk now. gm_rdb handles requests inside the debug hook, where
+ *   LuaJIT runs no hooks, so code run now never stops at breakpoints. "defer" schedules
+ *   the chunk for the next tick and returns an id, "take" returns its report once done,
+ *   and "cancel" drops it if it has not started (a hibernating server runs no timers).
  *
  * Bump `GLUALS_MCP_BRIDGE_VERSION` when the report shape changes so the extension can
  * tell a stale bridge (server not restarted yet) from a current one.
  */
-export const GLUALS_MCP_BRIDGE_VERSION = 1;
+export const GLUALS_MCP_BRIDGE_VERSION = 2;
 
 export const GLUALS_MCP_BRIDGE_LUA = String.raw`
     _GLUALS.mcpBridgeVersion = ${GLUALS_MCP_BRIDGE_VERSION}
@@ -312,4 +317,64 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
         report.bridgeVersion = _GLUALS.mcpBridgeVersion
         return util.TableToJSON(report)
     end
+
+    local deferredRuns = {}
+    local nextDeferredId = 0
+    local DEFERRED_KEEP_SECONDS = 600
+    -- A hibernating server (no players, sv_hibernate_think 0) runs no Think and no timers.
+    -- Replies say how long ago Think last ran so the extension can tell.
+    local lastThink = SysTime()
+    hook.Add("Think", "GLuaLS.MCP.Tick", function()
+        lastThink = SysTime()
+    end)
+    local function deferredStatus(state, id)
+        return util.TableToJSON({ id = id, state = state, sinceThink = SysTime() - lastThink })
+    end
+
+    _GLUALS.bridgeModes = {
+        capture = function(code)
+            return _GLUALS.runCaptured(code)
+        end,
+        defer = function(code)
+            local now = SysTime()
+            for id, entry in pairs(deferredRuns) do
+                if now - entry.created > DEFERRED_KEEP_SECONDS then
+                    deferredRuns[id] = nil
+                end
+            end
+            nextDeferredId = nextDeferredId + 1
+            local id = tostring(nextDeferredId)
+            local entry = { state = "scheduled", created = now }
+            deferredRuns[id] = entry
+            timer.Simple(0, function()
+                if entry.state ~= "scheduled" then
+                    return
+                end
+                entry.state = "running"
+                entry.report = _GLUALS.runCaptured(code)
+                entry.state = "done"
+            end)
+            return deferredStatus("scheduled", id)
+        end,
+        take = function(id)
+            local entry = deferredRuns[id]
+            if not entry then
+                return deferredStatus("unknown", id)
+            end
+            if entry.state == "done" then
+                deferredRuns[id] = nil
+                return entry.report
+            end
+            return deferredStatus(entry.state, id)
+        end,
+        cancel = function(id)
+            local entry = deferredRuns[id]
+            if entry and entry.state == "scheduled" then
+                entry.state = "cancelled"
+                deferredRuns[id] = nil
+                return deferredStatus("cancelled", id)
+            end
+            return deferredStatus(entry and entry.state or "unknown", id)
+        end,
+    }
 `;
