@@ -13,11 +13,12 @@
  *   LuaJIT runs no hooks, so code run now never stops at breakpoints. "defer" schedules
  *   the chunk for the next tick and returns an id, "take" returns its report once done,
  *   and "cancel" drops it if it has not started (a hibernating server runs no timers).
+ *   "trace", "untrace" and "traces" start, stop and list function traces (see traceStart).
  *
  * Bump `GLUALS_MCP_BRIDGE_VERSION` when the report shape changes so the extension can
  * tell a stale bridge (server not restarted yet) from a current one.
  */
-export const GLUALS_MCP_BRIDGE_VERSION = 2;
+export const GLUALS_MCP_BRIDGE_VERSION = 3;
 
 export const GLUALS_MCP_BRIDGE_LUA = String.raw`
     _GLUALS.mcpBridgeVersion = ${GLUALS_MCP_BRIDGE_VERSION}
@@ -219,6 +220,14 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
         return { n = select("#", ...), ... }
     end
 
+    -- Hit counts for logpoints with a hit condition (see logpoint.ts).
+    local logpointCounts = {}
+    function _GLUALS.countLogpoint(key)
+        local count = (logpointCounts[key] or 0) + 1
+        logpointCounts[key] = count
+        return count
+    end
+
     local function joinArgs(separator, ...)
         local parts = {}
         for i = 1, select("#", ...) do
@@ -331,7 +340,226 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
         return util.TableToJSON({ id = id, state = state, sinceThink = SysTime() - lastThink })
     end
 
+    -- Function tracing: a traced function is swapped for a wrapper that prints its
+    -- arguments and return values, until max_calls or max_seconds is reached.
+    local activeTraces = {}
+    local nextTraceId = 0
+    local TRACE_MAX_LINE = 600
+
+    local function clampLine(text)
+        if #text > TRACE_MAX_LINE then
+            return string.sub(text, 1, TRACE_MAX_LINE) .. "..."
+        end
+        return text
+    end
+
+    -- "MyAddon.Config.Get", "MyAddon:Method" or "Player:Nick" (a metatable from FindMetaTable).
+    local function resolveFunction(path)
+        local segments = {}
+        for segment in string.gmatch(path, "[^%.:]+") do
+            segments[#segments + 1] = segment
+        end
+        if #segments == 0 then
+            return nil, "no function name given"
+        end
+        local container = _G
+        -- "Player:Nick": a global named Player exists but is a function, so use the class.
+        if #segments > 1 and not istable(_G[segments[1]]) then
+            local meta = FindMetaTable and FindMetaTable(segments[1])
+            if not istable(meta) then
+                return nil, "there is no global table or class named " .. segments[1]
+            end
+            container = meta
+            table.remove(segments, 1)
+        end
+        for i = 1, #segments - 1 do
+            local value = container[segments[i]]
+            if not istable(value) then
+                return nil, table.concat(segments, ".", 1, i) .. " is not a table"
+            end
+            container = value
+        end
+        local key = segments[#segments]
+        local fn = container[key]
+        if not isfunction(fn) then
+            return nil, path .. " is not a function (it is " .. type(fn) .. ")"
+        end
+        return container, key, fn
+    end
+
+    local function parameterNames(fn)
+        local names = {}
+        for i = 1, 60 do
+            local ok, name = pcall(debug.getlocal, fn, i)
+            if not ok or not name then
+                break
+            end
+            names[i] = name
+        end
+        return names
+    end
+
+    -- A call that raised an error never reaches its "returned" line. Calling the function
+    -- through pcall would change the error's stack, so say so on the next call instead.
+    local function countOnStack(fn)
+        local count = 0
+        for level = 2, 250 do
+            local info = debug.getinfo(level, "f")
+            if not info then
+                break
+            end
+            if info.func == fn then
+                count = count + 1
+            end
+        end
+        return count
+    end
+
+    -- "running" is how many of the wrapper's frames belong to the caller (1 inside the wrapper).
+    local function reportUnreturned(trace, running)
+        if trace.pending and countOnStack(trace.wrapper) <= running then
+            print(string.format("[trace %s] #%d did not return: it raised an error (see server_errors)", trace.path, trace.pending))
+            trace.pending = nil
+        end
+    end
+
+    local function stopTrace(trace, reason)
+        if activeTraces[trace.id] ~= trace then
+            return
+        end
+        reportUnreturned(trace, 0)
+        activeTraces[trace.id] = nil
+        timer.Remove("GLuaLS.MCP.Trace" .. trace.id)
+        if trace.container[trace.key] == trace.wrapper then
+            if trace.own then
+                trace.container[trace.key] = trace.original
+            else
+                rawset(trace.container, trace.key, nil)
+            end
+        end
+        local hooks = hook.GetTable()
+        for _, entry in ipairs(trace.hooks) do
+            if hooks[entry.event] and hooks[entry.event][entry.name] == trace.wrapper then
+                hook.Add(entry.event, entry.name, trace.original)
+            end
+        end
+        print(string.format("[trace %s] stopped after %d call(s): %s", trace.path, trace.calls, reason))
+    end
+
+    local function traceStart(path, maxCalls, maxSeconds)
+        -- Named so a paused stack reads "in tracedFunction" for the traced function's frame.
+        local container, key, tracedFunction = resolveFunction(path)
+        if not container then
+            return { ok = false, error = key }
+        end
+        local original = tracedFunction
+        for _, existing in pairs(activeTraces) do
+            if existing.path == path then
+                stopTrace(existing, "replaced by a new trace")
+            end
+        end
+        nextTraceId = nextTraceId + 1
+        local trace = {
+            id = nextTraceId, path = path, container = container, key = key, original = original,
+            own = rawget(container, key) == original, calls = 0, maxCalls = maxCalls, hooks = {},
+            expires = SysTime() + maxSeconds,
+        }
+        local names = parameterNames(original)
+        local label = "[trace " .. path .. "]"
+        trace.wrapper = function(...)
+            if activeTraces[trace.id] ~= trace then
+                return original(...)
+            end
+            reportUnreturned(trace, 1)
+            -- Calls that raised an error never reached the max_calls check after returning.
+            if trace.calls >= trace.maxCalls then
+                stopTrace(trace, "reached max_calls")
+                return tracedFunction(...)
+            end
+            trace.calls = trace.calls + 1
+            local n = trace.calls
+            local count = select("#", ...)
+            local parts = {}
+            for i = 1, count do
+                parts[#parts + 1] = (names[i] or ("arg" .. i)) .. " = " .. formatValue((select(i, ...)), 1, "", {})
+            end
+            print(clampLine(string.format("%s #%d called (%s)", label, n, table.concat(parts, ", "))))
+            local started = SysTime()
+            local outermost = trace.pending == nil
+            if outermost then
+                trace.pending = n
+            end
+            local results = pack(tracedFunction(...))
+            if outermost then
+                trace.pending = nil
+            end
+            local rendered = {}
+            for i = 1, results.n do
+                rendered[i] = formatValue(results[i], 1, "", {})
+            end
+            print(clampLine(string.format("%s #%d returned %s (%.3f ms)", label, n,
+                results.n == 0 and "nothing" or table.concat(rendered, ", "), (SysTime() - started) * 1000)))
+            if n >= trace.maxCalls then
+                stopTrace(trace, "reached max_calls")
+            end
+            return unpack(results, 1, results.n)
+        end
+        container[key] = trace.wrapper
+        -- hook.Add stores its own reference, so point hooks running this function at the wrapper too.
+        for event, hooks in pairs(hook.GetTable()) do
+            for name, fn in pairs(hooks) do
+                if fn == original then
+                    trace.hooks[#trace.hooks + 1] = { event = event, name = name }
+                end
+            end
+        end
+        for _, entry in ipairs(trace.hooks) do
+            hook.Add(entry.event, entry.name, trace.wrapper)
+        end
+        activeTraces[trace.id] = trace
+        timer.Create("GLuaLS.MCP.Trace" .. trace.id, maxSeconds, 1, function()
+            stopTrace(trace, "reached max_seconds")
+        end)
+        local hookNames = {}
+        for _, entry in ipairs(trace.hooks) do
+            hookNames[#hookNames + 1] = tostring(entry.event) .. "/" .. tostring(entry.name)
+        end
+        return { ok = true, path = path, params = names, hooks = hookNames, maxCalls = maxCalls, maxSeconds = maxSeconds }
+    end
+
+    local function decodeArgs(code)
+        local ok, args = pcall(util.JSONToTable, code)
+        return ok and istable(args) and args or {}
+    end
+
     _GLUALS.bridgeModes = {
+        trace = function(code)
+            local args = decodeArgs(code)
+            local maxCalls = math.max(1, math.floor(tonumber(args.maxCalls) or 20))
+            local maxSeconds = math.max(1, tonumber(args.maxSeconds) or 120)
+            return util.TableToJSON(traceStart(tostring(args.path or ""), maxCalls, maxSeconds))
+        end,
+        untrace = function(code)
+            local args = decodeArgs(code)
+            local stopped = {}
+            for _, trace in pairs(activeTraces) do
+                if args.path == nil or trace.path == args.path then
+                    stopped[#stopped + 1] = { path = trace.path, calls = trace.calls }
+                    stopTrace(trace, "stopped by the agent")
+                end
+            end
+            return util.TableToJSON({ stopped = stopped })
+        end,
+        traces = function()
+            local list = {}
+            for _, trace in pairs(activeTraces) do
+                list[#list + 1] = {
+                    path = trace.path, calls = trace.calls, maxCalls = trace.maxCalls,
+                    secondsLeft = math.max(0, math.floor(trace.expires - SysTime())), hooks = #trace.hooks,
+                }
+            end
+            return util.TableToJSON({ traces = list })
+        end,
         capture = function(code)
             return _GLUALS.runCaptured(code)
         end,

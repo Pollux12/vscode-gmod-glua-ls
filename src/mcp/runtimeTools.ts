@@ -460,7 +460,7 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             description: [
                 'Status and control of the VS Code debugger attached to the Garry\'s Mod server.',
                 'status: connection, run state and, when paused, the paused location with source, stack, locals and upvalues (choose a frame with `frame`).',
-                'attach / detach: connect or disconnect the debugger (other tools attach automatically; detach leaves the server running).',
+                'attach: connect the debugger (other tools attach automatically). detach: remove your breakpoints and traces, resume if paused and disconnect, leaving the server as you found it.',
                 'wait: block until a breakpoint is hit (up to timeout_ms, default 25000). "Still running" is a normal answer: trigger the code (server_run_lua, a client MCP or the user) and call wait again.',
                 'continue: resume; by default returns at once, or pass timeout_ms to also wait for the next hit.',
                 'step_over / step_in / step_out: step while paused and return the new location.',
@@ -484,15 +484,21 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             const onAbort = (listener: () => void) => signal.onAbort(listener);
 
             if (action === 'detach') {
+                // Leave the server as the agent found it: nothing of the agent's left behind, nothing paused.
                 const current = context.bridge.session;
+                const traces = await stopTraces(context, current);
+                const removed = clearAgentBreakpoints(context);
+                const cleaned = removed + traces > 0 ? `Removed ${removed} breakpoint(s) and stopped ${traces} trace(s) you set. ` : '';
                 if (!current) {
-                    return { text: 'The debugger is not attached.' };
+                    return { text: `${cleaned}The debugger is not attached.` };
                 }
                 if (context.bridge.pause) {
                     await context.bridge.step(current, 'continue', 0).catch(() => undefined);
+                    // A server_run_lua stopped at a breakpoint usually finishes right after resuming.
+                    await context.bridge.waitForLateRuns(2000);
                 }
                 await vscode.debug.stopDebugging(current);
-                return { text: 'Detached the debugger. The server keeps running; breakpoints stay in VS Code but are inactive until it attaches again.' };
+                return { text: `${cleaned}Detached the debugger; the server keeps running.` };
             }
             if (action === 'status' && !context.bridge.session) {
                 return {
@@ -562,43 +568,62 @@ async function describeRunning(context: McpToolContext, session: vscode.DebugSes
     return lines.join('\n');
 }
 
-const BREAKPOINT_ACTIONS = ['set', 'remove', 'list', 'clear'] as const;
+const BREAKPOINT_ACTIONS = ['set', 'trace', 'remove', 'list', 'clear'] as const;
 
 interface BreakpointItem {
-    file: string;
+    file?: string;
     line?: number;
     condition?: string;
     hit_condition?: string;
     log_message?: string;
+    max_hits?: number;
+    max_seconds?: number;
+    /** For trace, or for remove of a trace: a function such as "MyAddon.Score" or "Player:Nick". */
+    function?: string;
+    max_calls?: number;
 }
 
-function parseItems(args: Record<string, unknown>, requireLine: boolean): BreakpointItem[] {
+function parseItems(args: Record<string, unknown>, kind: 'set' | 'trace' | 'remove'): BreakpointItem[] {
     const raw = args.items;
     if (raw === undefined) {
         return [];
     }
     if (!Array.isArray(raw)) {
-        throw new ToolInputError('"items" must be an array of {file, line, ...}.');
+        throw new ToolInputError('"items" must be an array of objects.');
     }
     return raw.map((item, index) => {
         if (!item || typeof item !== 'object') {
             throw new ToolInputError(`items[${index}] must be an object.`);
         }
         const entry = item as Record<string, unknown>;
+        const fn = stringArg(entry, 'function')?.trim();
         const file = stringArg(entry, 'file');
-        if (!file) {
-            throw new ToolInputError(`items[${index}].file is required.`);
-        }
         const line = numberArg(entry, 'line', { min: 1 });
-        if (requireLine && line === undefined) {
+        if (kind === 'trace' && !fn) {
+            throw new ToolInputError(`items[${index}].function is required for trace, e.g. "MyAddon.Score" or "Player:Nick".`);
+        }
+        if (kind !== 'trace' && !fn && !file) {
+            throw new ToolInputError(`items[${index}] needs a file${kind === 'remove' ? ' (or a function, to stop a trace)' : ''}.`);
+        }
+        if (kind === 'set' && line === undefined) {
             throw new ToolInputError(`items[${index}].line is required.`);
+        }
+        const logMessage = stringArg(entry, 'log_message');
+        const maxHits = numberArg(entry, 'max_hits', { min: 1 });
+        const maxSeconds = numberArg(entry, 'max_seconds', { min: 1, max: 3600 });
+        if (kind === 'set' && !logMessage && (maxHits !== undefined || maxSeconds !== undefined)) {
+            throw new ToolInputError(`items[${index}]: max_hits and max_seconds only apply to logpoints (set log_message).`);
         }
         return {
             file,
             line: line === undefined ? undefined : Math.floor(line),
             condition: stringArg(entry, 'condition'),
             hit_condition: stringArg(entry, 'hit_condition'),
-            log_message: stringArg(entry, 'log_message'),
+            log_message: logMessage,
+            max_hits: maxHits === undefined ? undefined : Math.floor(maxHits),
+            max_seconds: maxSeconds,
+            function: fn,
+            max_calls: numberArg(entry, 'max_calls', { min: 1, max: 1000 }),
         };
     });
 }
@@ -635,6 +660,69 @@ function sameFile(a: string, b: string): boolean {
     return path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
 }
 
+/** The text a logpoint's console lines start with, as the debug adapter prints it. */
+function logpointPrefixFor(file: string, line: number, mapping: GmodSourceMapping): string {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.find((folder) => !path.relative(folder.uri.fsPath, file).startsWith('..'))?.uri.fsPath;
+    const gamePath = clientPathToGamePath(file, mapping)
+        ?? (workspaceRoot ? path.relative(workspaceRoot, file) : path.basename(file));
+    return logpointLinePrefix(logpointLabel(gamePath, line));
+}
+
+function describeLimit(context: McpToolContext, bp: vscode.SourceBreakpoint): string | undefined {
+    const limited = context.bridge.limitedLogpoints.get(bp.id);
+    if (!limited) {
+        return undefined;
+    }
+    const parts: string[] = [];
+    if (limited.maxHits !== undefined) {
+        parts.push(`${Math.max(0, limited.maxHits - limited.hits)} of ${limited.maxHits} hits left`);
+    }
+    if (limited.expiresAt !== undefined) {
+        parts.push(`${Math.max(0, Math.round((limited.expiresAt - Date.now()) / 1000))} s left`);
+    }
+    return `(removes itself: ${parts.join(', ')})`;
+}
+
+interface TraceStatus {
+    path: string;
+    calls: number;
+    maxCalls: number;
+    secondsLeft: number;
+    hooks: number;
+}
+
+async function listTraces(context: McpToolContext, session: vscode.DebugSession | undefined): Promise<TraceStatus[] | undefined> {
+    if (!session) {
+        return [];
+    }
+    const result = await context.bridge.runLua(session, '{}', 'traces', 10_000).catch(() => undefined) as { traces?: unknown } | null | undefined;
+    if (!result || typeof result !== 'object') {
+        return undefined;
+    }
+    return Object.values((result.traces ?? {}) as Record<string, TraceStatus>);
+}
+
+/** Stops traces on the server: one function, or every trace when `fn` is undefined. Returns how many stopped. */
+export async function stopTraces(context: McpToolContext, session: vscode.DebugSession | undefined, fn?: string): Promise<number> {
+    if (!session) {
+        return 0;
+    }
+    const result = await context.bridge.runLua(session, JSON.stringify(fn ? { path: fn } : {}), 'untrace', 10_000).catch(() => undefined) as { stopped?: unknown } | null | undefined;
+    return result && typeof result === 'object' ? Object.keys((result.stopped ?? {}) as object).length : 0;
+}
+
+/** Removes the agent's breakpoints and logpoints (optionally only in `file`). Returns how many. */
+export function clearAgentBreakpoints(context: McpToolContext, file?: string): number {
+    const mine = vscode.debug.breakpoints.filter((bp): bp is vscode.SourceBreakpoint => bp instanceof vscode.SourceBreakpoint
+        && context.bridge.agentBreakpointIds.has(bp.id)
+        && (!file || path.normalize(bp.location.uri.fsPath).toLowerCase() === path.normalize(file).toLowerCase()));
+    vscode.debug.removeBreakpoints(mine);
+    for (const bp of mine) {
+        context.bridge.agentBreakpointIds.delete(bp.id);
+    }
+    return mine.length;
+}
+
 function describeBreakpoint(context: McpToolContext, bp: vscode.SourceBreakpoint, hits: number | undefined): string {
     const where = `${displayPath(bp.location.uri.fsPath)}:${bp.location.range.start.line + 1}`;
     const parts = [where];
@@ -642,7 +730,7 @@ function describeBreakpoint(context: McpToolContext, bp: vscode.SourceBreakpoint
     if (bp.condition) {
         parts.push(`if ${bp.condition}`);
     }
-    if (bp.hitCondition && !bp.logMessage) {
+    if (bp.hitCondition && !context.bridge.limitedLogpoints.get(bp.id)?.maxHits) {
         parts.push(`hits ${bp.hitCondition}`);
     }
     if (!bp.enabled) {
@@ -652,6 +740,10 @@ function describeBreakpoint(context: McpToolContext, bp: vscode.SourceBreakpoint
     if (hits !== undefined) {
         parts.push(`hit ${hits}x`);
     }
+    const limit = describeLimit(context, bp);
+    if (limit) {
+        parts.push(limit);
+    }
     return parts.join('  ');
 }
 
@@ -659,13 +751,15 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
     return {
         definition: {
             name: 'breakpoints',
-            title: 'Manage GMod server breakpoints and logpoints',
+            title: 'Manage GMod server breakpoints, logpoints and function traces',
             description: [
-                'Set, remove, list or clear breakpoints in server Lua files. They show up in the user\'s VS Code editor.',
-                'set: items [{file, line, condition?, hit_condition?, log_message?}]. Lines are 1-based; blank or comment lines move to the next code line.',
-                '`condition` is a Lua expression using the frame\'s locals; `hit_condition` like ">= 3" or "% 10".',
-                '`log_message` makes a LOGPOINT: it prints e.g. "hp={ply:Health()}" to server_console and never pauses. Prefer logpoints when something else (a client MCP or a player) is driving the game, because a breakpoint freezes the whole server.',
-                'list: all breakpoints with hit counts. remove: items [{file, line?}]. clear: removes the breakpoints you set (never the user\'s), optionally only in `file`.',
+                'Breakpoints, logpoints and function traces in server Lua. Breakpoints and logpoints show up in the user\'s VS Code editor.',
+                'set: items [{file, line, condition?, hit_condition?, log_message?, max_hits?, max_seconds?}]. Lines are 1-based; blank or comment lines move to the next code line.',
+                '`condition` is a Lua expression using the frame\'s locals; `hit_condition` like ">= 3" or "% 10" (for logpoints too).',
+                '`log_message` makes a LOGPOINT: it prints e.g. "hp={ply:Health()}" to server_console before the line runs and never pauses. `max_hits` / `max_seconds` make it remove itself.',
+                'trace: items [{function, max_calls?, max_seconds?}] logs every call of a function, e.g. "MyAddon.Score" or "Player:Nick": its arguments, return values and time (a call that errors is reported as not returning). Stops by itself after max_calls (default 20) or max_seconds (default 120).',
+                'Prefer logpoints and traces when something else (a client MCP or a player) is driving the game, because a breakpoint freezes the whole server.',
+                'list: breakpoints with hit counts, and active traces. remove: items [{file, line?}] or [{function}]. clear: removes everything you set (never the user\'s breakpoints), optionally only in `file`.',
                 'Breakpoints in clientside files never hit on the server.',
             ].join(' '),
             inputSchema: {
@@ -682,8 +776,11 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                                 condition: { type: 'string' },
                                 hit_condition: { type: 'string' },
                                 log_message: { type: 'string', description: 'Text with {lua expressions}; makes a logpoint. Values are formatted like server_run_lua results, so no tostring() needed.' },
+                                max_hits: { type: 'integer', minimum: 1, description: 'Logpoints: remove after this many hits.' },
+                                max_seconds: { type: 'number', minimum: 1, maximum: 3600, description: 'Logpoints and traces: remove after this long.' },
+                                function: { type: 'string', description: 'trace (or remove a trace): the function to trace, e.g. "MyAddon.Score" or "Player:Nick".' },
+                                max_calls: { type: 'integer', minimum: 1, maximum: 1000, description: 'trace: stop after this many calls (default 20).' },
                             },
-                            required: ['file'],
                         },
                     },
                     file: { type: 'string', description: 'For clear/list: only this file.' },
@@ -696,35 +793,71 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
             const action = enumArg(args, 'action', BREAKPOINT_ACTIONS);
             const session = context.bridge.session;
             const state = session ? await context.bridge.state(session).catch(() => undefined) : undefined;
+            const mapping = mappingOf(state);
             const sourceRoot = state?.sourceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             const fileFilterArg = stringArg(args, 'file');
             const fileFilter = fileFilterArg ? resolveWorkspacePath(fileFilterArg, sourceRoot) : undefined;
             const all = () => vscode.debug.breakpoints.filter((bp): bp is vscode.SourceBreakpoint => bp instanceof vscode.SourceBreakpoint);
 
+            if (action === 'trace') {
+                requireExecution(context);
+                const items = parseItems(args, 'trace');
+                if (items.length === 0) {
+                    throw new ToolInputError('"items" is required for trace, e.g. [{"function": "MyAddon.Score"}].');
+                }
+                const { session: attached, attachedNote } = await requireSession(context);
+                const lines: string[] = attachedNote ? [attachedNote] : [];
+                for (const item of items) {
+                    const result = await context.bridge.runLua(attached, JSON.stringify({
+                        path: item.function,
+                        maxCalls: item.max_calls ?? 20,
+                        maxSeconds: item.max_seconds ?? 120,
+                    }), 'trace', 10_000) as { ok?: boolean; error?: string; params?: Record<string, string>; hooks?: Record<string, string>; maxCalls?: number; maxSeconds?: number } | null;
+                    if (!result || typeof result.ok !== 'boolean') {
+                        lines.push(`SKIPPED ${item.function}: the server's bridge is out of date. Restart the map or server so it loads the updated lua/autorun/debug.lua.`);
+                    } else if (!result.ok) {
+                        lines.push(`SKIPPED ${item.function}: ${result.error ?? 'could not trace it'}.`);
+                    } else {
+                        const params = Object.values(result.params ?? {});
+                        const hooks = Object.values(result.hooks ?? {});
+                        lines.push(`TRACING ${item.function}(${params.join(', ')}) for the next ${result.maxCalls} call(s) or ${result.maxSeconds} s`
+                            + (hooks.length > 0 ? `, including the hook(s) ${hooks.join(', ')}.` : '.'));
+                    }
+                }
+                lines.push(`Each call prints "[trace <function>] #n called (...)" and "#n returned ..." to server_console; calls you make with server_run_lua also show under "Printed". `
+                    + 'Code that saved its own copy of the function (local f = MyAddon.Score, a timer callback) is not traced.');
+                return { text: lines.join('\n') };
+            }
+
             if (action === 'set') {
-                const items = parseItems(args, true);
+                const items = parseItems(args, 'set');
                 if (items.length === 0) {
                     throw new ToolInputError('"items" is required for set.');
                 }
                 const lines: string[] = [];
-                const created: vscode.SourceBreakpoint[] = [];
+                const created: Array<{ bp: vscode.SourceBreakpoint; item: BreakpointItem; prefix: string }> = [];
                 const replaced: vscode.SourceBreakpoint[] = [];
                 for (const item of items) {
-                    const resolved = resolveWorkspacePath(item.file, sourceRoot);
+                    const resolved = resolveWorkspacePath(item.file!, sourceRoot);
                     if (!resolved || !fs.existsSync(resolved)) {
                         lines.push(`SKIPPED ${item.file}: file not found.`);
                         continue;
                     }
                     const line = effectiveLine(resolved, item.line!);
                     replaced.push(...all().filter((bp) => sameFile(bp.location.uri.fsPath, resolved) && bp.location.range.start.line + 1 === line));
+                    // A logpoint's max_hits is enforced on the server as the hit condition "<= N".
+                    const hitCondition = item.log_message && item.max_hits !== undefined
+                        ? `<= ${item.max_hits}`
+                        : item.hit_condition?.trim() || undefined;
                     const bp = new vscode.SourceBreakpoint(
                         new vscode.Location(vscode.Uri.file(resolved), new vscode.Position(line - 1, 0)),
                         true,
                         item.condition?.trim() || undefined,
-                        item.log_message ? undefined : item.hit_condition?.trim() || undefined,
+                        hitCondition,
                         item.log_message?.trim() || undefined
                     );
-                    created.push(bp);
+                    const prefix = logpointPrefixFor(resolved, line, mapping);
+                    created.push({ bp, item, prefix });
                     const notes: string[] = [];
                     if (line !== item.line) {
                         notes.push(`moved from line ${item.line} to the next code line`);
@@ -732,15 +865,26 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     if (looksClientOnly(resolved)) {
                         notes.push('WARNING: this looks like a clientside file; server breakpoints there will not hit');
                     }
-                    lines.push(`SET ${describeBreakpoint(context, bp, undefined).replace(/\s+\[user\]$/, '')}${notes.length ? ` (${notes.join('; ')})` : ''}`);
+                    const limits = [
+                        item.max_hits !== undefined ? `${item.max_hits} hits` : undefined,
+                        item.max_seconds !== undefined ? `${item.max_seconds} s` : undefined,
+                    ].filter((entry): entry is string => entry !== undefined);
+                    if (limits.length > 0) {
+                        notes.push(`removes itself after ${limits.join(' or ')}`);
+                    }
+                    const head = `SET ${describeBreakpoint(context, bp, undefined).replace(/\s+\[user\]$/, '')}`;
+                    lines.push(`${head}${item.log_message ? `  prints "${prefix} ..."` : ''}${notes.length ? ` (${notes.join('; ')})` : ''}`);
                 }
                 if (replaced.length > 0) {
                     vscode.debug.removeBreakpoints(replaced);
                 }
                 if (created.length > 0) {
-                    vscode.debug.addBreakpoints(created);
-                    for (const bp of created) {
+                    vscode.debug.addBreakpoints(created.map((entry) => entry.bp));
+                    for (const { bp, item, prefix } of created) {
                         context.bridge.agentBreakpointIds.add(bp.id);
+                        if (item.log_message && (item.max_hits !== undefined || item.max_seconds !== undefined)) {
+                            context.bridge.limitLogpoint(bp, prefix, item.max_hits, item.max_seconds);
+                        }
                     }
                 }
                 if (!session) {
@@ -750,13 +894,18 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
             }
 
             if (action === 'remove') {
-                const items = parseItems(args, false);
+                const items = parseItems(args, 'remove');
                 if (items.length === 0) {
                     throw new ToolInputError('"items" is required for remove (use clear to remove all of yours).');
                 }
                 const toRemove = new Set<vscode.SourceBreakpoint>();
+                let tracesStopped = 0;
                 for (const item of items) {
-                    const resolved = resolveWorkspacePath(item.file, sourceRoot);
+                    if (item.function) {
+                        tracesStopped += await stopTraces(context, session, item.function);
+                        continue;
+                    }
+                    const resolved = resolveWorkspacePath(item.file!, sourceRoot);
                     for (const bp of all()) {
                         if (resolved && sameFile(bp.location.uri.fsPath, resolved)
                             && (item.line === undefined || bp.location.range.start.line + 1 === effectiveLine(resolved, item.line))) {
@@ -768,28 +917,28 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                 for (const bp of toRemove) {
                     context.bridge.agentBreakpointIds.delete(bp.id);
                 }
-                return { text: toRemove.size === 0 ? 'No matching breakpoints.' : `Removed ${toRemove.size} breakpoint(s).` };
+                const parts = [`Removed ${toRemove.size} breakpoint(s)`];
+                if (items.some((item) => item.function)) {
+                    parts.push(`stopped ${tracesStopped} trace(s)`);
+                }
+                return { text: `${parts.join(' and ')}.` };
             }
 
             if (action === 'clear') {
-                const mine = all().filter((bp) => context.bridge.agentBreakpointIds.has(bp.id)
-                    && (!fileFilter || sameFile(bp.location.uri.fsPath, fileFilter)));
-                vscode.debug.removeBreakpoints(mine);
-                for (const bp of mine) {
-                    context.bridge.agentBreakpointIds.delete(bp.id);
-                }
+                const removed = clearAgentBreakpoints(context, fileFilter);
+                const traces = fileFilter ? 0 : await stopTraces(context, session);
                 const userCount = all().length;
-                return { text: `Removed ${mine.length} breakpoint(s) you set. ${userCount > 0 ? `${userCount} remain, set by the user (left alone).` : 'None remain.'}` };
+                return {
+                    text: `Removed ${removed} breakpoint(s)${traces > 0 ? ` and stopped ${traces} trace(s)` : ''} you set. `
+                        + (userCount > 0 ? `${userCount} remain, set by the user (left alone).` : 'None remain.'),
+                };
             }
 
             // list
             const listed = all().filter((bp) => !fileFilter || sameFile(bp.location.uri.fsPath, fileFilter));
-            if (listed.length === 0) {
-                return { text: 'No breakpoints.' };
-            }
+            const lines: string[] = [];
             const hitCounts = new Map<string, number>();
-            const mapping = mappingOf(state);
-            if (session) {
+            if (session && listed.length > 0) {
                 try {
                     for (const entry of await context.bridge.serverBreakpoints(session)) {
                         if (entry.file && typeof entry.line === 'number') {
@@ -800,21 +949,29 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     // hit counts are optional
                 }
             }
-            const lines = listed.map((bp) => {
+            for (const bp of listed) {
                 const line = bp.location.range.start.line + 1;
-                const gamePath = clientPathToGamePath(bp.location.uri.fsPath, mapping);
                 let hits: number | undefined;
-                if (gamePath !== undefined) {
-                    if (bp.logMessage) {
-                        const prefix = logpointLinePrefix(logpointLabel(gamePath, line));
-                        hits = context.bridge.events.queryConsole({ search: prefix, limit: 500 }).entries.length;
-                    } else if (session) {
-                        hits = hitCounts.get(`${gamePath.replace(/\\/g, '/').toLowerCase()}:${line}`);
-                    }
+                if (bp.logMessage) {
+                    hits = context.bridge.events.queryConsole({ search: logpointPrefixFor(bp.location.uri.fsPath, line, mapping), limit: 500 }).entries.length;
+                } else if (session) {
+                    const gamePath = clientPathToGamePath(bp.location.uri.fsPath, mapping);
+                    hits = gamePath === undefined ? undefined : hitCounts.get(`${gamePath.replace(/\\/g, '/').toLowerCase()}:${line}`);
                 }
-                return describeBreakpoint(context, bp, hits);
-            });
-            if (!session) {
+                lines.push(describeBreakpoint(context, bp, hits));
+            }
+            if (lines.length === 0) {
+                lines.push('No breakpoints.');
+            }
+            const traces = fileFilter ? [] : await listTraces(context, session);
+            if (traces === undefined) {
+                lines.push('(Traces could not be listed: the server\'s bridge is out of date.)');
+            } else {
+                for (const trace of traces) {
+                    lines.push(`trace ${trace.path}  ${trace.calls} of ${trace.maxCalls} calls, ${trace.secondsLeft} s left${trace.hooks > 0 ? `, ${trace.hooks} hook(s)` : ''}  [yours]`);
+                }
+            }
+            if (!session && listed.length > 0) {
                 lines.push('(The debugger is not attached, so hit counts are unknown.)');
             }
             return { text: lines.join('\n') };

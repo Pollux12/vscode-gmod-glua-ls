@@ -53,7 +53,7 @@ function consoleTool(context: McpToolContext): ToolSpec {
             description: [
                 'Read the Garry\'s Mod SERVER console (print/Msg output, engine messages, logpoint lines). Lines are collected while the debugger is attached; this attaches it if needed.',
                 'Filter with `search` (case-insensitive text, or /regex/) and `after` (a cursor from an earlier reply) to see only what is new.',
-                '`wait_ms` blocks until a matching line arrives, e.g. after making something happen through a client MCP.',
+                '`wait_ms` blocks until a matching line printed since your previous tool call (or since `after`) is there, e.g. after making something happen through a client MCP.',
                 'With `command`, runs a server console command (e.g. "status", "changelevel gm_construct", "lua_refresh_file x.lua"; no ";" chaining) and returns the output it produced.',
             ].join(' '),
             inputSchema: {
@@ -112,8 +112,8 @@ function consoleTool(context: McpToolContext): ToolSpec {
             }
             const after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
-                // Without a cursor, wait for lines newer than this call.
-                const from = after ?? events.cursor;
+                // Without a cursor, anything since the previous tool call counts as new.
+                const from = after ?? context.bridge.lastReplyCursor ?? events.cursor;
                 await events.waitFor(() => events.queryConsole({ after: from, search, limit: 1 }).entries.length > 0, waitMs, onAbort);
                 const result = events.queryConsole({ after: from, search, limit });
                 const mapping = await currentMapping(context);
@@ -145,7 +145,7 @@ function errorsTool(context: McpToolContext): ToolSpec {
             description: [
                 'Unique Lua runtime errors raised on the Garry\'s Mod SERVER (hooks, timers, net receivers, entities), newest first, with counts and stack traces mapped to workspace files.',
                 'Errors are collected while the debugger is attached; this attaches it if needed. Errors from server_run_lua are reported by that tool directly.',
-                'Typical loop: clear: true, reproduce the problem (server_run_lua, a client MCP or the user), then read again, or use `wait_ms` to block until an error arrives.',
+                'Typical loop: clear: true, reproduce the problem (server_run_lua, a client MCP or the user), then read again, or use `wait_ms` to block until an error since your previous tool call arrives.',
                 '`after` takes a cursor from an earlier reply; `search` filters by text or /regex/.',
             ].join(' '),
             inputSchema: {
@@ -176,7 +176,7 @@ function errorsTool(context: McpToolContext): ToolSpec {
             }
             let after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
-                const from = after ?? events.cursor;
+                const from = after ?? context.bridge.lastReplyCursor ?? events.cursor;
                 await events.waitFor(() => events.queryErrors({ after: from, search, limit: 1 }).entries.length > 0, waitMs, (listener) => signal.onAbort(listener));
                 after = from;
             }

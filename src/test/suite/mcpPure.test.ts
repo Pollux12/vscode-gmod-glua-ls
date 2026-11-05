@@ -9,7 +9,7 @@ import {
     mergeJsonServerConfig,
 } from '../../mcp/clientSetup';
 import { clampLimit, createMatcher, McpEventLog } from '../../mcp/eventLog';
-import { buildLogpointCondition, luaStringLiteral, parseLogMessage } from '../../mcp/logpoint';
+import { buildLogpointCondition, hitConditionTest, logpointLabel, luaStringLiteral, parseLogMessage } from '../../mcp/logpoint';
 
 suite('MCP event log', () => {
     test('console entries share one cursor and filter by after and search', () => {
@@ -79,6 +79,16 @@ suite('MCP event log', () => {
         assert.strictEqual(await log.waitFor(() => false, 20), false);
     });
 
+    test('console listeners see each new line until unregistered', () => {
+        const log = new McpEventLog();
+        const seen: string[] = [];
+        const stop = log.onConsole((entry) => seen.push(entry.text));
+        log.pushConsole('first\n');
+        stop();
+        log.pushConsole('second');
+        assert.deepStrictEqual(seen, ['first']);
+    });
+
     test('createMatcher and clampLimit handle odd input', () => {
         assert.ok(createMatcher(undefined)('anything'));
         assert.ok(createMatcher('/[/')('a /[/ b'), 'an invalid regex falls back to substring search');
@@ -104,6 +114,28 @@ suite('MCP logpoints', () => {
     test('quotes Lua strings safely', () => {
         assert.strictEqual(luaStringLiteral('a"b\\c\nd'), '"a\\"b\\\\c\\nd"');
         assert.strictEqual(luaStringLiteral('\u0001'), '"\\001"');
+    });
+
+    test('labels use the include() path, which is short and unique on the server', () => {
+        assert.strictEqual(logpointLabel('addons/myaddon/lua/autorun/server/init.lua', 12), 'autorun/server/init.lua:12');
+        assert.strictEqual(logpointLabel('lua\\autorun\\x.lua', 3), 'autorun/x.lua:3');
+        assert.strictEqual(logpointLabel('gamemodes/sandbox/gamemode/init.lua', 5), 'sandbox/gamemode/init.lua:5');
+        assert.strictEqual(logpointLabel('sample.lua', 1), 'sample.lua:1');
+    });
+
+    test('turns hit conditions into Lua tests', () => {
+        assert.strictEqual(hitConditionTest('5'), 'n >= 5');
+        assert.strictEqual(hitConditionTest('<= 3'), 'n <= 3');
+        assert.strictEqual(hitConditionTest('% 10'), 'n % 10 == 0');
+        assert.strictEqual(hitConditionTest('== 2'), 'n == 2');
+        assert.strictEqual(hitConditionTest('soon'), undefined);
+    });
+
+    test('a hit condition counts on the server under the given key', () => {
+        assert.strictEqual(
+            buildLogpointCondition('x', 'a.lua:1', undefined, '<= 2', 'a.lua:1#7'),
+            '((function(n) return n <= 2 end)((_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint("a.lua:1#7") or 1)) and (print("[logpoint a.lua:1] " .. "x") and false))'
+        );
     });
 
     test('builds a condition that prints and never pauses', () => {

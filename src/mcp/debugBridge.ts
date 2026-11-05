@@ -56,6 +56,16 @@ export interface LateRun {
     settled: Promise<void>;
 }
 
+export interface LimitedLogpoint {
+    breakpoint: vscode.SourceBreakpoint;
+    /** What the logpoint's console lines start with. */
+    prefix: string;
+    maxHits?: number;
+    hits: number;
+    expiresAt?: number;
+    timer?: NodeJS.Timeout;
+}
+
 interface TrackedSession {
     session: vscode.DebugSession;
     startedAt: number;
@@ -84,9 +94,15 @@ export class GmodDebugBridge implements vscode.Disposable {
     readonly events = new McpEventLog();
     /** Breakpoints the agent created, so `clear` never removes the user's own. */
     readonly agentBreakpointIds = new Set<string>();
+    /** Agent logpoints that remove themselves after a number of hits or seconds. */
+    readonly limitedLogpoints = new Map<string, LimitedLogpoint>();
+    /** Where "new" output starts for a wait without a cursor: see buildMcpTools. */
+    lastReplyCursor?: number;
     /** Where the latest described pause stopped, for the banner on other tools' replies. */
     lastPauseLocation?: { pauseId: number; text: string };
     private readonly sessions = new Map<string, TrackedSession>();
+    /** Sessions that ended. Their late messages must not bring them back. */
+    private readonly ended = new Set<string>();
     private readonly disposables: vscode.Disposable[] = [];
     private readonly pauseListeners = new Set<() => void>();
     private pauseCounter = 0;
@@ -104,16 +120,22 @@ export class GmodDebugBridge implements vscode.Disposable {
                 }
             }),
             vscode.debug.onDidTerminateDebugSession((session) => {
-                const tracked = this.sessions.get(session.id);
-                if (tracked) {
+                if (session.type === GMOD_SERVER_DEBUG_TYPE) {
                     this.log(`Debug session ended: ${session.name}`);
-                    tracked.terminated = true;
-                    tracked.pause = undefined;
-                    this.sessions.delete(session.id);
-                    this.firePauseChange();
+                    this.markEnded(session);
                 }
             }),
-            vscode.debug.onDidReceiveDebugSessionCustomEvent((event) => this.onCustomEvent(event))
+            vscode.debug.onDidReceiveDebugSessionCustomEvent((event) => this.onCustomEvent(event)),
+            { dispose: this.events.onConsole((entry) => this.countLogpointHit(entry.text)) },
+            vscode.debug.onDidChangeBreakpoints((event) => {
+                for (const removed of event.removed) {
+                    const limited = this.limitedLogpoints.get(removed.id);
+                    if (limited) {
+                        clearTimeout(limited.timer);
+                        this.limitedLogpoints.delete(removed.id);
+                    }
+                }
+            })
         );
         // Sessions that started before the MCP host did.
         if (vscode.debug.activeDebugSession?.type === GMOD_SERVER_DEBUG_TYPE) {
@@ -121,7 +143,38 @@ export class GmodDebugBridge implements vscode.Disposable {
         }
     }
 
+    /** Removes `breakpoint` once it has printed `maxHits` lines or `maxSeconds` have passed. */
+    limitLogpoint(breakpoint: vscode.SourceBreakpoint, prefix: string, maxHits?: number, maxSeconds?: number): void {
+        const limited: LimitedLogpoint = { breakpoint, prefix, maxHits, hits: 0 };
+        if (maxSeconds !== undefined) {
+            limited.expiresAt = Date.now() + maxSeconds * 1000;
+            limited.timer = setTimeout(() => this.removeLimitedLogpoint(limited), maxSeconds * 1000);
+        }
+        this.limitedLogpoints.set(breakpoint.id, limited);
+    }
+
+    private countLogpointHit(line: string): void {
+        for (const limited of this.limitedLogpoints.values()) {
+            if (limited.maxHits !== undefined && line.includes(limited.prefix)) {
+                limited.hits += 1;
+                if (limited.hits >= limited.maxHits) {
+                    this.removeLimitedLogpoint(limited);
+                }
+            }
+        }
+    }
+
+    private removeLimitedLogpoint(limited: LimitedLogpoint): void {
+        clearTimeout(limited.timer);
+        this.limitedLogpoints.delete(limited.breakpoint.id);
+        this.agentBreakpointIds.delete(limited.breakpoint.id);
+        vscode.debug.removeBreakpoints([limited.breakpoint]);
+    }
+
     dispose(): void {
+        for (const limited of this.limitedLogpoints.values()) {
+            clearTimeout(limited.timer);
+        }
         for (const disposable of this.disposables.splice(0)) {
             disposable.dispose();
         }
@@ -240,10 +293,17 @@ export class GmodDebugBridge implements vscode.Disposable {
             if (session) {
                 // Wait until the adapter has connected to gm_rdb and finished its handshake.
                 let state: SessionState | undefined;
+                let failures = 0;
                 while (this.sessions.has(session.id) && Date.now() < deadline) {
                     state = await this.state(session).catch(() => undefined);
                     if (state?.ready) {
                         return { session, attached };
+                    }
+                    // A session that no longer answers at all is gone, whatever VS Code reported.
+                    failures = state ? 0 : failures + 1;
+                    if (failures >= 4) {
+                        this.markEnded(session);
+                        break;
                     }
                     lastReason = state?.notReadyReason ?? lastReason;
                     await delay(250);
@@ -331,7 +391,7 @@ export class GmodDebugBridge implements vscode.Disposable {
     }
 
     /** Calls the server bridge's `_GLUALS.runLua` in `mode`; see GmodMcpBridgeLua.ts. */
-    runLua(session: vscode.DebugSession, lua: string, mode: 'capture' | 'defer' | 'take' | 'cancel', timeoutMs: number): Promise<unknown> {
+    runLua(session: vscode.DebugSession, lua: string, mode: 'capture' | 'defer' | 'take' | 'cancel' | 'trace' | 'untrace' | 'traces', timeoutMs: number): Promise<unknown> {
         return Promise.resolve(session.customRequest('gmod.mcp.runLua', { lua, mode, timeoutMs }))
             .then((result: { report?: unknown }) => result?.report ?? null);
     }
@@ -412,7 +472,22 @@ export class GmodDebugBridge implements vscode.Disposable {
         return this.pauseCounter;
     }
 
+    private markEnded(session: vscode.DebugSession): void {
+        this.ended.add(session.id);
+        const tracked = this.sessions.get(session.id);
+        if (tracked) {
+            tracked.terminated = true;
+            tracked.pause = undefined;
+            this.sessions.delete(session.id);
+        }
+        this.firePauseChange();
+    }
+
     private track(session: vscode.DebugSession): TrackedSession {
+        if (this.ended.has(session.id)) {
+            // A late event from an ended session: answer with a record that is not kept.
+            return { session, startedAt: 0, terminated: true };
+        }
         let tracked = this.sessions.get(session.id);
         if (!tracked) {
             tracked = { session, startedAt: Date.now(), terminated: false };
@@ -439,8 +514,7 @@ export class GmodDebugBridge implements vscode.Disposable {
                     tracked.pause = undefined;
                     this.firePauseChange();
                 } else if (message.event === 'terminated' || message.event === 'exited') {
-                    tracked.pause = undefined;
-                    this.firePauseChange();
+                    this.markEnded(session);
                 }
             },
             onExit: () => {

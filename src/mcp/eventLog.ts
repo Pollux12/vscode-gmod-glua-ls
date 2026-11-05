@@ -79,6 +79,7 @@ export class McpEventLog {
     /** The server's running total for each fingerprint when errors were last cleared. */
     private readonly errorBaselines = new Map<string, number>();
     private readonly listeners = new Set<() => void>();
+    private readonly consoleListeners = new Set<(entry: ConsoleEntry) => void>();
 
     constructor(
         private readonly consoleCapacity = DEFAULT_CONSOLE_CAPACITY,
@@ -100,7 +101,17 @@ export class McpEventLog {
         if (this.consoleEntries.length > this.consoleCapacity) {
             this.consoleEntries.splice(0, this.consoleEntries.length - this.consoleCapacity);
         }
+        const entry = this.consoleEntries[this.consoleEntries.length - 1];
+        for (const listener of [...this.consoleListeners]) {
+            listener(entry);
+        }
         this.notify();
+    }
+
+    /** Calls `listener` for every new console line; returns a function that unregisters it. */
+    onConsole(listener: (entry: ConsoleEntry) => void): () => void {
+        this.consoleListeners.add(listener);
+        return () => this.consoleListeners.delete(listener);
     }
 
     recordError(report: ErrorReport): void {

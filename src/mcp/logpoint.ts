@@ -7,6 +7,8 @@
  * pauses. Each line starts with `[logpoint <label>]` so it can be found in the console.
  */
 
+import { gamePathToLuaPath } from '../debugger/gmod_debugger/GmodSourcePaths';
+
 export const LOGPOINT_PREFIX = '[logpoint';
 
 interface LogMessagePart {
@@ -97,9 +99,14 @@ export function luaStringLiteral(text: string): string {
     return `${out}"`;
 }
 
-/** The label a logpoint prints, e.g. `lua/autorun/server/init.lua:12`. */
-export function logpointLabel(file: string, line: number): string {
-    return `${file.replace(/\\/g, '/')}:${line}`;
+/**
+ * The label a logpoint prints, e.g. `autorun/server/init.lua:12` for
+ * `addons/myaddon/lua/autorun/server/init.lua`: the path include() would use, which
+ * is short and still unique on the server. Files outside lua/ keep their game path.
+ */
+export function logpointLabel(gamePath: string, line: number): string {
+    const normalized = gamePath.replace(/\\/g, '/');
+    return `${gamePathToLuaPath(normalized) ?? normalized}:${line}`;
 }
 
 /** The text a logpoint's console lines start with. */
@@ -108,11 +115,26 @@ export function logpointLinePrefix(label: string): string {
 }
 
 /**
- * Builds the LRDB condition for a logpoint. When `condition` is set the message is
- * only printed while it holds. Interpolated values go through `_GLUALS.format` when
- * the bridge is loaded and `tostring` otherwise.
+ * Turns a hit condition ("5", ">= 5", "<= 3", "% 10") into a Lua test of `n`, the
+ * number of times the logpoint was reached. A bare number means ">= n", as LRDB reads it.
  */
-export function buildLogpointCondition(logMessage: string, label: string, condition?: string): string {
+export function hitConditionTest(hitCondition: string): string | undefined {
+    const match = /^\s*(<=|>=|==|<|>|%)?\s*(\d+)\s*$/.exec(hitCondition);
+    if (!match) {
+        return undefined;
+    }
+    const operator = match[1] ?? '>=';
+    return operator === '%' ? `n % ${match[2]} == 0` : `n ${operator} ${match[2]}`;
+}
+
+/**
+ * Builds the LRDB condition for a logpoint. When `condition` is set the message is
+ * only printed while it holds. A `hitCondition` counts hits on the server under
+ * `counterKey` (unique per breakpoint), so "<= 3" prints exactly three times.
+ * Interpolated values go through `_GLUALS.format` when the bridge is loaded and
+ * `tostring` otherwise.
+ */
+export function buildLogpointCondition(logMessage: string, label: string, condition?: string, hitCondition?: string, counterKey?: string): string {
     const formatter = '(_GLUALS and _GLUALS.format or tostring)';
     const pieces = [luaStringLiteral(`${logpointLinePrefix(label)} `)];
     for (const part of parseLogMessage(logMessage)) {
@@ -120,6 +142,15 @@ export function buildLogpointCondition(logMessage: string, label: string, condit
     }
     // print returns nothing, so `print(...) and false` is nil and the line never pauses.
     const printCall = `(print(${pieces.join(' .. ')}) and false)`;
+    const gates: string[] = [];
     const trimmed = condition?.trim();
-    return trimmed ? `((${trimmed}) and ${printCall})` : printCall;
+    if (trimmed) {
+        gates.push(`(${trimmed})`);
+    }
+    const test = hitCondition ? hitConditionTest(hitCondition) : undefined;
+    if (test) {
+        const counter = `(_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint(${luaStringLiteral(counterKey ?? label)}) or 1)`;
+        gates.push(`(function(n) return ${test} end)(${counter})`);
+    }
+    return gates.length > 0 ? `(${gates.join(' and ')} and ${printCall})` : printCall;
 }

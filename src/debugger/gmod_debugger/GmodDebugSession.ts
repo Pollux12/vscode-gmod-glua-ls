@@ -603,11 +603,14 @@ export class GmodDebugSession extends DebugSession {
           breakpoints.push(bp)
           if (verified) {
             // LRDB has no logpoints, so a logpoint is a condition that prints and never pauses.
+            const label = logpointLabel(debuggerFilePath, this.convertDebuggerLineToClient(l))
             const condition = souceBreakpoint.logMessage
               ? buildLogpointCondition(
                 souceBreakpoint.logMessage,
-                logpointLabel(debuggerFilePath, this.convertDebuggerLineToClient(l)),
-                souceBreakpoint.condition
+                label,
+                souceBreakpoint.condition,
+                souceBreakpoint.hitCondition,
+                `${label}#${bp.id}`
               )
               : souceBreakpoint.condition
             const sendbreakpoint = {

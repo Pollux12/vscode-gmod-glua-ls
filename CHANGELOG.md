@@ -9,7 +9,8 @@
 
 - Add an optional MCP server (`gluals.mcp.enabled`, off by default) that lets AI agents such as Claude Code, Codex, GitHub Copilot and Cursor work with the GMod server. Its tools run Lua and return the result and printed output, read the console and Lua errors, set breakpoints and logpoints, wait for a hit, step and read locals, and read GLuaLS diagnostics and symbols.
 - Add the **GLuaLS: Set Up AI Agent (MCP)** command and an **AI Agents (MCP)** card in the settings panel. GitHub Copilot and Cursor find the server automatically; the command writes Claude Code, Codex, Cursor and VS Code configs.
-- Add logpoints to the GMod server debugger.
+- Add logpoints to the GMod server debugger. Hit conditions such as `% 10` work for logpoints too.
+- Add function traces and self-removing logpoints for MCP agents, and make the MCP `detach` action remove everything the agent set.
 - Fix a breakpoint on a line that calls a built-in function, such as `math.max`, pausing twice and counting two hits (needs the updated `gm_rdb`).
 - Fix "Run Lua" reporting `nil` instead of the message when the code has a syntax error.
 
