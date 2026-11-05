@@ -189,7 +189,7 @@ export class GmodMcpHost implements vscode.Disposable {
         } catch (error) {
             const code = (error as NodeJS.ErrnoException).code;
             const message = code === 'EADDRINUSE'
-                ? `Port ${settings.port} is already in use (another VS Code window running the GLuaLS MCP server?). Set gluals.mcp.port to a free port for this workspace.`
+                ? `Port ${settings.port} is already in use. Choose another in gluals.mcp.port.`
                 : `Could not start the MCP server on port ${settings.port}: ${error instanceof Error ? error.message : String(error)}`;
             this.output.appendLine(`[MCP] ${message}`);
             bridge.dispose();
@@ -230,7 +230,7 @@ export class GmodMcpHost implements vscode.Disposable {
                 return;
             case 'untrusted':
                 this.statusBar.text = '$(shield) GLuaLS MCP';
-                this.statusBar.tooltip = 'The GLuaLS MCP server only runs in trusted workspaces.';
+                this.statusBar.tooltip = 'The GLuaLS MCP server needs a trusted workspace.';
                 break;
             case 'running':
                 this.statusBar.text = '$(plug) GLuaLS MCP';
@@ -315,7 +315,7 @@ export class GmodMcpHost implements vscode.Disposable {
         if (!settings.enabled) {
             items.push({
                 label: '$(play) Enable the GLuaLS MCP server',
-                detail: 'Off by default. Lets AI agents run Lua on your GMod server, read its console and errors, and debug it.',
+                detail: 'Lets AI agents run Lua on your GMod server, read its console and errors, and debug it.',
                 run: async () => {
                     if (await this.enable()) {
                         void vscode.window.showInformationMessage(`GLuaLS MCP server running at ${mcpUrl(this.port)}.`);
@@ -331,7 +331,7 @@ export class GmodMcpHost implements vscode.Disposable {
         items.push({ label: 'Connect an agent', kind: vscode.QuickPickItemKind.Separator });
         items.push({
             label: '$(sparkle) Claude Code: add to this project',
-            detail: `Writes "${MCP_SERVER_NAME}" to .mcp.json in ${folder?.name ?? 'the workspace'}. Claude Code asks once to approve it.`,
+            detail: 'Adds it to .mcp.json. Claude Code asks you to approve it once.',
             run: async () => this.writeJsonConfig(folder, '.mcp.json', 'mcpServers', claudeCodeEntry(port), 'Claude Code'),
         });
         items.push({
@@ -340,28 +340,28 @@ export class GmodMcpHost implements vscode.Disposable {
             run: async () => this.copy(claudeCodeCommand(port), 'Claude Code command'),
         });
         items.push({
-            label: '$(sparkle) Codex: add to ~/.codex/config.toml',
-            detail: 'Adds [mcp_servers.gluals] with a 120 s tool timeout so debugger waits are not cut off.',
+            label: '$(sparkle) Codex: add to your Codex config',
+            detail: '~/.codex/config.toml',
             run: async () => this.writeCodexConfig(port),
         });
         items.push(inCursor
-            ? { label: '$(check) Cursor: registered automatically', detail: 'Cursor picks the server up while it is enabled. Nothing else to do.' }
+            ? { label: '$(check) Cursor: connected automatically', detail: 'Nothing to set up.' }
             : {
                 label: '$(sparkle) Cursor: add to this project',
-                detail: 'Writes .cursor/mcp.json in the workspace.',
+                detail: 'Adds it to .cursor/mcp.json.',
                 run: async () => this.writeJsonConfig(folder, path.join('.cursor', 'mcp.json'), 'mcpServers', cursorEntry(port), 'Cursor'),
             });
         const hasProvider = typeof (vscode as unknown as { lm?: McpDefinitionApi }).lm?.registerMcpServerDefinitionProvider === 'function';
         items.push(hasProvider
-            ? { label: '$(check) GitHub Copilot (VS Code): registered automatically', detail: `Appears as "${SERVER_LABEL}" in the MCP servers list. VS Code may ask you to trust it once.` }
+            ? { label: '$(check) GitHub Copilot: connected automatically', detail: `Listed as "${SERVER_LABEL}" in VS Code's MCP servers.` }
             : {
-                label: '$(sparkle) GitHub Copilot (VS Code): add to this project',
-                detail: 'Writes .vscode/mcp.json (this VS Code version cannot register it automatically).',
+                label: '$(sparkle) GitHub Copilot: add to this project',
+                detail: 'Adds it to .vscode/mcp.json.',
                 run: async () => this.writeJsonConfig(folder, path.join('.vscode', 'mcp.json'), 'servers', vscodeEntry(port), 'VS Code'),
             });
         items.push({
             label: '$(clippy) Other client: copy JSON config',
-            detail: `Streamable HTTP at ${mcpUrl(port)}, no authentication.`,
+            detail: mcpUrl(port),
             run: async () => this.copy(genericJsonSnippet(port), 'MCP JSON config'),
         });
         items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
@@ -393,7 +393,7 @@ export class GmodMcpHost implements vscode.Disposable {
         }
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, merged, 'utf8');
-        const open = await vscode.window.showInformationMessage(`Added the GLuaLS MCP server to ${relative} for ${client}. Restart or reload ${client} to pick it up.`, 'Open File');
+        const open = await vscode.window.showInformationMessage(`Added to ${relative}. Restart ${client} to connect.`, 'Open File');
         if (open) {
             await vscode.window.showTextDocument(vscode.Uri.file(file));
         }
@@ -405,7 +405,7 @@ export class GmodMcpHost implements vscode.Disposable {
         const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
         fs.mkdirSync(home, { recursive: true });
         fs.writeFileSync(file, mergeCodexToml(existing, port), 'utf8');
-        const open = await vscode.window.showInformationMessage(`Added the GLuaLS MCP server to ${file}. Restart Codex to pick it up.`, 'Open File');
+        const open = await vscode.window.showInformationMessage(`Added to ${file}. Restart Codex to connect.`, 'Open File');
         if (open) {
             await vscode.window.showTextDocument(vscode.Uri.file(file));
         }

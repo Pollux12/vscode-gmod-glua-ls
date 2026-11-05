@@ -104,9 +104,8 @@ export function renderMcpSection({ categoryList, sectionsContent, onCategoryClic
     heading.appendChild(title);
     const description = document.createElement("div");
     description.className = "section-description";
-    description.textContent = "Let AI agents such as Claude Code, Codex, GitHub Copilot and Cursor run Lua on your GMod server, "
-        + "read its console and errors, and debug it with breakpoints. These are VS Code settings for this workspace, "
-        + "not .gluarc.json values.";
+    description.textContent = "Let AI agents run Lua on your GMod server, read its console and errors, and debug it. "
+        + "Saved in VS Code settings, not .gluarc.json.";
     heading.appendChild(description);
     section.appendChild(heading);
 
@@ -114,7 +113,7 @@ export function renderMcpSection({ categoryList, sectionsContent, onCategoryClic
     body.className = "section-body";
 
     body.appendChild(settingRow("enabled", "MCP Server",
-        "Run a local MCP server for AI agents. It only listens on this computer (127.0.0.1) and only in trusted workspaces.",
+        "Run the MCP server for AI agents. Only this computer can connect.",
         booleanSelect("enabled")));
 
     const status = document.createElement("span");
@@ -128,7 +127,7 @@ export function renderMcpSection({ categoryList, sectionsContent, onCategoryClic
     statusWrap.appendChild(copy);
     const statusRow = createSettingRow({
         label: "Status",
-        description: "Whether the server is running, and the address agents connect to.",
+        description: "The address agents connect to.",
         path: ["mcp", "status"],
         input: statusWrap,
         inline: true,
@@ -137,24 +136,22 @@ export function renderMcpSection({ categoryList, sectionsContent, onCategoryClic
 
     body.appendChild(createSettingRow({
         label: "Connect an Agent",
-        description: "GitHub Copilot and Cursor find the server on their own. For Claude Code, Codex and other clients, "
-            + "this writes or copies the config they need.",
+        description: "Copilot and Cursor connect automatically. Set up Claude Code, Codex and others here.",
         path: ["mcp", "setup"],
         input: actionButton("Set Up Agent…", "setup"),
         inline: true,
     }));
 
     body.appendChild(settingRow("port", "Port",
-        "Port the server listens on. Each VS Code window running the server needs its own; run Set Up Agent again after changing it.",
+        "Port the MCP server listens on.",
         portInput()));
 
     body.appendChild(settingRow("allowCodeExecution", "Allow Code Execution",
-        "Let agents run Lua and console commands on the server and evaluate expressions while paused. "
-        + "Disabled leaves the read-only tools: console, errors, diagnostics, code lookup and breakpoints.",
+        "Let agents run Lua and console commands on the server. When disabled, they can still read and debug.",
         booleanSelect("allowCodeExecution")));
 
     body.appendChild(settingRow("autoAttach", "Auto Attach",
-        "Attach the debugger to the GMod server when an agent first uses a server tool. It never pauses on attach.",
+        "Connect the debugger automatically when an agent needs it.",
         booleanSelect("autoAttach")));
 
     section.appendChild(body);
