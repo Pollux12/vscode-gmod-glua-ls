@@ -6,6 +6,8 @@ import * as vscode from 'vscode';
 import {
     claudeCodeCommand,
     claudeCodeEntry,
+    codexTomlBlock,
+    CodexTomlUnsupportedError,
     cursorEntry,
     genericJsonSnippet,
     MCP_SERVER_NAME,
@@ -17,7 +19,7 @@ import {
 import { DiagnosticsWatcher } from './codeTools';
 import { GmodDebugBridge } from './debugBridge';
 import { McpHttpServer } from './mcpHttpServer';
-import { McpToolSettings } from './runtimeTools';
+import { McpToolSettings, releaseAgentState } from './runtimeTools';
 import { buildMcpTools, MCP_INSTRUCTIONS } from './tools';
 
 export const MCP_SETTINGS_SECTION = 'gluals.mcp';
@@ -218,8 +220,16 @@ export class GmodMcpHost implements vscode.Disposable {
     /** Stops everything: the server, the debug bridge and the diagnostics watcher. */
     private async stop(): Promise<void> {
         await this.stopServer();
-        this.bridge?.dispose();
+        const bridge = this.bridge;
         this.bridge = undefined;
+        if (bridge) {
+            // The ownership records go with the bridge, so remove the agent's breakpoints, traces and
+            // debug session now; afterwards nothing could tell them apart from the user's.
+            await releaseAgentState({ bridge, settings: () => readSettings() }, false).catch((error) => {
+                this.output.appendLine(`[MCP] Cleanup: ${error instanceof Error ? error.message : String(error)}`);
+            });
+            bridge.dispose();
+        }
         this.watcher?.dispose();
         this.watcher = undefined;
     }
@@ -407,8 +417,18 @@ export class GmodMcpHost implements vscode.Disposable {
         const home = process.env.CODEX_HOME && process.env.CODEX_HOME.length > 0 ? process.env.CODEX_HOME : path.join(os.homedir(), '.codex');
         const file = path.join(home, 'config.toml');
         const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
+        let merged: string;
+        try {
+            merged = mergeCodexToml(existing, port);
+        } catch (error) {
+            if (!(error instanceof CodexTomlUnsupportedError)) {
+                throw error;
+            }
+            await this.copy(codexTomlBlock(port), `Codex config (${file} already has a ${MCP_SERVER_NAME} entry setup cannot edit, so update it by hand)`);
+            return;
+        }
         fs.mkdirSync(home, { recursive: true });
-        fs.writeFileSync(file, mergeCodexToml(existing, port), 'utf8');
+        fs.writeFileSync(file, merged, 'utf8');
         const open = await vscode.window.showInformationMessage(`Added to ${file}. Restart Codex to connect.`, 'Open File');
         if (open) {
             await vscode.window.showTextDocument(vscode.Uri.file(file));

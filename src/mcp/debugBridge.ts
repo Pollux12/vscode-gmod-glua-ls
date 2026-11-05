@@ -453,6 +453,8 @@ export class GmodDebugBridge implements vscode.Disposable {
         }
         return new Promise((resolve) => {
             let done = false;
+            // Declared first: onAbort calls its listener at once when the request is already aborted.
+            let unregister: (() => void) | undefined;
             const finish = (value: PauseInfo | undefined) => {
                 if (done) {
                     return;
@@ -473,7 +475,7 @@ export class GmodDebugBridge implements vscode.Disposable {
             };
             const timer = setTimeout(() => finish(undefined), Math.max(0, timeoutMs));
             this.pauseListeners.add(listener);
-            const unregister = onAbort?.(() => finish(undefined));
+            unregister = onAbort?.(() => finish(undefined));
         });
     }
 

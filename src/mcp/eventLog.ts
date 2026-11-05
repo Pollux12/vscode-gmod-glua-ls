@@ -214,6 +214,8 @@ export class McpEventLog {
         }
         return new Promise((resolve) => {
             let done = false;
+            // Declared first: onAbort calls its listener at once when the request is already aborted.
+            let unregisterAbort: (() => void) | undefined;
             const finish = (value: boolean) => {
                 if (done) {
                     return;
@@ -231,7 +233,7 @@ export class McpEventLog {
             };
             const timer = setTimeout(() => finish(false), Math.max(0, timeoutMs));
             this.listeners.add(check);
-            const unregisterAbort = onAbort?.(() => finish(false));
+            unregisterAbort = onAbort?.(() => finish(false));
         });
     }
 

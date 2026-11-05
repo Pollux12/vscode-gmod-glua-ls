@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 
 import { clientPathToGamePath, gamePathToLuaPath, GmodSourceMapping } from '../debugger/gmod_debugger/GmodSourcePaths';
 import { GmodDebugBridge, PauseInfo, RunReport, SessionState, StackFrameInfo, StepKind } from './debugBridge';
-import { logpointLabel, logpointLinePrefix, luaStringLiteral } from './logpoint';
+import { hitConditionTest, logpointLabel, logpointLinePrefix, luaStringLiteral } from './logpoint';
 import { AbortSignalLike, McpTool } from './mcpHttpServer';
 import {
     displayPath,
@@ -483,24 +483,16 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             const onAbort = (listener: () => void) => signal.onAbort(listener);
 
             if (action === 'detach') {
-                // Leave the server as the agent found it: nothing of the agent's left behind, nothing paused.
-                const current = context.bridge.session;
-                const traces = await stopTraces(context, current);
-                const removed = clearAgentBreakpoints(context);
+                const { removed, traces, attached, detached } = await releaseAgentState(context, true);
                 const cleaned = removed + traces > 0 ? `Removed ${removed} breakpoint(s) and stopped ${traces} trace(s) you set. ` : '';
-                if (!current) {
+                if (!attached) {
                     return { text: `${cleaned}The debugger is not attached.` };
                 }
-                if (context.bridge.pause) {
-                    await context.bridge.step(current, 'continue', 0).catch(() => undefined);
-                    // A server_run_lua stopped at a breakpoint usually finishes right after resuming.
-                    await context.bridge.waitForLateRuns(2000);
-                }
-                if (!context.bridge.startedByAgent(current)) {
-                    return { text: `${cleaned}The user started this debug session, so it stays attached. The server is running.` };
-                }
-                await vscode.debug.stopDebugging(current);
-                return { text: `${cleaned}Detached the debugger; the server keeps running.` };
+                return {
+                    text: detached
+                        ? `${cleaned}Detached the debugger; the server keeps running.`
+                        : `${cleaned}The user started this debug session, so it stays attached. The server is running.`,
+                };
             }
             if (action === 'status' && !context.bridge.session) {
                 return {
@@ -713,6 +705,31 @@ export async function stopTraces(context: McpToolContext, session: vscode.DebugS
     return result && typeof result === 'object' ? Object.keys((result.stopped ?? {}) as object).length : 0;
 }
 
+/**
+ * Leaves the server as the agent found it: its breakpoints and traces removed, and the debug session it
+ * started disconnected. A session the user started stays attached; `resumeUserSession` decides whether a
+ * pause in it is resumed (detach does, turning the MCP off leaves the user's pause alone).
+ */
+export async function releaseAgentState(context: McpToolContext, resumeUserSession: boolean): Promise<{ removed: number; traces: number; attached: boolean; detached: boolean }> {
+    const current = context.bridge.session;
+    const traces = await stopTraces(context, current);
+    const removed = clearAgentBreakpoints(context);
+    if (!current) {
+        return { removed, traces, attached: false, detached: false };
+    }
+    const byAgent = context.bridge.startedByAgent(current);
+    if (context.bridge.pause && (byAgent || resumeUserSession)) {
+        await context.bridge.step(current, 'continue', 0).catch(() => undefined);
+        // A server_run_lua stopped at a breakpoint usually finishes right after resuming.
+        await context.bridge.waitForLateRuns(2000);
+    }
+    if (!byAgent) {
+        return { removed, traces, attached: true, detached: false };
+    }
+    await vscode.debug.stopDebugging(current);
+    return { removed, traces, attached: true, detached: true };
+}
+
 /** Removes the agent's breakpoints and logpoints (optionally only in `file`). Returns how many. */
 export function clearAgentBreakpoints(context: McpToolContext, file?: string): number {
     const mine = vscode.debug.breakpoints.filter((bp): bp is vscode.SourceBreakpoint => bp instanceof vscode.SourceBreakpoint
@@ -775,8 +792,8 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                             properties: {
                                 file: { type: 'string', description: 'Workspace-relative or absolute path.' },
                                 line: { type: 'integer', minimum: 1 },
-                                condition: { type: 'string' },
-                                hit_condition: { type: 'string' },
+                                condition: { type: 'string', description: 'Lua expression; needs code execution to be allowed.' },
+                                hit_condition: { type: 'string', description: 'Hit count test: ">= 5", "== 3", "< 10" or "% 10".' },
                                 log_message: { type: 'string', description: 'Text with {lua expressions}; makes a logpoint. Values are formatted like server_run_lua results, so no tostring() needed.' },
                                 max_hits: { type: 'integer', minimum: 1, description: 'Logpoints: remove after this many hits.' },
                                 max_seconds: { type: 'number', minimum: 1, maximum: 3600, description: 'Logpoints and traces: remove after this long.' },
@@ -837,6 +854,15 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                 if (items.length === 0) {
                     throw new ToolInputError('"items" is required for set.');
                 }
+                // Conditions and logpoint messages are Lua that runs on the server, so they need the same
+                // permission as server_run_lua. LRDB also evaluates a hit condition as Lua, so only allow counts.
+                if (items.some((item) => item.condition?.trim() || item.log_message?.trim())) {
+                    requireExecution(context);
+                }
+                const badHit = items.find((item) => item.hit_condition?.trim() && !hitConditionTest(item.hit_condition));
+                if (badHit) {
+                    throw new ToolInputError(`hit_condition "${badHit.hit_condition}" is not a hit count test. Use ">= 5", "== 3", "< 10" or "% 10".`);
+                }
                 const lines: string[] = [];
                 const created: Array<{ bp: vscode.SourceBreakpoint; item: BreakpointItem; prefix: string }> = [];
                 const replaced: vscode.SourceBreakpoint[] = [];
@@ -847,7 +873,13 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                         continue;
                     }
                     const line = effectiveLine(resolved, item.line!);
-                    replaced.push(...all().filter((bp) => sameFile(bp.location.uri.fsPath, resolved) && bp.location.range.start.line + 1 === line));
+                    const existing = all().filter((bp) => sameFile(bp.location.uri.fsPath, resolved) && bp.location.range.start.line + 1 === line);
+                    // Only the agent's own breakpoint on that line is replaced; the user's is never touched.
+                    if (existing.some((bp) => !context.bridge.agentBreakpointIds.has(bp.id))) {
+                        lines.push(`SKIPPED ${displayPath(resolved)}:${line}: the user has a breakpoint on that line (left alone). Use a nearby line.`);
+                        continue;
+                    }
+                    replaced.push(...existing);
                     // A logpoint's max_hits is enforced on the server as the hit condition "<= N".
                     const hitCondition = item.log_message && item.max_hits !== undefined
                         ? `<= ${item.max_hits}`
@@ -884,6 +916,9 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                 }
                 if (replaced.length > 0) {
                     vscode.debug.removeBreakpoints(replaced);
+                    for (const bp of replaced) {
+                        context.bridge.agentBreakpointIds.delete(bp.id);
+                    }
                 }
                 if (created.length > 0) {
                     vscode.debug.addBreakpoints(created.map((entry) => entry.bp));
@@ -906,6 +941,7 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     throw new ToolInputError('"items" is required for remove (use clear to remove all of yours).');
                 }
                 const toRemove = new Set<vscode.SourceBreakpoint>();
+                const userOwned = new Set<vscode.SourceBreakpoint>();
                 let tracesStopped = 0;
                 for (const item of items) {
                     if (item.function) {
@@ -916,7 +952,7 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     for (const bp of all()) {
                         if (resolved && sameFile(bp.location.uri.fsPath, resolved)
                             && (item.line === undefined || bp.location.range.start.line + 1 === effectiveLine(resolved, item.line))) {
-                            toRemove.add(bp);
+                            (context.bridge.agentBreakpointIds.has(bp.id) ? toRemove : userOwned).add(bp);
                         }
                     }
                 }
@@ -928,7 +964,8 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                 if (items.some((item) => item.function)) {
                     parts.push(`stopped ${tracesStopped} trace(s)`);
                 }
-                return { text: `${parts.join(' and ')}.` };
+                const kept = userOwned.size > 0 ? ` ${userOwned.size} set by the user there were left alone.` : '';
+                return { text: `${parts.join(' and ')}.${kept}` };
             }
 
             if (action === 'clear') {

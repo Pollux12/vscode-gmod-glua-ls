@@ -23,29 +23,46 @@ const SEVERITY_LABEL = ['error', 'warning', 'info', 'hint'];
  * edited after that can wait for the language server to catch up.
  */
 export class DiagnosticsWatcher implements vscode.Disposable {
+    /** Files changed on disk before this are assumed to have been analysed already. */
+    readonly startedAt = Date.now();
     private readonly updatedAt = new Map<string, number>();
+    private readonly editedAt = new Map<string, number>();
     private readonly listeners = new Set<(uris: readonly vscode.Uri[]) => void>();
-    private readonly subscription: vscode.Disposable;
+    private readonly subscriptions: vscode.Disposable[];
 
     constructor() {
-        this.subscription = vscode.languages.onDidChangeDiagnostics((event) => {
-            const now = Date.now();
-            for (const uri of event.uris) {
-                this.updatedAt.set(uri.toString(), now);
-            }
-            for (const listener of [...this.listeners]) {
-                listener(event.uris);
-            }
-        });
+        this.subscriptions = [
+            vscode.languages.onDidChangeDiagnostics((event) => {
+                const now = Date.now();
+                for (const uri of event.uris) {
+                    this.updatedAt.set(uri.toString(), now);
+                }
+                for (const listener of [...this.listeners]) {
+                    listener(event.uris);
+                }
+            }),
+            // Edits in an open editor change what the language server analyses without touching the file on disk.
+            vscode.workspace.onDidChangeTextDocument((event) => {
+                if (event.document.uri.scheme === 'file' && event.contentChanges.length > 0) {
+                    this.editedAt.set(event.document.uri.toString(), Date.now());
+                }
+            }),
+        ];
     }
 
     dispose(): void {
-        this.subscription.dispose();
+        for (const subscription of this.subscriptions) {
+            subscription.dispose();
+        }
         this.listeners.clear();
     }
 
     lastUpdate(uri: vscode.Uri): number | undefined {
         return this.updatedAt.get(uri.toString());
+    }
+
+    lastEdit(uri: vscode.Uri): number | undefined {
+        return this.editedAt.get(uri.toString());
     }
 
     /** Waits until every URI in `pending` had a diagnostics update, or the timeout passes. */
@@ -96,6 +113,43 @@ function isUnder(file: string, target: string): boolean {
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+const FOLDER_SCAN_LIMIT = 5000;
+const MAX_FILES_TO_REFRESH = 50;
+
+/** Lua files under `folder` changed on disk since `since` (bounded, skipping hidden folders and node_modules). */
+function luaFilesChangedSince(folder: string, since: number): string[] {
+    const found: string[] = [];
+    const queue = [folder];
+    let seen = 0;
+    while (queue.length > 0 && seen < FOLDER_SCAN_LIMIT) {
+        const dir = queue.shift()!;
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+        for (const entry of entries) {
+            seen += 1;
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
+                    queue.push(full);
+                }
+            } else if (entry.name.endsWith('.lua')) {
+                try {
+                    if (fs.statSync(full).mtimeMs > since) {
+                        found.push(full);
+                    }
+                } catch {
+                    // Deleted while scanning.
+                }
+            }
+        }
+    }
+    return found;
+}
+
 function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): ToolSpec {
     return {
         definition: {
@@ -137,18 +191,39 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
                 }
             }
 
-            // Files edited since their last analysis: make sure the server sees them, then wait.
-            const pending = new Set<string>();
+            // Files edited (on disk or in an editor) since their last analysis: make sure the server sees them, then wait.
+            // Inside a requested folder, only files changed since the watcher started are candidates.
+            const candidates = new Map<string, boolean>();
             for (const target of targets) {
-                if (!fs.statSync(target).isFile()) {
+                if (fs.statSync(target).isFile()) {
+                    candidates.set(target, true);
                     continue;
                 }
-                const uri = vscode.Uri.file(target);
+                for (const file of luaFilesChangedSince(target, watcher.startedAt)) {
+                    candidates.set(file, candidates.get(file) ?? false);
+                }
+                for (const document of vscode.workspace.textDocuments) {
+                    if (document.uri.scheme === 'file' && isUnder(document.uri.fsPath, target) && watcher.lastEdit(document.uri) !== undefined) {
+                        candidates.set(document.uri.fsPath, candidates.get(document.uri.fsPath) ?? false);
+                    }
+                }
+            }
+            const pending = new Set<string>();
+            for (const [file, requested] of candidates) {
+                if (pending.size >= MAX_FILES_TO_REFRESH) {
+                    break;
+                }
+                const uri = vscode.Uri.file(file);
                 const last = watcher.lastUpdate(uri);
-                const modified = fs.statSync(target).mtimeMs;
-                if (last === undefined || modified > last) {
+                let changed = watcher.lastEdit(uri) ?? 0;
+                try {
+                    changed = Math.max(changed, fs.statSync(file).mtimeMs);
+                } catch {
+                    continue;
+                }
+                if ((last === undefined && (requested || changed > watcher.startedAt)) || (last !== undefined && changed > last)) {
                     pending.add(uri.toString());
-                    if (!vscode.workspace.textDocuments.some((document) => document.uri.fsPath === target)) {
+                    if (!vscode.workspace.textDocuments.some((document) => document.uri.fsPath === file)) {
                         await vscode.workspace.openTextDocument(uri).then(undefined, () => undefined);
                     }
                 }
@@ -163,6 +238,7 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
 
             const totals = [0, 0, 0, 0];
             const listed: string[] = [];
+            let listedCount = 0;
             let omitted = 0;
             const sorted = [...all].sort(([a], [b]) => a.fsPath.localeCompare(b.fsPath));
             for (const [uri, list] of sorted) {
@@ -172,10 +248,12 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
                     if (diagnostic.severity > minSeverity) {
                         continue;
                     }
-                    if (listed.length >= limit) {
+                    // The limit counts diagnostics, not output lines (each may add a source line).
+                    if (listedCount >= limit) {
                         omitted += 1;
                         continue;
                     }
+                    listedCount += 1;
                     const code = typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
                     const message = diagnostic.message.replace(/\s*\n\s*/g, ' ').replace(/[\s.]+$/, '');
                     listed.push(`${displayPath(uri.fsPath)}:${diagnostic.range.start.line + 1}:${diagnostic.range.start.character + 1} `

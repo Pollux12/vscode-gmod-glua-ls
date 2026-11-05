@@ -151,7 +151,9 @@ export function buildLogpointCondition(logMessage: string, label: string, condit
     }
     const test = hitCondition ? hitConditionTest(hitCondition) : undefined;
     if (test) {
-        const counter = `(_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint(${luaStringLiteral(counterKey ?? label)}) or 1)`;
+        // A server still running an older lua/autorun/debug.lua has no countLogpoint, so count in a global table instead.
+        const fallback = 'function(k) local t = rawget(_G, "__glualsLogpointCounts") or {} rawset(_G, "__glualsLogpointCounts", t) t[k] = (t[k] or 0) + 1 return t[k] end';
+        const counter = `((_GLUALS and _GLUALS.countLogpoint) or ${fallback})(${luaStringLiteral(counterKey ?? label)})`;
         gates.push(`(function(n) return ${test} end)(${counter})`);
     }
     const printCall = `print(${pieces.join(' .. ')})`;

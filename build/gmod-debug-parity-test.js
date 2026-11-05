@@ -158,7 +158,7 @@ async function run() {
 
     // A logpoint with a hit condition keeps its server-side counter while VS Code re-sends it unchanged,
     // and gets a fresh one when it is edited.
-    const counterKey = (condition) => /countLogpoint\("([^"]+)"\)/.exec(condition)?.[1]
+    const counterKey = (condition) => /return t\[k\] end\)\("([^"]+)"\)/.exec(condition)?.[1]
     const sendLogpoint = async (logMessage) => {
       addedBreakpoints.length = 0
       session.setBreakPointsRequest(makeResponse('setBreakpoints'), {

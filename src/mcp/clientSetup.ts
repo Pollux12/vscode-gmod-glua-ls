@@ -58,20 +58,33 @@ export function codexTomlBlock(port: number): string {
     ].join('\n');
 }
 
+/** Thrown when config.toml already defines the server in a form setup cannot safely edit. */
+export class CodexTomlUnsupportedError extends Error {}
+
 /** Adds or replaces the `[mcp_servers.gluals]` table in a Codex `config.toml`, leaving the rest as it was. */
 export function mergeCodexToml(existing: string | undefined, port: number): string {
     const block = codexTomlBlock(port);
     const text = existing ?? '';
     const lines = text.split(/\r?\n/);
-    const header = new RegExp(`^\\s*\\[mcp_servers\\.(?:"${MCP_SERVER_NAME}"|${MCP_SERVER_NAME})\\]\\s*(#.*)?$`);
+    // TOML allows quoted keys and spaces around the dots: [mcp_servers.gluals], [mcp_servers."gluals"], [ mcp_servers . 'gluals' ].
+    const name = `(?:${MCP_SERVER_NAME}|"${MCP_SERVER_NAME}"|'${MCP_SERVER_NAME}')`;
+    const key = `\\s*mcp_servers\\s*\\.\\s*${name}\\s*`;
+    const header = new RegExp(`^\\s*\\[${key}\\]\\s*(#.*)?$`);
+    const subTable = new RegExp(`^\\s*\\[${key}\\.`);
     const start = lines.findIndex((line) => header.test(line));
     if (start < 0) {
+        // Defined some other way (a dotted key, an inline table under [mcp_servers], or only sub-tables):
+        // appending a second definition would make the file invalid, so leave it to the user.
+        const elsewhere = new RegExp(`^\\s*(?:mcp_servers\\s*\\.\\s*)?${name}\\s*[.=]`);
+        if (lines.some((line) => elsewhere.test(line) || subTable.test(line))) {
+            throw new CodexTomlUnsupportedError(`config.toml already defines mcp_servers.${MCP_SERVER_NAME} in a form setup cannot edit safely.`);
+        }
         const trimmed = text.replace(/\s+$/, '');
         return trimmed.length > 0 ? `${trimmed}\n\n${block}` : block;
     }
     let end = start + 1;
-    // The table runs until the next header that is not one of its own sub-tables.
-    while (end < lines.length && !(/^\s*\[/.test(lines[end]) && !lines[end].trim().startsWith(`[mcp_servers.${MCP_SERVER_NAME}.`))) {
+    // Replace only the table's own keys, up to the next header. Its sub-tables (env, headers, ...) stay as the user wrote them.
+    while (end < lines.length && !/^\s*\[/.test(lines[end])) {
         end += 1;
     }
     const before = lines.slice(0, start).join('\n').replace(/\s+$/, '');

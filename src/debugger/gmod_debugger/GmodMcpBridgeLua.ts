@@ -453,17 +453,29 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
     end
 
     local function traceStart(path, maxCalls, maxSeconds)
-        -- Named so a paused stack reads "in tracedFunction" for the traced function's frame.
-        local container, key, tracedFunction = resolveFunction(path)
-        if not container then
-            return { ok = false, error = key }
-        end
-        local original = tracedFunction
+        -- Stop an earlier trace of the same function first, so the real function (and any hooks it
+        -- restores) is what gets saved below, not the old wrapper.
         for _, existing in pairs(activeTraces) do
             if existing.path == path then
                 stopTrace(existing, "replaced by a new trace")
             end
         end
+        -- Named so a paused stack reads "in tracedFunction" for the traced function's frame.
+        local container, key, tracedFunction = resolveFunction(path)
+        if not container then
+            return { ok = false, error = key }
+        end
+        -- The same function under another name ("MyAddon:Score" and "MyAddon.Score").
+        for _, existing in pairs(activeTraces) do
+            if existing.container == container and existing.key == key then
+                stopTrace(existing, "replaced by a new trace")
+                container, key, tracedFunction = resolveFunction(path)
+                if not container then
+                    return { ok = false, error = key }
+                end
+            end
+        end
+        local original = tracedFunction
         nextTraceId = nextTraceId + 1
         local trace = {
             id = nextTraceId, path = path, container = container, key = key, original = original,

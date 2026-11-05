@@ -3,12 +3,14 @@ import * as assert from 'assert';
 import {
     claudeCodeCommand,
     codexTomlBlock,
+    CodexTomlUnsupportedError,
     genericJsonSnippet,
     mcpUrl,
     mergeCodexToml,
     mergeJsonServerConfig,
 } from '../../mcp/clientSetup';
 import { clampLimit, createMatcher, McpEventLog } from '../../mcp/eventLog';
+import { createAbortController } from '../../mcp/mcpHttpServer';
 import { buildLogpointCondition, hitConditionTest, logpointLabel, luaStringLiteral, parseLogMessage } from '../../mcp/logpoint';
 
 suite('MCP event log', () => {
@@ -97,6 +99,13 @@ suite('MCP event log', () => {
         assert.strictEqual(await log.waitFor(() => false, 20), false);
     });
 
+    test('waitFor on an already aborted request finishes instead of throwing', async () => {
+        const controller = createAbortController();
+        controller.abort();
+        const log = new McpEventLog();
+        assert.strictEqual(await log.waitFor(() => false, 1000, (listener) => controller.signal.onAbort(listener)), false);
+    });
+
     test('console listeners see each new line until unregistered', () => {
         const log = new McpEventLog();
         const seen: string[] = [];
@@ -149,9 +158,16 @@ suite('MCP logpoints', () => {
         assert.strictEqual(hitConditionTest('soon'), undefined);
     });
 
+    test('a hit condition counts even when the server has an older helper without countLogpoint', () => {
+        const condition = buildLogpointCondition('x', 'a.lua:1', undefined, '>= 2', 'k');
+        assert.ok(condition.includes('rawget(_G, "__glualsLogpointCounts")'), condition);
+        assert.ok(!condition.includes(' or 1)'), 'no constant fallback count');
+    });
+
     test('a hit condition counts on the server under the given key', () => {
         const condition = buildLogpointCondition('x', 'a.lua:1', undefined, '<= 2', 'a.lua:1#7');
-        assert.ok(condition.includes('if (function(n) return n <= 2 end)((_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint("a.lua:1#7") or 1)) then print("[logpoint a.lua:1] " .. "x") end'), condition);
+        assert.ok(condition.includes('if (function(n) return n <= 2 end)(((_GLUALS and _GLUALS.countLogpoint) or function(k) '), condition);
+        assert.ok(condition.includes('return t[k] end)("a.lua:1#7")) then print("[logpoint a.lua:1] " .. "x") end'), condition);
     });
 
     // LRDB treats a condition that raises an error as true, so everything must run inside pcall
@@ -187,6 +203,17 @@ suite('MCP client setup', () => {
         assert.strictEqual(merged.match(/\[mcp_servers\.gluals\]/g)?.length, 1);
         const appended = mergeCodexToml('model = "x"\n', 5);
         assert.ok(appended.endsWith('[mcp_servers.gluals]\nurl = "http://127.0.0.1:5/mcp"\ntool_timeout_sec = 120\n'));
+    });
+
+    test('recognises equivalent Codex headers, keeps sub-tables, and refuses forms it cannot edit', () => {
+        for (const header of ["[mcp_servers.'gluals']", '[ mcp_servers . "gluals" ]']) {
+            const merged = mergeCodexToml(`${header}\nurl = "old"\n[mcp_servers.'gluals'.env]\nA = "1"\n[other]\nx = 1\n`, 21120);
+            assert.strictEqual(merged.match(/^\[.*gluals.*\]$/gm)?.length, 2, merged);
+            assert.ok(merged.includes('url = "http://127.0.0.1:21120/mcp"') && !merged.includes('url = "old"'), merged);
+            assert.ok(merged.includes("[mcp_servers.'gluals'.env]\nA = \"1\"") && merged.includes('[other]\nx = 1'), merged);
+        }
+        assert.throws(() => mergeCodexToml('[mcp_servers]\ngluals = { url = "old" }\n', 21120), CodexTomlUnsupportedError);
+        assert.throws(() => mergeCodexToml('mcp_servers.gluals.url = "old"\n', 21120), CodexTomlUnsupportedError);
     });
 
     test('snippets name the server and URL', () => {
