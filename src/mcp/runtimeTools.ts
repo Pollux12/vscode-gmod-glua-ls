@@ -450,7 +450,7 @@ function runLuaTool(context: McpToolContext): ToolSpec {
     };
 }
 
-const DEBUGGER_ACTIONS = ['status', 'attach', 'wait', 'continue', 'step_over', 'step_in', 'step_out', 'pause'] as const;
+const DEBUGGER_ACTIONS = ['status', 'attach', 'detach', 'wait', 'continue', 'step_over', 'step_in', 'step_out', 'pause'] as const;
 
 function debuggerTool(context: McpToolContext): ToolSpec {
     return {
@@ -460,7 +460,7 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             description: [
                 'Status and control of the VS Code debugger attached to the Garry\'s Mod server.',
                 'status: connection, run state and, when paused, the paused location with source, stack, locals and upvalues (choose a frame with `frame`).',
-                'attach: connect the debugger (other tools also do this automatically).',
+                'attach / detach: connect or disconnect the debugger (other tools attach automatically; detach leaves the server running).',
                 'wait: block until a breakpoint is hit (up to timeout_ms, default 25000). "Still running" is a normal answer: trigger the code (server_run_lua, a client MCP or the user) and call wait again.',
                 'continue: resume; by default returns at once, or pass timeout_ms to also wait for the next hit.',
                 'step_over / step_in / step_out: step while paused and return the new location.',
@@ -483,6 +483,17 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             const frame = Math.floor(numberArg(args, 'frame', { min: 0, fallback: 0 })!);
             const onAbort = (listener: () => void) => signal.onAbort(listener);
 
+            if (action === 'detach') {
+                const current = context.bridge.session;
+                if (!current) {
+                    return { text: 'The debugger is not attached.' };
+                }
+                if (context.bridge.pause) {
+                    await context.bridge.step(current, 'continue', 0).catch(() => undefined);
+                }
+                await vscode.debug.stopDebugging(current);
+                return { text: 'Detached the debugger. The server keeps running; breakpoints stay in VS Code but are inactive until it attaches again.' };
+            }
             if (action === 'status' && !context.bridge.session) {
                 return {
                     text: 'Debugger: not attached. Any server tool attaches it automatically, or call debugger {"action":"attach"}.\n'
@@ -670,7 +681,7 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                                 line: { type: 'integer', minimum: 1 },
                                 condition: { type: 'string' },
                                 hit_condition: { type: 'string' },
-                                log_message: { type: 'string', description: 'Text with {lua expressions}; makes a logpoint.' },
+                                log_message: { type: 'string', description: 'Text with {lua expressions}; makes a logpoint. Values are formatted like server_run_lua results, so no tostring() needed.' },
                             },
                             required: ['file'],
                         },
@@ -768,7 +779,7 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     context.bridge.agentBreakpointIds.delete(bp.id);
                 }
                 const userCount = all().length;
-                return { text: `Removed ${mine.length} breakpoint(s) you set.${userCount > 0 ? ` ${userCount} remain (set by the user; left alone).` : ''}` };
+                return { text: `Removed ${mine.length} breakpoint(s) you set. ${userCount > 0 ? `${userCount} remain, set by the user (left alone).` : 'None remain.'}` };
             }
 
             // list

@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import { McpToolContext, ToolSpec } from './runtimeTools';
-import { booleanArg, clampText, displayPath, enumArg, numberArg, resolveWorkspacePath, sourceExcerpt, stringArg, ToolInputError } from './toolSupport';
+import { booleanArg, clampText, displayPath, enumArg, getAnnotationsRoot, numberArg, resolveWorkspacePath, sourceExcerpt, stringArg, ToolInputError } from './toolSupport';
 
 /** The `source` the GLuaLS language server puts on its diagnostics. */
 export const LANGUAGE_SERVER_SOURCE = 'GLuaLS';
@@ -73,6 +73,24 @@ export class DiagnosticsWatcher implements vscode.Disposable {
     }
 }
 
+const fileLines = new Map<string, string[]>();
+
+function sourceLine(uri: vscode.Uri, line: number): string | undefined {
+    const key = uri.toString();
+    let lines = fileLines.get(key);
+    if (!lines) {
+        const open = vscode.workspace.textDocuments.find((document) => document.uri.toString() === key);
+        try {
+            lines = (open ? open.getText() : fs.readFileSync(uri.fsPath, 'utf8')).split(/\r?\n/);
+        } catch {
+            return undefined;
+        }
+        fileLines.set(key, lines);
+    }
+    const text = lines[line]?.trim();
+    return text ? (text.length > 160 ? `${text.slice(0, 160)}...` : text) : undefined;
+}
+
 function isUnder(file: string, target: string): boolean {
     const relative = path.relative(target, file);
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
@@ -100,6 +118,7 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
             annotations: { title: 'Diagnostics', readOnlyHint: true, openWorldHint: false },
         },
         handler: async (args) => {
+            fileLines.clear();
             const minSeverity = SEVERITY_RANK[enumArg(args, 'min_severity', SEVERITIES, 'warning')];
             const limit = numberArg(args, 'limit', { min: 1, max: 500, fallback: 100 })!;
             const waitMs = numberArg(args, 'wait_ms', { min: 0, max: 15_000, fallback: 4000 })!;
@@ -158,8 +177,14 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
                         continue;
                     }
                     const code = typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
+                    const message = diagnostic.message.replace(/\s*\n\s*/g, ' ').replace(/[\s.]+$/, '');
                     listed.push(`${displayPath(uri.fsPath)}:${diagnostic.range.start.line + 1}:${diagnostic.range.start.character + 1} `
-                        + `${SEVERITY_LABEL[diagnostic.severity]}${code !== undefined ? ` [${code}]` : ''} ${diagnostic.message.replace(/\s*\n\s*/g, ' ')}`);
+                        + `${SEVERITY_LABEL[diagnostic.severity]}${code !== undefined ? ` [${code}]` : ''} ${message}`);
+                    // The offending line, so the agent can judge the fix without opening the file.
+                    const source = sourceLine(uri, diagnostic.range.start.line);
+                    if (source) {
+                        listed.push(`    | ${source}`);
+                    }
                 }
             }
 
@@ -170,6 +195,10 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
             }
             if (waitedFor > 0 && pending.size > 0) {
                 lines.push(`Note: ${pending.size} file(s) had not been re-analysed after ${waitMs} ms; results for them may be stale.`);
+            }
+            const hidden = totals.reduce((sum, count, severity) => sum + (severity > minSeverity ? count : 0), 0);
+            if (hidden > 0) {
+                lines.push(`${hidden} lower-severity item(s) not listed; pass min_severity "hint" to include them.`);
             }
             if (listed.length === 0) {
                 lines.push(totals.some((count) => count > 0) ? 'Nothing at or above the requested severity.' : 'No problems found.');
@@ -231,49 +260,99 @@ function escapeRegExp(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Finds where a member such as `MyAddon.Config` or `PLAYER:GetMoney` is written in the
- * workspace, preferring its definition. The language server's workspace symbols only
- * list globals, so members are found in the source and then asked about.
- */
-async function findMemberInWorkspace(symbol: string): Promise<vscode.Location | undefined> {
-    const parts = symbol.split(/[.:]/).filter((part) => part.length > 0);
-    if (parts.length < 2) {
-        return undefined;
+interface SourceMatch {
+    location: vscode.Location;
+    isDefinition: boolean;
+}
+
+/** Lua files of the GMod API annotations, read once per folder and kept in memory. */
+let apiFileCache: { root: string; files: Array<{ uri: vscode.Uri; text: string }> } | undefined;
+
+function apiFiles(): Array<{ uri: vscode.Uri; text: string }> {
+    const root = getAnnotationsRoot();
+    if (!root || !fs.existsSync(root)) {
+        return [];
     }
-    const pathPattern = parts.map(escapeRegExp).join('\\s*[.:]\\s*');
-    const definition = new RegExp(`function\\s+(${pathPattern})\\b|(${pathPattern})\\s*=(?!=)`);
-    const usage = new RegExp(`\\b(${pathPattern})\\b`);
-    const files = await vscode.workspace.findFiles('**/*.lua', '**/{node_modules,.git}/**', 20_000);
-    let firstUsage: vscode.Location | undefined;
-    for (const file of files) {
-        let text: string;
-        try {
-            text = fs.readFileSync(file.fsPath, 'utf8');
-        } catch {
-            continue;
-        }
-        if (!text.includes(parts[parts.length - 1])) {
-            continue;
-        }
-        const lines = text.split(/\r?\n/);
-        for (let index = 0; index < lines.length; index++) {
-            const defined = definition.exec(lines[index]);
-            if (defined) {
-                const matched = defined[1] ?? defined[2];
-                const column = lines[index].indexOf(matched) + matched.length - parts[parts.length - 1].length;
-                return new vscode.Location(file, new vscode.Position(index, column));
-            }
-            if (!firstUsage) {
-                const used = usage.exec(lines[index]);
-                if (used) {
-                    const column = used.index + used[1].length - parts[parts.length - 1].length;
-                    firstUsage = new vscode.Location(file, new vscode.Position(index, column));
+    if (apiFileCache?.root !== root) {
+        const files: Array<{ uri: vscode.Uri; text: string }> = [];
+        const walk = (dir: string) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(full);
+                } else if (entry.name.endsWith('.lua')) {
+                    files.push({ uri: vscode.Uri.file(full), text: fs.readFileSync(full, 'utf8') });
                 }
             }
+        };
+        walk(root);
+        apiFileCache = { root, files };
+    }
+    return apiFileCache.files;
+}
+
+/**
+ * Finds where `symbol` is written in `files`. For `A.B` / `A:B` the whole path must
+ * match; for a bare name any `X.name` or `X:name` matches too. Definitions come first.
+ */
+function searchSource(files: Iterable<{ uri: vscode.Uri; text: string }>, symbol: string, limit: number): SourceMatch[] {
+    const parts = symbol.split(/[.:]/).filter((part) => part.length > 0);
+    if (parts.length === 0) {
+        return [];
+    }
+    const tail = parts[parts.length - 1];
+    const pathPattern = parts.length > 1
+        ? parts.map(escapeRegExp).join('\\s*[.:]\\s*')
+        : `(?:[A-Za-z_][\\w]*\\s*[.:]\\s*)*${escapeRegExp(tail)}`;
+    const definition = new RegExp(`function\\s+(${pathPattern})\\b|(${pathPattern})\\s*=(?!=)`);
+    const usage = new RegExp(`\\b(${pathPattern})\\b`);
+    const definitions: SourceMatch[] = [];
+    const usages: SourceMatch[] = [];
+    for (const file of files) {
+        if (!file.text.includes(tail)) {
+            continue;
+        }
+        const lines = file.text.split(/\r?\n/);
+        for (let index = 0; index < lines.length && definitions.length < limit; index++) {
+            const defined = definition.exec(lines[index]);
+            const found = defined ?? (usages.length === 0 ? usage.exec(lines[index]) : null);
+            if (!found) {
+                continue;
+            }
+            const matched = found[1] ?? found[2];
+            const column = lines[index].indexOf(matched, found.index) + matched.length - tail.length;
+            const location = new vscode.Location(file.uri, new vscode.Position(index, column));
+            (defined ? definitions : usages).push({ location, isDefinition: !!defined });
+        }
+        if (definitions.length >= limit) {
+            break;
         }
     }
-    return firstUsage;
+    return [...definitions, ...usages].slice(0, limit);
+}
+
+/**
+ * Finds `symbol` in the workspace's Lua files, then in the GMod API annotations. The
+ * language server's workspace symbols only list the workspace's globals, so members
+ * (`MyAddon.Config`) and API functions (`Player:Nick`) are found in the source instead.
+ */
+async function findInSource(symbol: string, limit = 8): Promise<SourceMatch[]> {
+    const workspaceFiles = await vscode.workspace.findFiles('**/*.lua', '**/{node_modules,.git}/**', 20_000);
+    function* read() {
+        for (const uri of workspaceFiles) {
+            try {
+                yield { uri, text: fs.readFileSync(uri.fsPath, 'utf8') };
+            } catch {
+                // unreadable file
+            }
+        }
+    }
+    const inWorkspace = searchSource(read(), symbol, limit);
+    if (inWorkspace.some((match) => match.isDefinition)) {
+        return inWorkspace;
+    }
+    const inApi = searchSource(apiFiles(), symbol, limit).filter((match) => match.isDefinition);
+    return [...inApi, ...inWorkspace].slice(0, limit);
 }
 
 function codeLookupTool(): ToolSpec {
@@ -332,14 +411,18 @@ function codeLookupTool(): ToolSpec {
                     return (full === lowered.replace(':', '.') ? 4 : 0) + (name === tail ? 2 : 0) + (name.startsWith(tail) ? 1 : 0);
                 };
                 const ranked = found.filter((entry) => entry.location.uri.scheme === 'file').sort((a, b) => score(b) - score(a));
-                const exact = ranked.length > 0 && score(ranked[0]) >= 4;
-                if (!exact && /[.:]/.test(symbol)) {
-                    // Workspace symbols only list globals; find members in the source instead.
-                    const member = await findMemberInWorkspace(symbol);
-                    if (member) {
-                        uri = member.uri;
-                        position = member.range.start;
-                        lines.push(`Found "${symbol}" at ${oneLine(member)}`, '');
+                const exact = ranked.length > 0 && score(ranked[0]) >= (/[.:]/.test(symbol) ? 4 : 2);
+                if (!exact) {
+                    const matches = await findInSource(symbol);
+                    if (matches.length > 0) {
+                        uri = matches[0].location.uri;
+                        position = matches[0].location.range.start;
+                        // With references requested, the references list below already shows every place.
+                        if (matches.length === 1 || wantReferences) {
+                            lines.push(`Found "${symbol}" at ${oneLine(matches[0].location)}`, '');
+                        } else {
+                            lines.push(`Matches for "${symbol}":`, ...matches.map((match) => `  ${oneLine(match.location)}`), '', 'Details for the first match:');
+                        }
                     }
                 }
                 if (!position) {

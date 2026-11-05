@@ -14,6 +14,26 @@ async function currentMapping(context: McpToolContext): Promise<GmodSourceMappin
     return state ? { sourceRoot: state.sourceRoot, sourceFileMap: state.sourceFileMap } : undefined;
 }
 
+/**
+ * Console lines and errors are only collected while the debugger is attached, so attach
+ * first (when allowed) rather than answering "nothing" for a session that is not listening.
+ */
+const JUST_ATTACHED = 'Attached the VS Code debugger just now, so only what happens from now on is collected.\n';
+
+async function ensureCollecting(context: McpToolContext): Promise<string> {
+    if (context.bridge.session) {
+        return '';
+    }
+    if (!context.settings().autoAttach) {
+        return 'The debugger is not attached, so nothing is being collected. Call debugger {"action":"attach"} first.\n';
+    }
+    const ensured = await context.bridge.ensureSession(true);
+    if (!ensured.session || ensured.problem) {
+        return `Nothing is being collected: ${ensured.problem ?? 'the debugger could not attach.'}\n`;
+    }
+    return JUST_ATTACHED;
+}
+
 function renderConsole(entries: ConsoleEntry[], omitted: number, cursor: number, mapping: GmodSourceMapping | undefined, empty: string): string {
     if (entries.length === 0) {
         return `${empty} (cursor ${cursor}).`;
@@ -52,7 +72,7 @@ function consoleTool(context: McpToolContext): ToolSpec {
             const command = stringArg(args, 'command')?.trim();
             const search = stringArg(args, 'search');
             const limit = numberArg(args, 'limit', { min: 1, max: 500, fallback: 50 });
-            const waitMs = numberArg(args, 'wait_ms', { min: 0, max: 30_000, fallback: command ? 1500 : 0 })!;
+            let waitMs = numberArg(args, 'wait_ms', { min: 0, max: 30_000, fallback: command ? 1500 : 0 })!;
             const events = context.bridge.events;
             const onAbort = (listener: () => void) => signal.onAbort(listener);
 
@@ -85,6 +105,11 @@ function consoleTool(context: McpToolContext): ToolSpec {
                 return { text: prefix + renderConsole(result.entries, result.omitted, result.cursor, mapping, 'No console output yet; it may still arrive, check again with after=' + mark) };
             }
 
+            const note = await ensureCollecting(context);
+            // Nothing has been collected yet right after attaching, so give output a moment to arrive.
+            if (note === JUST_ATTACHED && args.wait_ms === undefined) {
+                waitMs = 1500;
+            }
             const after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
                 // Without a cursor, wait for lines newer than this call.
@@ -92,12 +117,11 @@ function consoleTool(context: McpToolContext): ToolSpec {
                 await events.waitFor(() => events.queryConsole({ after: from, search, limit: 1 }).entries.length > 0, waitMs, onAbort);
                 const result = events.queryConsole({ after: from, search, limit });
                 const mapping = await currentMapping(context);
-                return { text: renderConsole(result.entries, result.omitted, result.cursor, mapping, `No matching line within ${waitMs} ms`) };
+                return { text: note + renderConsole(result.entries, result.omitted, result.cursor, mapping, `No matching line within ${waitMs} ms`) };
             }
             const result = events.queryConsole({ after, search, limit });
             const mapping = await currentMapping(context);
-            const empty = context.bridge.session ? 'No matching console lines' : 'No console lines (the debugger is not attached; output is only collected while it is)';
-            return { text: renderConsole(result.entries, result.omitted, result.cursor, mapping, empty) };
+            return { text: note + renderConsole(result.entries, result.omitted, result.cursor, mapping, 'No matching console lines') };
         },
     };
 }
@@ -144,7 +168,12 @@ function errorsTool(context: McpToolContext): ToolSpec {
             }
             const search = stringArg(args, 'search');
             const limit = numberArg(args, 'limit', { min: 1, max: 100, fallback: 20 });
-            const waitMs = numberArg(args, 'wait_ms', { min: 0, max: 30_000, fallback: 0 })!;
+            let waitMs = numberArg(args, 'wait_ms', { min: 0, max: 30_000, fallback: 0 })!;
+            const attachNote = await ensureCollecting(context);
+            // Nothing has been collected yet right after attaching, so give errors a moment to arrive.
+            if (attachNote === JUST_ATTACHED && args.wait_ms === undefined) {
+                waitMs = 3000;
+            }
             let after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
                 const from = after ?? events.cursor;
@@ -155,11 +184,10 @@ function errorsTool(context: McpToolContext): ToolSpec {
             const mapping = await currentMapping(context);
             if (result.entries.length === 0) {
                 const scope = after !== undefined ? ` after cursor ${after}` : '';
-                const note = context.bridge.session ? '' : ' The debugger is not attached, so errors are not being collected.';
-                return { text: `No Lua errors${scope}${waitMs > 0 ? ` within ${waitMs} ms` : ''}.${note} Cursor ${result.cursor}.` };
+                return { text: `${attachNote}No Lua errors${scope}${waitMs > 0 ? ` within ${waitMs} ms` : ''}. Cursor ${result.cursor}.` };
             }
             const header = `${result.entries.length} error(s)${result.omitted > 0 ? ` (${result.omitted} more not shown)` : ''}. Cursor ${result.cursor}.`;
-            return { text: clampText(`${header}\n${result.entries.map((entry, index) => renderError(entry, index, mapping)).join('\n')}`) };
+            return { text: clampText(`${attachNote}${header}\n${result.entries.map((entry, index) => renderError(entry, index, mapping)).join('\n')}`) };
         },
     };
 }

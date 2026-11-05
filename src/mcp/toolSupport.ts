@@ -108,8 +108,26 @@ export function resolveWorkspacePath(input: string, sourceRoot?: string): string
     return roots.length > 0 ? path.resolve(roots[0], trimmed) : undefined;
 }
 
+let annotationsRoot: () => string | undefined = () => undefined;
+
+/** Where the GMod API annotations live, so their files can be shown as `[GMod API] player.lua`. */
+export function setAnnotationsRoot(getter: () => string | undefined): void {
+    annotationsRoot = getter;
+}
+
+export function getAnnotationsRoot(): string | undefined {
+    return annotationsRoot();
+}
+
 /** Shows a local file the way an agent's own file tools expect: relative to the workspace when inside it. */
 export function displayPath(fsPath: string): string {
+    const apiRoot = annotationsRoot();
+    if (apiRoot) {
+        const relative = path.relative(apiRoot, fsPath);
+        if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+            return `[GMod API] ${relative.replace(/\\/g, '/')}`;
+        }
+    }
     const folders = vscode.workspace.workspaceFolders ?? [];
     for (const folder of folders) {
         const relative = path.relative(folder.uri.fsPath, fsPath);
