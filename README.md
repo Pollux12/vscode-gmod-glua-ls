@@ -128,6 +128,10 @@ Runtime Lua errors from the game are collected in one place, and each one links 
 
 ![Runtime error and matching diagnostic](https://raw.githubusercontent.com/Pollux12/vscode-gmod-glua-ls/refs/heads/main/media/runtime-errors.png)
 
+## AI agents (MCP)
+
+Turn on the optional MCP server (off by default) and AI agents such as Claude Code, Codex, GitHub Copilot and Cursor can work with your GMod server through the debugger. They can run Lua and see what it returned, read the console and Lua errors, set breakpoints and logpoints, step through code and read locals, and check code with GLuaLS diagnostics. Run **GLuaLS: Set Up AI Agent (MCP)** to connect an agent. It covers the server realm and pairs well with a clientside MCP such as [gmcl_mcp](https://github.com/TomDotBat/gmcl_mcp). See the [AI agents guide](https://gluals.arnux.net/debugger/ai-agents).
+
 ## Configuration and formatting
 
 A settings panel lets you adjust or turn off any diagnostic that doesn't suit your codebase, without editing JSON. The built-in formatter has presets such as CFC, with the individual options available.

@@ -73,6 +73,7 @@ export interface ConnectedNotify extends JsonRpcNotify {
     }
     protocol_version?: string
     module_version?: string
+    backlog?: number
   }
 }
 
@@ -146,6 +147,8 @@ export class GmodClientDebugSession extends DebugSession {
 
   private _debuggee_protocol_version?: string
   private _debuggee_module_version?: string
+  /** Error and console notifications gm_rdb is still replaying from before this connection. */
+  private _replayRemaining = 0
   private _isPaused = false
 
   public constructor() {
@@ -941,13 +944,22 @@ export class GmodClientDebugSession extends DebugSession {
               `[Client] Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
             )
           )
+          this._replayRemaining = typeof event.params?.backlog === 'number' && event.params.backlog > 0 ? Math.floor(event.params.backlog) : 0
           break
 
         case 'output':
           this._consoleOutput.push(event.params)
+          if (this._replayRemaining > 0) {
+            this._replayRemaining -= 1
+          }
           break
 
         case 'error': {
+          // An error from before this connection must not pause the client now.
+          const replayedError = this._replayRemaining > 0
+          if (replayedError) {
+            this._replayRemaining -= 1
+          }
           const { message, stackTrace } = parseGmodLuaError(event.params.message, event.params.raw_message)
           const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
             ? event.params.fingerprint
@@ -965,7 +977,7 @@ export class GmodClientDebugSession extends DebugSession {
             realm: 'client',
           }))
 
-          if (this._stopOnError) {
+          if (this._stopOnError && !replayedError) {
             this._debug_client?.pauseNow().catch((error) => {
               this.sendEvent(
                 new OutputEvent(

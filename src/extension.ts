@@ -61,6 +61,8 @@ import {
 } from './startupProgress';
 import { throwIfGluaEnhancedIsEnabled } from './extensionConflict';
 import { registerGluaLanguageModeWarning } from './gluaLanguageModeWarning';
+import { GmodMcpHost } from './mcp/mcpHost';
+import { setAnnotationsRoot } from './mcp/toolSupport';
 
 /**
  * Command registration entry
@@ -173,6 +175,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerLanguageConfiguration(context);
     registerDebugConfigurationProviders(context);
     registerTerminalLinkProvider(context);
+    // Off unless gluals.mcp.enabled is set; see src/mcp/mcpHost.ts.
+    const mcpOutput = vscode.window.createOutputChannel('GLuaLS MCP', { log: true });
+    setAnnotationsRoot(() => gmodAnnotationManager?.getAnnotationsPath());
+    context.subscriptions.push(mcpOutput, new GmodMcpHost(context, mcpOutput));
     registerUndefinedGlobalCodeActions(context);
     registerNonLanguageFeatures(context);
     await refreshGmodDebugConfigContext();

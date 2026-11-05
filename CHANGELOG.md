@@ -2,6 +2,26 @@
 
 ---
 
+## [Unreleased]
+> MCP server for AI agents
+
+## VS Code Extension
+
+- Add an optional MCP server (`gluals.mcp.enabled`, off by default) that lets AI agents such as Claude Code, Codex, GitHub Copilot and Cursor work with the GMod server. Its tools run Lua and return the result and printed output, read the console and Lua errors, set breakpoints and logpoints, wait for a hit, step and read locals, and read GLuaLS diagnostics and symbols.
+- Add the **GLuaLS: Set Up AI Agent (MCP)** command and an **AI Agents (MCP)** card in the settings panel. GitHub Copilot and Cursor find the server automatically; the command writes Claude Code, Codex, Cursor and VS Code configs.
+- Add logpoints to the GMod server debugger. Hit conditions such as `% 10` work for logpoints too. A logpoint whose expression fails prints the error instead of pausing the server.
+- Add function traces and self-removing logpoints for MCP agents. The MCP `detach` action removes everything the agent set, and only disconnects a debug session the agent started.
+- MCP agents now see console output and Lua errors from before the debugger attached (needs the updated `gm_rdb`, which keeps the last 2000 lines while nothing is connected). The Debug Console marks where that earlier output starts and ends, and replayed errors never trigger stop on error.
+- The MCP's instructions give an exact example call for every tool, so agents get the arguments right even before a tool's full schema has loaded.
+- The MCP `server_errors` tool notes when GMod removed a timer because its callback errored, since that timer never runs again.
+- With `gluals.mcp.allowCodeExecution` off, MCP agents can no longer set breakpoint conditions or logpoints, which run Lua too. Hit conditions must be counts such as `>= 5` or `% 10`.
+- MCP agents never replace or remove a breakpoint the user set, and turning the MCP off removes the agent's breakpoints, traces and debug session.
+- The Codex setup recognises every TOML spelling of `[mcp_servers.gluals]`, keeps its sub-tables, and copies the config to the clipboard instead of writing a duplicate entry.
+- Fix a breakpoint on a line that calls a built-in function, such as `math.max`, pausing twice and counting two hits (needs the updated `gm_rdb`).
+- Fix "Run Lua" reporting `nil` instead of the message when the code has a syntax error.
+
+---
+
 ## [1.3.0] [Pre-Release] - 2026-11-01
 > Incremental Analysis System + Fixes
 

@@ -29,6 +29,7 @@ import {
 import { renderFormatterSectionContent } from "./components/formatterSection.js";
 import { createSettingRow } from "./components/settingRow.js";
 import { showConfirmDialog } from "./components/dialog.js";
+import { renderMcpSection, setupMcpSection } from "./mcpSection.js";
 
 const vscode = acquireVsCodeApi();
 const SECTION_READING_OFFSET = 48;
@@ -126,6 +127,7 @@ if (saveButton) {
 }
 
 vscode.postMessage({ type: "ready" });
+setupMcpSection(vscode);
 
 function getValue(path, defaultValue) {
     if (!Array.isArray(path)) {
@@ -489,6 +491,17 @@ function renderSettings() {
 
         sectionsContent.appendChild(section);
         visibleCategoryIndex += 1;
+    });
+
+    // VS Code settings rather than .gluarc.json, so it comes last and stands apart.
+    renderMcpSection({
+        categoryList,
+        sectionsContent,
+        onCategoryClick: (categoryId) => {
+            clickedCategoryId = categoryId;
+            document.getElementById(categoryId)?.scrollIntoView({ block: "start" });
+            setActiveCategory(categoryId);
+        },
     });
 
     const searchInput = document.getElementById("searchInput");

@@ -20,6 +20,7 @@ import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
 import { parseGmodLuaError } from './GmodLuaError'
+import { buildLogpointCondition, logpointLabel } from '../../mcp/logpoint'
 import {
   EntityDetail,
   GetEntityNetworkVarsResult,
@@ -107,6 +108,7 @@ export interface ConnectedNotify extends JsonRpcNotify {
     working_directory?: string,
     protocol_version?: string
     module_version?: string
+    backlog?: number
   }
 }
 
@@ -183,6 +185,10 @@ export class GmodDebugSession extends DebugSession {
   private _debug_client?: LRDBClient.Client
 
   private _breakPointID = 1000
+  /** Per file: logpoint -> its server hit counter key, kept while VS Code re-sends the same logpoint. */
+  private _logpointCounterKeys = new Map<string, Map<string, string>>()
+  /** Console and error notifications gm_rdb is still replaying from before this connection. */
+  private _replayRemaining = 0
 
   private _variableHandles = new Handles<VariableReference>()
 
@@ -208,6 +214,7 @@ export class GmodDebugSession extends DebugSession {
   private _configurationDoneReceived = false
   private _serverInitCompleted = false
   private _isPaused = false
+  private _pauseReason?: string
 
   /**
    * Creates a new debug adapter that is used for one debug session.
@@ -259,7 +266,7 @@ export class GmodDebugSession extends DebugSession {
     response.body.supportsSetVariable = true
     response.body.supportsSetExpression = false
     response.body.supportTerminateDebuggee = false
-    response.body.supportsLogPoints = false
+    response.body.supportsLogPoints = true
 
     this.sendResponse(response)
   }
@@ -508,7 +515,7 @@ export class GmodDebugSession extends DebugSession {
     response: DebugProtocol.Response,
     args: any
   ): void {
-    const entityRequest = this.resolveEntityRequest(command, args)
+    const entityRequest = this.resolveEntityRequest(command, args) ?? this.resolveMcpRequest(command, args)
     if (entityRequest) {
       entityRequest
         .then((result) => {
@@ -577,22 +584,23 @@ export class GmodDebugSession extends DebugSession {
           this.sendEvent(new OutputEvent(`Warning: failed to clear breakpoints for '${debuggerFilePath}': ${err.message}\n`, 'stderr'))
         })
 
+      const previousCounterKeys = this._logpointCounterKeys.get(debuggerFilePath)
+      const counterKeys = new Map<string, string>()
+      this._logpointCounterKeys.set(debuggerFilePath, counterKeys)
+
       if (args.breakpoints) {
         // verify breakpoint locations
         for (const souceBreakpoint of args.breakpoints) {
           let l = this.convertClientLineToDebugger(souceBreakpoint.line)
           let verified = false
-          const isLogPoint = !!souceBreakpoint.logMessage
-          if (!isLogPoint) {
-            while (l <= lines.length) {
-              const line = lines[l - 1].trim()
-              // if a line is empty or starts with '--' we don't allow to set a breakpoint but move the breakpoint down
-              if (line.length == 0 || line.startsWith('--')) {
-                l++
-              } else {
-                verified = true // this breakpoint has been validated
-                break
-              }
+          while (l <= lines.length) {
+            const line = lines[l - 1].trim()
+            // if a line is empty or starts with '--' we don't allow to set a breakpoint but move the breakpoint down
+            if (line.length == 0 || line.startsWith('--')) {
+              l++
+            } else {
+              verified = true // this breakpoint has been validated
+              break
             }
           }
 
@@ -601,16 +609,30 @@ export class GmodDebugSession extends DebugSession {
             this.convertDebuggerLineToClient(l)
           )
           bp.id = this._breakPointID++
-          if (isLogPoint) {
-            bp.message = 'Logpoints are not supported by gluals_gmod; use a conditional breakpoint or evaluate instead.'
-          }
           breakpoints.push(bp)
           if (verified) {
+            // LRDB has no logpoints, so a logpoint is a condition that prints and never pauses.
+            const label = logpointLabel(debuggerFilePath, this.convertDebuggerLineToClient(l))
+            let condition = souceBreakpoint.condition
+            if (souceBreakpoint.logMessage) {
+              // VS Code re-sends every breakpoint in the file when one changes; an unchanged logpoint
+              // keeps its hit count, while a new or edited one starts from zero.
+              const identity = JSON.stringify([l, souceBreakpoint.logMessage, souceBreakpoint.condition, souceBreakpoint.hitCondition])
+              const counterKey = previousCounterKeys?.get(identity) ?? `${label}#${bp.id}`
+              counterKeys.set(identity, counterKey)
+              condition = buildLogpointCondition(
+                souceBreakpoint.logMessage,
+                label,
+                souceBreakpoint.condition,
+                souceBreakpoint.hitCondition,
+                counterKey
+              )
+            }
             const sendbreakpoint = {
               line: l,
               file: debuggerFilePath,
-              condition: souceBreakpoint.condition,
-              hit_condition: souceBreakpoint.hitCondition,
+              condition,
+              hit_condition: souceBreakpoint.logMessage ? undefined : souceBreakpoint.hitCondition,
             }
             this._debug_client.addBreakPoint(sendbreakpoint)
               .catch((err: Error) => {
@@ -1272,6 +1294,7 @@ export class GmodDebugSession extends DebugSession {
             this._debug_client?.continue()
           } else {
             this._isPaused = true
+            this._pauseReason = typeof event.params?.reason === 'string' ? event.params.reason : undefined
             this.sendEvent(
               new StoppedEvent(
                 event.params.reason,
@@ -1297,19 +1320,25 @@ export class GmodDebugSession extends DebugSession {
           this.sendEvent(new DebugEvent('gmod.connected', {
             protocolVersion: this._debuggee_protocol_version,
             moduleVersion: this._debuggee_module_version,
+            // How many console lines and errors from before the connection gm_rdb replays next.
+            backlog: typeof event.params?.backlog === 'number' ? event.params.backlog : undefined,
           }))
           this.sendEvent(
             new OutputEvent(
               `Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
             )
           )
+          this.startReplay(event.params?.backlog)
           break
 
         case 'output':
           this._consoleOutput.push(event.params)
+          this.consumeReplay()
           break
 
         case 'error':
+          // An error from before this connection must not pause the server now.
+          const replayedError = this.consumeReplay()
           const { message, stackTrace } = parseGmodLuaError(event.params.message, event.params.raw_message)
           const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
             ? event.params.fingerprint
@@ -1324,9 +1353,10 @@ export class GmodDebugSession extends DebugSession {
             count,
             source,
             stackTrace,
+            timestamp: typeof event.params.timestamp === 'number' ? event.params.timestamp : undefined,
           }))
 
-          if (this._stopOnError) {
+          if (this._stopOnError && !replayedError) {
             this._debug_client?.pauseNow().catch((error) => {
               this.sendEvent(
                 new OutputEvent(
@@ -1360,6 +1390,104 @@ export class GmodDebugSession extends DebugSession {
       return command as GmodControlCommand
     }
     return undefined
+  }
+
+  /** gm_rdb sends `backlog` console lines and errors from before this connection right after "connected". */
+  private startReplay(backlog: unknown): void {
+    this._replayRemaining = typeof backlog === 'number' && backlog > 0 ? Math.floor(backlog) : 0
+    if (this._replayRemaining > 0) {
+      this.sendEvent(new OutputEvent(`--- ${this._replayRemaining} console message(s) from before the debugger attached ---\n`, 'console'))
+    }
+  }
+
+  /** Counts one replayed message off; returns true while messages are still from before this connection. */
+  private consumeReplay(): boolean {
+    if (this._replayRemaining <= 0) {
+      return false
+    }
+    this._replayRemaining -= 1
+    if (this._replayRemaining === 0) {
+      this._consoleOutput.flush()
+      this.sendEvent(new OutputEvent('--- End of earlier output ---\n', 'console'))
+    }
+    return true
+  }
+
+  /**
+   * Requests the GLuaLS MCP tools use. They return LRDB's own data rather than DAP's
+   * display strings, and paths both as the game sees them and as local files.
+   */
+  private resolveMcpRequest(command: string, args: any): Promise<unknown> | undefined {
+    if (!command.startsWith('gmod.mcp.')) {
+      return undefined
+    }
+    const raw: Record<string, unknown> = args && typeof args === 'object' ? args : {}
+    const frame = typeof raw.frame === 'number' && raw.frame >= 0 ? Math.floor(raw.frame) : 0
+    const depth = typeof raw.depth === 'number' && raw.depth >= 0 ? Math.floor(raw.depth) : 0
+    switch (command) {
+      case 'gmod.mcp.state':
+        return Promise.resolve({
+          connected: this._debug_client !== undefined,
+          ready: this.getConsoleCommandReadinessError() === undefined,
+          notReadyReason: this.getConsoleCommandReadinessError(),
+          paused: this._isPaused,
+          pauseReason: this._isPaused ? this._pauseReason : undefined,
+          protocolVersion: this._debuggee_protocol_version,
+          moduleVersion: this._debuggee_module_version,
+          sourceRoot: this._sourceMapping.sourceRoot,
+          sourceFileMap: this._sourceMapping.sourceFileMap,
+        })
+      case 'gmod.mcp.stack':
+        return this.requireDebugClient().getStackTrace().then((res) =>
+          (res.result ?? []).map((info, index) => {
+            const file = typeof info.file === 'string' ? info.file : ''
+            return {
+              index,
+              func: typeof info.func === 'string' ? info.func : '',
+              file,
+              localPath: file.startsWith('@') ? this.convertDebuggerPathToClient(file) : undefined,
+              line: this.convertDebuggerLineToClient(typeof info.line === 'number' ? info.line : 0),
+            }
+          })
+        )
+      case 'gmod.mcp.frame': {
+        const client = this.requireDebugClient()
+        return Promise.all([
+          client.getLocalVariable({ stack_no: frame, depth }).then((res) => res.result ?? {}),
+          client.getUpvalues({ stack_no: frame, depth }).then((res) => res.result ?? {}),
+        ]).then(([locals, upvalues]) => ({ locals, upvalues }))
+      }
+      case 'gmod.mcp.eval': {
+        const chunk = typeof raw.chunk === 'string' ? raw.chunk : ''
+        if (chunk.trim().length === 0) {
+          return Promise.reject(new Error('Expression is empty.'))
+        }
+        return this.requireDebugClient().eval({ stack_no: frame, chunk, depth }).then((res) => ({ values: res.result }))
+      }
+      case 'gmod.mcp.runLua': {
+        const lua = typeof raw.lua === 'string' ? raw.lua : ''
+        const mode = typeof raw.mode === 'string' ? raw.mode : 'capture'
+        const timeoutMs = typeof raw.timeoutMs === 'number' && raw.timeoutMs > 0 ? raw.timeoutMs : undefined
+        const readinessError = this.getConsoleCommandReadinessError()
+        if (readinessError) {
+          return Promise.reject(new Error(readinessError))
+        }
+        return this.requireDebugClient()
+          .runLua({ lua, realm: 'server', mode }, timeoutMs)
+          .then((res) => ({ report: res.result ?? null }))
+      }
+      case 'gmod.mcp.command': {
+        const consoleCommand = typeof raw.command === 'string' ? raw.command.trim() : ''
+        if (consoleCommand.length === 0) {
+          return Promise.reject(new Error('Console command is empty.'))
+        }
+        return this.sendConsoleCommand(consoleCommand).then(() => ({ ok: true }))
+      }
+      case 'gmod.mcp.breakpoints':
+        return this.requireDebugClient().getBreakPoints().then((res) => ({ breakpoints: res.result ?? [] }))
+      default:
+        return Promise.reject(new Error(`Unknown MCP request: ${command}`))
+    }
   }
 
   private resolveEntityRequest(command: string, args: any): Promise<unknown> | undefined {

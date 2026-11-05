@@ -93,5 +93,11 @@
     "view.gmodEntityExplorer.title": "Entity Explorer",
     "view.gmodEntityExplorer.welcome": "Connect debugger to see entities.",
     "view.gmodErrors.title": "Errors",
-    "view.gmodErrors.welcome": "No errors detected in this debug session."
+    "view.gmodErrors.welcome": "No errors detected in this debug session.",
+    "command.mcp.setup.title": "Set Up AI Agent (MCP)",
+    "command.mcp.copyUrl.title": "Copy MCP Server URL",
+    "config.mcp.enabled.description": "Run an [MCP](https://modelcontextprotocol.io) server so AI agents (Claude Code, Codex, GitHub Copilot, Cursor and others) can run Lua on your GMod server, read its console and errors, and debug it. Only this computer can connect.\n\n[Set up an AI agent](command:gluals.mcp.setup)",
+    "config.mcp.port.description": "Port the MCP server listens on (`http://127.0.0.1:<port>/mcp`).",
+    "config.mcp.allowCodeExecution.description": "Let agents run Lua and console commands on the server. Breakpoint conditions, logpoints and traces also run Lua, so they need this too. When disabled, agents can still read the console and errors and use plain breakpoints.",
+    "config.mcp.autoAttach.description": "Connect the debugger to the GMod server automatically when an agent needs it."
 }
