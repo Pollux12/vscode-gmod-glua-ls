@@ -10,10 +10,10 @@ export const MCP_INSTRUCTIONS = `GLuaLS tools for the Garry's Mod SERVER realm, 
 Start with debugger {"action":"status"}. Server tools attach the VS Code debugger to the server automatically.
 
 Workflows:
-- Check code: diagnostics {"paths":[...]} after editing; code_lookup for types, docs and definitions.
+- Check code: diagnostics {"paths":[...]} after editing; code_lookup for types, docs and definitions, including the GMod API (e.g. "Player:Nick").
 - Try something: server_run_lua with "return ..." to see values. Its errors come back with a traceback.
 - Runtime errors: server_errors {"clear":true}, reproduce, then server_errors (or pass wait_ms).
-- Trace without stopping the game: breakpoints set with log_message, trigger the code, then server_console {"search":"[logpoint"}.
+- Trace without stopping the game: breakpoints set with log_message, trigger the code, then server_console {"search":"[logpoint"}. Lines from code you ran with server_run_lua also appear in its "Printed" output.
 - Inspect state: breakpoints set (optionally with a condition), trigger the code (server_run_lua, a client MCP or ask the user), debugger {"action":"wait"}, read the locals, dig in with server_run_lua {"frame":0,"code":"..."}, then debugger continue or step. Run breakpoints clear when done.
 - Hangs: debugger {"action":"pause"} shows where the server is stuck.
 
@@ -21,7 +21,8 @@ Rules:
 - While paused the whole server is frozen for every player, and connected clients drop after cl_timeout (30 s by default). Continue as soon as you are done. Prefer logpoints while a client MCP or a person is playing.
 - "Still running" from debugger wait is normal: trigger the code and wait again.
 - Replies include a cursor. Pass it as "after" to server_console or server_errors to see only what happened since.
-- Paths are workspace-relative or absolute local paths; lines are 1-based.`;
+- Paths are workspace-relative or absolute local paths; lines are 1-based.
+- Clean up when done: breakpoints {"action":"clear"}, then debugger {"action":"detach"} if you attached it.`;
 
 /** Builds the MCP tools. Every reply warns when the server is paused and reports runs that finished late. */
 export function buildMcpTools(context: McpToolContext, watcher: DiagnosticsWatcher): McpTool[] {

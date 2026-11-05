@@ -51,7 +51,7 @@ function consoleTool(context: McpToolContext): ToolSpec {
             name: 'server_console',
             title: 'Read the GMod server console or run a console command',
             description: [
-                'Read the Garry\'s Mod SERVER console (print/Msg output, engine messages, logpoint lines) as buffered by VS Code since the debugger attached.',
+                'Read the Garry\'s Mod SERVER console (print/Msg output, engine messages, logpoint lines). Lines are collected while the debugger is attached; this attaches it if needed.',
                 'Filter with `search` (case-insensitive text, or /regex/) and `after` (a cursor from an earlier reply) to see only what is new.',
                 '`wait_ms` blocks until a matching line arrives, e.g. after making something happen through a client MCP.',
                 'With `command`, runs a server console command (e.g. "status", "changelevel gm_construct", "lua_refresh_file x.lua"; no ";" chaining) and returns the output it produced.',
@@ -144,7 +144,7 @@ function errorsTool(context: McpToolContext): ToolSpec {
             title: 'Read Lua errors from the GMod server',
             description: [
                 'Unique Lua runtime errors raised on the Garry\'s Mod SERVER (hooks, timers, net receivers, entities), newest first, with counts and stack traces mapped to workspace files.',
-                'Errors from server_run_lua are reported by that tool directly.',
+                'Errors are collected while the debugger is attached; this attaches it if needed. Errors from server_run_lua are reported by that tool directly.',
                 'Typical loop: clear: true, reproduce the problem (server_run_lua, a client MCP or the user), then read again, or use `wait_ms` to block until an error arrives.',
                 '`after` takes a cursor from an earlier reply; `search` filters by text or /regex/.',
             ].join(' '),
@@ -152,8 +152,8 @@ function errorsTool(context: McpToolContext): ToolSpec {
                 type: 'object',
                 properties: {
                     clear: { type: 'boolean', description: 'Forget all errors seen so far (later occurrences count from zero).' },
-                    search: { type: 'string' },
-                    after: { type: 'integer', minimum: 0 },
+                    search: { type: 'string', description: 'Case-insensitive text, or /regex/, matched against the message and stack.' },
+                    after: { type: 'integer', minimum: 0, description: 'Only errors seen after this cursor.' },
                     limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Default 20.' },
                     wait_ms: { type: 'integer', minimum: 0, maximum: 30000, description: 'Wait up to this long for a new matching error.' },
                 },

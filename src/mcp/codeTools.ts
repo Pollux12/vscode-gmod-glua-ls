@@ -363,15 +363,15 @@ function codeLookupTool(): ToolSpec {
             description: [
                 'Ask the GLuaLS language server about a symbol: its type and docs (hover), where it is defined, and optionally every reference.',
                 'Knows Garry\'s Mod API types, realms, hooks, net messages and the workspace\'s own classes (ENT, SWEP, PANEL, gamemode tables).',
-                'Give `symbol` (e.g. "PLAYER:GetMoney", "MyAddon.Config", "net.Start") to search the workspace, or `file` + `line` (+ `symbol` or `column`) to look at a specific spot.',
+                'Give `symbol` (e.g. "Player:Nick", "MyAddon.Config", "hook.Add") to find it in the workspace or the GMod API, or `file` + `line` (+ `symbol` or `column`) to look at a specific spot.',
             ].join(' '),
             inputSchema: {
                 type: 'object',
                 properties: {
                     symbol: { type: 'string', description: 'Symbol name to search for, or to locate on `line`.' },
-                    file: { type: 'string' },
-                    line: { type: 'integer', minimum: 1 },
-                    column: { type: 'integer', minimum: 1 },
+                    file: { type: 'string', description: 'Workspace-relative or absolute path, to look at a spot instead of searching.' },
+                    line: { type: 'integer', minimum: 1, description: 'With file: the 1-based line.' },
+                    column: { type: 'integer', minimum: 1, description: 'With file: the 1-based column. Optional when symbol names what is on the line.' },
                     references: { type: 'boolean', description: 'Also list references (default false).' },
                 },
             },
