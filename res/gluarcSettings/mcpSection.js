@@ -147,7 +147,7 @@ export function renderMcpSection({ categoryList, sectionsContent, onCategoryClic
         portInput()));
 
     body.appendChild(settingRow("allowCodeExecution", "Allow Code Execution",
-        "Let agents run Lua and console commands on the server. When disabled, they can still read and debug.",
+        "Let agents run Lua and console commands on the server. Breakpoint conditions, logpoints and traces also run Lua, so they need this too. When disabled, agents can still read the console and errors and use plain breakpoints.",
         booleanSelect("allowCodeExecution")));
 
     body.appendChild(settingRow("autoAttach", "Auto Attach",
