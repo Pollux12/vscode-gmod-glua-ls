@@ -625,7 +625,7 @@
         "en": "Whether to add or remove a trailing separator after the last field in a table (`keep`, `never`, `always`, `smart`)."
     },
     "EmmyrcGmod.activeGamemode": {
-        "en": "The gamemode a Garry's Mod folder (named `garrysmod`, or holding `addons/`\nand `gamemodes/`) loads with its addons, together with the custom\ngamemodes it derives from. `\"*\"` loads every custom gamemode and `\"\"`\nnone, for working on addons. Unset, a sole custom gamemode loads; with\nseveral, each loads while a file in it is open."
+        "en": "The gamemode a Garry's Mod folder (named `garrysmod`, or holding `addons/`\nand `gamemodes/`) loads with its addons, together with the gamemodes it\nderives from up to `base` or `sandbox`, which the annotations describe.\n`\"*\"` loads every custom gamemode and `\"\"`\nnone, for working on addons. Unset, a sole custom gamemode loads; with\nseveral, each loads while a file in it is open."
     },
     "EmmyrcGmod.annotationsPath": {
         "en": "Path to GMod annotations to load as core library.\nWhen set to empty string or not provided, uses VSCode extension's auto-downloaded annotations (if enabled).\nSet to explicit path to override, or use `autoLoadAnnotations: false` in .gluarc to disable entirely."

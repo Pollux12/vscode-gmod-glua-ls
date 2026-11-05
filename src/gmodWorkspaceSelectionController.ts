@@ -63,7 +63,43 @@ async function saveToGluarc(folder: vscode.WorkspaceFolder, settings: GamemodeSe
         setNestedValue(config, ['gmod', 'activeGamemode'], settings.activeGamemode);
     }
     setNestedValue(config, ['gmod', 'loadEverything'], settings.loadEverything || undefined);
-    return writeGluarcConfig(folder, config);
+    if (!(await writeGluarcConfig(folder, config))) {
+        return false;
+    }
+    try {
+        await clearSettingsOverrides(
+            vscode.workspace.getConfiguration('gluals.gmod', folder.uri),
+            vscode.workspace.workspaceFile !== undefined,
+        );
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to clear the gamemode settings that override .gluarc.json: ${message}`);
+        return false;
+    }
+}
+
+const GAMEMODE_SETTING_KEYS = ['activeGamemode', 'loadEverything'] as const;
+
+/**
+ * Removes the folder's own gamemode settings, which the language server reads over
+ * `.gluarc.json`: one left from a pick saved to the settings would override the
+ * pick just saved to `.gluarc.json`. A multi-root workspace's own settings apply to
+ * every folder, so only a single-folder workspace's are removed.
+ */
+export async function clearSettingsOverrides(
+    config: Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>,
+    multiRoot: boolean,
+): Promise<void> {
+    for (const key of GAMEMODE_SETTING_KEYS) {
+        const inspected = config.inspect(key);
+        if (inspected?.workspaceFolderValue !== undefined) {
+            await config.update(key, undefined, vscode.ConfigurationTarget.WorkspaceFolder);
+        }
+        if (!multiRoot && inspected?.workspaceValue !== undefined) {
+            await config.update(key, undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    }
 }
 
 async function saveToWorkspaceFolderSettings(folder: vscode.WorkspaceFolder, settings: GamemodeSettings): Promise<boolean> {
