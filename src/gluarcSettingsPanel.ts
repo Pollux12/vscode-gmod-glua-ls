@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { buildCategories, Category } from './gluarcSchema';
 import { readGluarcConfig, writeGluarcConfig, setNestedValue, getGluarcUri, ensureGluarcExists } from './gluarcConfig';
-import { describeMcpStatus, getMcpHost } from './mcp/mcpHost';
+import { describeMcpStatus, getMcpHost, MCP_SETTING_KEYS, McpSettingKey } from './mcp/mcpHost';
 
 const SAVE_DEBOUNCE_MS = 5000;
 const SETTINGS_AUTO_SAVE_KEY = 'gmod.settingsAutoSave';
@@ -154,9 +154,9 @@ export class GluarcSettingsPanel implements vscode.Disposable {
                     return;
                 }
 
-                const message = msg as { type?: unknown; path?: unknown; value?: unknown; action?: unknown };
+                const message = msg as { type?: unknown; path?: unknown; value?: unknown; action?: unknown; key?: unknown };
                 if (typeof message.type === 'string' && message.type.startsWith('mcp:')) {
-                    await this._handleMcpMessage(message.type, message.value, message.action);
+                    await this._handleMcpMessage(message.type, message.value, message.action, message.key);
                     return;
                 }
                 if (message.type === 'ready') {
@@ -275,7 +275,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         }
     }
 
-    private async _handleMcpMessage(type: string, value: unknown, action: unknown): Promise<void> {
+    private async _handleMcpMessage(type: string, value: unknown, action: unknown, key: unknown): Promise<void> {
         const host = getMcpHost();
         if (!host) {
             return;
@@ -283,14 +283,22 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         switch (type) {
             case 'mcp:ready':
                 break;
-            case 'mcp:setEnabled':
-                await host.setEnabled(value === true);
-                break;
-            case 'mcp:setPort':
-                if (typeof value === 'number' && Number.isInteger(value) && value >= 1024 && value <= 65535) {
-                    await host.setPort(value);
+            case 'mcp:setSetting': {
+                if (!(MCP_SETTING_KEYS as readonly unknown[]).includes(key)) {
+                    break;
+                }
+                const settingKey = key as McpSettingKey;
+                if (value === null) {
+                    await host.updateSetting(settingKey, undefined);
+                } else if (settingKey === 'port') {
+                    if (typeof value === 'number' && Number.isInteger(value) && value >= 1024 && value <= 65535) {
+                        await host.updateSetting(settingKey, value);
+                    }
+                } else if (typeof value === 'boolean') {
+                    await host.updateSetting(settingKey, value);
                 }
                 break;
+            }
             case 'mcp:action':
                 if (action === 'setup') {
                     await vscode.commands.executeCommand('gluals.mcp.setup');
@@ -312,8 +320,7 @@ export class GluarcSettingsPanel implements vscode.Disposable {
         const status = host.currentStatus;
         await this.panel.webview.postMessage({
             type: 'mcpState',
-            enabled: host.settings.enabled,
-            port: host.settings.port,
+            ...host.settings,
             statusKind: status.kind,
             statusText: describeMcpStatus(status),
         });

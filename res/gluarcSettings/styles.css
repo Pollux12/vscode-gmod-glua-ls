@@ -1682,31 +1682,15 @@
     align-items: center;
 }
 
-.mcp-card {
-    margin-bottom: 24px;
-    padding: 12px 16px;
-    font-size: 13px;
-    line-height: 1.5;
-    border: 1px solid var(--vscode-settings-sashBorder, var(--vscode-panel-border));
-    border-radius: 4px;
-}
-
-.mcp-card-header {
+.mcp-status-control {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 4px;
-}
-
-.mcp-card-header strong {
-    color: var(--vscode-foreground);
-    font-size: 14px;
-    font-weight: 500;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .mcp-status {
-    font-size: 12px;
     color: var(--vscode-descriptionForeground);
 }
 
@@ -1719,41 +1703,6 @@
     color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
 }
 
-.mcp-card-text {
-    color: var(--vscode-descriptionForeground);
-}
-
-.mcp-card-controls,
-.mcp-card-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-    margin-top: 10px;
-}
-
-.mcp-card-actions {
-    gap: 8px;
-}
-
-.mcp-toggle,
-.mcp-port {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--vscode-foreground);
-}
-
-.mcp-port input {
-    width: 80px;
-    padding: 2px 6px;
-    color: var(--vscode-input-foreground);
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, transparent);
-    border-radius: 2px;
-}
-
-
-.mcp-card-actions[hidden] {
+.mcp-status-control [hidden] {
     display: none;
 }

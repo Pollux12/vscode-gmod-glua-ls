@@ -25,6 +25,9 @@ export const DEFAULT_MCP_PORT = 21120;
 const PROVIDER_ID = 'gluals.mcp';
 const SERVER_LABEL = 'GLuaLS (GMod server)';
 
+export const MCP_SETTING_KEYS = ['enabled', 'port', 'allowCodeExecution', 'autoAttach'] as const;
+export type McpSettingKey = (typeof MCP_SETTING_KEYS)[number];
+
 export type McpHostStatus =
     | { kind: 'disabled' }
     | { kind: 'untrusted' }
@@ -114,20 +117,18 @@ export class GmodMcpHost implements vscode.Disposable {
 
     /** Turns the server on or off in this workspace's settings. */
     async setEnabled(enabled: boolean): Promise<void> {
+        await this.updateSetting('enabled', enabled);
+    }
+
+    /** Writes one gluals.mcp setting for this workspace; `undefined` removes it (back to the default). */
+    async updateSetting(key: McpSettingKey, value: boolean | number | undefined): Promise<void> {
         const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update('enabled', enabled, target);
+        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update(key, value, target);
         await this.apply();
     }
 
-    async setPort(port: number): Promise<void> {
-        const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        await vscode.workspace.getConfiguration(MCP_SETTINGS_SECTION).update('port', port, target);
-        await this.apply();
-    }
-
-    get settings(): { enabled: boolean; port: number } {
-        const { enabled, port } = readSettings();
-        return { enabled, port };
+    get settings(): { enabled: boolean; port: number; allowCodeExecution: boolean; autoAttach: boolean } {
+        return readSettings();
     }
 
     get port(): number {

@@ -70,33 +70,6 @@
                             configuration — it is separate from your VS Code settings.
                         </div>
                     </div>
-                    <section class="mcp-card" id="mcpCard" aria-labelledby="mcpCardTitle">
-                        <div class="mcp-card-header">
-                            <strong id="mcpCardTitle">AI Agents (MCP)</strong>
-                            <span class="mcp-status" id="mcpStatus" data-kind="disabled">Off</span>
-                        </div>
-                        <div class="mcp-card-text">
-                            Lets AI agents (Claude Code, Codex, GitHub Copilot, Cursor and others) run Lua on your
-                            GMod <em>server</em>, read its console and Lua errors, set breakpoints and logpoints,
-                            step through code, and read these diagnostics. Saved in VS Code settings, not
-                            <code>.gluarc.json</code>. Only listens on this computer.
-                        </div>
-                        <div class="mcp-card-controls">
-                            <label class="mcp-toggle">
-                                <input type="checkbox" id="mcpEnabled" />
-                                Enable MCP server
-                            </label>
-                            <label class="mcp-port">
-                                Port
-                                <input type="number" id="mcpPort" min="1024" max="65535" value="21120" />
-                            </label>
-                        </div>
-                        <div class="mcp-card-actions" id="mcpDetails" hidden>
-                            <button class="header-action-btn" data-mcp-action="setup">Connect an agent…</button>
-                            <button class="header-action-btn" data-mcp-action="copyUrl">Copy URL</button>
-                            <button class="header-action-btn" data-mcp-action="settings">All MCP settings</button>
-                        </div>
-                    </section>
                     <div id="settingsSections"></div>
                     <div
                         id="noResultsState"
