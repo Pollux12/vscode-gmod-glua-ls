@@ -69,6 +69,24 @@ suite('MCP event log', () => {
         assert.strictEqual(entry.lastSeen, 20_000);
     });
 
+    test('a following "Timer Failed!" line is noted on the error', () => {
+        let now = 1000;
+        const log = new McpEventLog(100, 100, () => now);
+        log.recordError({ message: 'boom', fingerprint: 'fb' });
+        log.pushConsole('[12:00:00.000] Timer Failed! [Payout.1][@addons/x/lua/x.lua (line 22)]');
+        log.pushConsole('Timer Failed! [Payout.2][@addons/x/lua/x.lua (line 22)]');
+        log.pushConsole('Timer Failed! [Payout.1][@addons/x/lua/x.lua (line 22)]');
+        log.pushConsole('Timer Failed! [Simple][@addons/x/lua/x.lua (line 30)]');
+        const [entry] = log.queryErrors().entries;
+        assert.deepStrictEqual(entry.removedTimers, ['Payout.1', 'Payout.2']);
+        assert.strictEqual(entry.inSimpleTimer, true);
+
+        // A line long after the error is not linked to it.
+        now += 5000;
+        log.pushConsole('Timer Failed! [Late][@x.lua (line 1)]');
+        assert.deepStrictEqual(log.queryErrors().entries[0].removedTimers, ['Payout.1', 'Payout.2']);
+    });
+
     test('waitFor resolves on a new entry and times out otherwise', async () => {
         const log = new McpEventLog();
         const mark = log.cursor;

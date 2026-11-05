@@ -22,6 +22,10 @@ export interface ErrorEntry {
     lastSeen: number;
     /** Cursor of the latest occurrence. */
     lastSeq: number;
+    /** Repeating timers GMod removed after this error ("Timer Failed!"), oldest first. */
+    removedTimers: string[];
+    /** Set when the error was raised in a timer.Simple callback. */
+    inSimpleTimer: boolean;
 }
 
 export interface ErrorReport {
@@ -48,6 +52,10 @@ export interface QueryResult<T> {
 const DEFAULT_CONSOLE_CAPACITY = 5000;
 const DEFAULT_ERROR_CAPACITY = 500;
 const MAX_LINE_LENGTH = 2000;
+/** GMod prints "Timer Failed!" right after the error; later lines belong to something else. */
+const TIMER_LINK_MS = 2000;
+const MAX_REMOVED_TIMERS = 50;
+const TIMER_FAILED = /Timer Failed! \[(.*?)\]\[@/;
 
 /**
  * Turns a search string into a predicate. `/pattern/flags` is a regular expression;
@@ -78,6 +86,8 @@ export class McpEventLog {
     private readonly errors = new Map<string, ErrorEntry>();
     private readonly listeners = new Set<() => void>();
     private readonly consoleListeners = new Set<(entry: ConsoleEntry) => void>();
+    /** The error recorded last and when it arrived, for linking a following "Timer Failed!" line. */
+    private lastError?: { fingerprint: string; receivedAt: number };
 
     constructor(
         private readonly consoleCapacity = DEFAULT_CONSOLE_CAPACITY,
@@ -100,6 +110,7 @@ export class McpEventLog {
             this.consoleEntries.splice(0, this.consoleEntries.length - this.consoleCapacity);
         }
         const entry = this.consoleEntries[this.consoleEntries.length - 1];
+        this.linkTimerFailure(line);
         for (const listener of [...this.consoleListeners]) {
             listener(entry);
         }
@@ -125,7 +136,10 @@ export class McpEventLog {
             firstSeen: existing?.firstSeen ?? time,
             lastSeen: time,
             lastSeq: ++this.seq,
+            removedTimers: existing?.removedTimers ?? [],
+            inSimpleTimer: existing?.inSimpleTimer ?? false,
         };
+        this.lastError = { fingerprint: report.fingerprint, receivedAt: this.now() };
         this.errors.delete(report.fingerprint);
         this.errors.set(report.fingerprint, entry);
         while (this.errors.size > this.errorCapacity) {
@@ -136,6 +150,30 @@ export class McpEventLog {
             this.errors.delete(oldest);
         }
         this.notify();
+    }
+
+    /**
+     * When a timer's callback errors, GMod prints the error and then "Timer Failed! [name][@file (line n)]",
+     * and removes the timer if it repeats. That line only reaches the console, so note it on the error.
+     */
+    private linkTimerFailure(line: string): void {
+        const match = TIMER_FAILED.exec(line);
+        const last = this.lastError;
+        if (!match || !last || this.now() - last.receivedAt > TIMER_LINK_MS) {
+            return;
+        }
+        const entry = this.errors.get(last.fingerprint);
+        if (!entry) {
+            return;
+        }
+        if (match[1] === 'Simple') {
+            entry.inSimpleTimer = true;
+        } else if (!entry.removedTimers.includes(match[1])) {
+            entry.removedTimers.push(match[1]);
+            if (entry.removedTimers.length > MAX_REMOVED_TIMERS) {
+                entry.removedTimers.shift();
+            }
+        }
     }
 
     /** Forgets every error; later occurrences count from zero. Returns how many were cleared. */

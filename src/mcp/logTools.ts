@@ -155,6 +155,14 @@ function renderError(entry: ErrorEntry, index: number, mapping: GmodSourceMappin
     if (entry.stackTrace.length > 12) {
         lines.push(`    ... ${entry.stackTrace.length - 12} more frames`);
     }
+    if (entry.removedTimers.length > 0) {
+        const names = entry.removedTimers.slice(0, 3).join(', ');
+        const more = entry.removedTimers.length > 3 ? ` and ${entry.removedTimers.length - 3} more` : '';
+        lines.push(`    GMod removed the failing timer${entry.removedTimers.length > 1 ? 's' : ''} ${names}${more}: it does not run again until it is created again.`);
+    }
+    if (entry.inSimpleTimer) {
+        lines.push('    Raised in a timer.Simple callback.');
+    }
     return lines.join('\n');
 }
 

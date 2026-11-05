@@ -12,6 +12,7 @@
 - Add logpoints to the GMod server debugger. Hit conditions such as `% 10` work for logpoints too.
 - Add function traces and self-removing logpoints for MCP agents. The MCP `detach` action removes everything the agent set, and only disconnects a debug session the agent started.
 - MCP agents now see console output and Lua errors from before the debugger attached (needs the updated `gm_rdb`, which keeps the last 2000 lines while nothing is connected).
+- The MCP `server_errors` tool notes when GMod removed a timer because its callback errored, since that timer never runs again.
 - Fix a breakpoint on a line that calls a built-in function, such as `math.max`, pausing twice and counting two hits (needs the updated `gm_rdb`).
 - Fix "Run Lua" reporting `nil` instead of the message when the code has a syntax error.
 
