@@ -67,14 +67,15 @@ async function saveToGluarc(folder: vscode.WorkspaceFolder, settings: GamemodeSe
         return false;
     }
     try {
-        await clearSettingsOverrides(
+        await alignSettingsWithGluarc(
             vscode.workspace.getConfiguration('gluals.gmod', folder.uri),
             vscode.workspace.workspaceFile !== undefined,
+            settings,
         );
         return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to clear the gamemode settings that override .gluarc.json: ${message}`);
+        vscode.window.showErrorMessage(`Failed to update the gamemode settings that override .gluarc.json: ${message}`);
         return false;
     }
 }
@@ -82,20 +83,31 @@ async function saveToGluarc(folder: vscode.WorkspaceFolder, settings: GamemodeSe
 const GAMEMODE_SETTING_KEYS = ['activeGamemode', 'loadEverything'] as const;
 
 /**
- * Removes the folder's own gamemode settings, which the language server reads over
- * `.gluarc.json`: one left from a pick saved to the settings would override the
- * pick just saved to `.gluarc.json`. A multi-root workspace's own settings apply to
- * every folder, so only a single-folder workspace's are removed.
+ * Keeps the settings, which the language server reads over `.gluarc.json`, from
+ * overriding a pick just saved there. The folder's own setting is removed, so one
+ * left from a pick saved to the settings does not win; but where a setting it
+ * would inherit (user settings, or a multi-root workspace's own, which apply to
+ * every folder) differs from the pick, the folder keeps the pick instead.
  */
-export async function clearSettingsOverrides(
+export async function alignSettingsWithGluarc(
     config: Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>,
     multiRoot: boolean,
+    pick: GamemodeSettings,
 ): Promise<void> {
     for (const key of GAMEMODE_SETTING_KEYS) {
+        const picked = key === 'activeGamemode' ? pick.activeGamemode : pick.loadEverything;
         const inspected = config.inspect(key);
+        const inherited = multiRoot
+            ? inspected?.workspaceValue ?? inspected?.globalValue
+            : inspected?.globalValue;
+        if (picked !== undefined && inherited !== undefined && inherited !== null && inherited !== picked) {
+            await config.update(key, picked, vscode.ConfigurationTarget.WorkspaceFolder);
+            continue;
+        }
         if (inspected?.workspaceFolderValue !== undefined) {
             await config.update(key, undefined, vscode.ConfigurationTarget.WorkspaceFolder);
         }
+        // A single-folder workspace keeps its folder settings as workspace settings.
         if (!multiRoot && inspected?.workspaceValue !== undefined) {
             await config.update(key, undefined, vscode.ConfigurationTarget.Workspace);
         }

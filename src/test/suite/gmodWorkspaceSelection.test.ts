@@ -11,7 +11,7 @@ import {
     statusText,
     statusTooltip,
 } from '../../gmodWorkspaceSelection';
-import { clearSettingsOverrides, GmodWorkspaceSelection } from '../../gmodWorkspaceSelectionController';
+import { alignSettingsWithGluarc, GmodWorkspaceSelection } from '../../gmodWorkspaceSelectionController';
 
 function makeRoot(overrides: Partial<GmodRoot> = {}): GmodRoot {
     return {
@@ -145,28 +145,49 @@ suite('GMod Workspace Selection', () => {
     });
 
     test('clears the folder settings that would override a pick saved to .gluarc.json', async () => {
-        const updates: [string, unknown, vscode.ConfigurationTarget | boolean | null | undefined][] = [];
-        const values: Record<string, { workspaceValue?: unknown; workspaceFolderValue?: unknown }> = {
+        const { config, updates } = fakeConfig({
             activeGamemode: { workspaceFolderValue: 'helix', workspaceValue: 'darkrp' },
             loadEverything: {},
-        };
-        const config = {
-            inspect: (key: string) => ({ key, ...values[key] }),
-            update: async (key: string, value: unknown, target?: vscode.ConfigurationTarget | boolean | null) => {
-                updates.push([key, value, target]);
-            },
-        } as unknown as Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>;
+        });
+        const pick = { activeGamemode: 'ixhl2rp', loadEverything: false };
 
-        await clearSettingsOverrides(config, true);
+        await alignSettingsWithGluarc(config, true, pick);
         const multiRoot = updates.splice(0);
-        await clearSettingsOverrides(config, false);
+        await alignSettingsWithGluarc(config, false, pick);
 
         assert.deepStrictEqual(multiRoot, [
-            ['activeGamemode', undefined, vscode.ConfigurationTarget.WorkspaceFolder],
+            ['activeGamemode', 'ixhl2rp', vscode.ConfigurationTarget.WorkspaceFolder],
         ]);
         assert.deepStrictEqual(updates, [
             ['activeGamemode', undefined, vscode.ConfigurationTarget.WorkspaceFolder],
             ['activeGamemode', undefined, vscode.ConfigurationTarget.Workspace],
         ]);
     });
+
+    test('keeps the pick in the folder settings where an inherited setting would override it', async () => {
+        const { config, updates } = fakeConfig({
+            activeGamemode: { globalValue: 'ixhl2rp', workspaceFolderValue: 'darkrp' },
+            loadEverything: { globalValue: true, workspaceFolderValue: false },
+        });
+
+        await alignSettingsWithGluarc(config, false, { activeGamemode: 'ixhl2rp', loadEverything: false });
+
+        assert.deepStrictEqual(updates, [
+            ['activeGamemode', undefined, vscode.ConfigurationTarget.WorkspaceFolder],
+            ['loadEverything', false, vscode.ConfigurationTarget.WorkspaceFolder],
+        ]);
+    });
 });
+
+type Inspected = { globalValue?: unknown; workspaceValue?: unknown; workspaceFolderValue?: unknown };
+
+function fakeConfig(values: Record<string, Inspected>) {
+    const updates: [string, unknown, vscode.ConfigurationTarget | boolean | null | undefined][] = [];
+    const config = {
+        inspect: (key: string) => ({ key, ...values[key] }),
+        update: async (key: string, value: unknown, target?: vscode.ConfigurationTarget | boolean | null) => {
+            updates.push([key, value, target]);
+        },
+    } as unknown as Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>;
+    return { config, updates };
+}
