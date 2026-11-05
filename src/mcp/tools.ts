@@ -7,22 +7,24 @@ import { ToolInputError } from './toolSupport';
 /** Sent to agents in the MCP `initialize` result. Keep it short; tool descriptions carry the details. */
 export const MCP_INSTRUCTIONS = `GLuaLS tools for the Garry's Mod SERVER realm, provided by the GLuaLS VS Code extension. For clientside Lua, player input or screenshots, use a client MCP (for example gmcl_mcp) alongside these.
 
-Start with debugger {"action":"status"}. Server tools attach the VS Code debugger to the server automatically.
+Server tools attach the VS Code debugger automatically. debugger {} shows the connection, run state and, when paused, where.
 
-Workflows:
-- Check code: diagnostics {"paths":[...]} after editing; code_lookup for types, docs and definitions, including the GMod API (e.g. "Player:Nick").
-- Try something: server_run_lua with "return ..." to see values. Its errors come back with a traceback.
-- Runtime errors: server_errors {"clear":true}, reproduce, then server_errors (or pass wait_ms).
-- Trace without stopping the game: breakpoints trace [{"function":"MyAddon.Score"}] logs each call's arguments and return values; breakpoints set with log_message logs values at a line (max_hits makes it remove itself). Trigger the code, then server_console {"search":"[trace"} or {"search":"[logpoint"}. Lines from code you ran with server_run_lua also appear in its "Printed" output.
-- Inspect state: breakpoints set (optionally with a condition), trigger the code (server_run_lua, a client MCP or ask the user), debugger {"action":"wait"}, read the locals, dig in with server_run_lua {"frame":0,"code":"..."}, then debugger continue or step.
-- Hangs: debugger {"action":"pause"} shows where the server is stuck.
+Common calls, with their exact arguments:
+- Run Lua and see values: server_run_lua {"code":"return #player.GetAll(), MyAddon.Config"}
+- Lua errors, including ones from before the debugger attached: server_errors {}. Start fresh with server_errors {"clear":true}; wait for a new one with server_errors {"wait_ms":10000}.
+- Console output (prints, engine messages such as "Dropped <name> from server"): server_console {"search":"dropped","limit":50}. Run a command: server_console {"command":"status"}. Wait for lines: server_console {"search":"[logpoint","wait_ms":10000,"wait_count":3}.
+- Log values at a line without pausing (logpoint): breakpoints {"action":"set","items":[{"file":"lua/myaddon/sv_init.lua","line":42,"log_message":"hp={ply:Health()}","max_hits":5}]}
+- Log every call of a function: breakpoints {"action":"trace","items":[{"function":"MyAddon.Score","max_calls":10}]}
+- Pause at a line: breakpoints {"action":"set","items":[{"file":"lua/myaddon/sv_init.lua","line":42,"condition":"amount < 0"}]}, trigger the code, then debugger {"action":"wait"}. Read values with server_run_lua {"frame":0,"code":"return ply, amount"}, then debugger {"action":"continue"} (or step_over, step_in, step_out).
+- Find a hang: debugger {"action":"pause"}
+- Check code: diagnostics {"paths":["lua/myaddon/sv_init.lua"]} after editing; code_lookup {"symbol":"Player:Nick"} for docs, types and definitions.
+- Clean up: breakpoints {"action":"clear"} removes everything you set; debugger {"action":"detach"} also resumes and disconnects if you attached it.
 
 Rules:
-- While paused the whole server is frozen for every player, and connected clients drop after cl_timeout (30 s by default). Continue as soon as you are done. Prefer traces and logpoints while a client MCP or a person is playing.
+- "items" is always a list, even for one breakpoint. Lines are 1-based. Paths can be workspace-relative, relative to lua/ as include() uses them, or absolute.
+- While paused the whole server is frozen for every player, and connected clients drop after cl_timeout (30 s by default). Continue as soon as you are done. Prefer logpoints and traces while a person or a client MCP is playing.
 - "Still running" from debugger wait is normal: trigger the code and wait again.
-- Replies include a cursor. Pass it as "after" to server_console or server_errors to see only what happened since.
-- Paths are workspace-relative or absolute local paths; lines are 1-based.
-- Clean up when done: debugger {"action":"detach"} removes your breakpoints and traces, resumes, and disconnects if you attached it. To keep the debugger attached, use breakpoints {"action":"clear"} instead.`;
+- Replies include a cursor. Pass it as "after" to server_console or server_errors to see only what happened since.`;
 
 /** Builds the MCP tools. Every reply warns when the server is paused and reports runs that finished late. */
 export function buildMcpTools(context: McpToolContext, watcher: DiagnosticsWatcher): McpTool[] {
