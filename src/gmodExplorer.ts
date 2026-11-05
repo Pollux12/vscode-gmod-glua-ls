@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { extensionContext } from './extension';
+import { GmodRoot, uriBasename } from './gmodWorkspaceSelection';
 import {
     isExpectedLifecycleRequestError,
     sendRequestWithStartupRetry,
@@ -22,6 +23,7 @@ type GmodExplorerItemType =
     | 'scriptedClass'
     | 'resourceCategory'
     | 'resourceGroup'
+    | 'loadedFolder'
     | 'file';
 
 interface ItemData {
@@ -38,6 +40,7 @@ interface ItemData {
     rcType?: ResourceCategory;
     groupKey?: string;
     uri?: vscode.Uri;
+    description?: string;
 }
 
 interface LsPosition {
@@ -508,6 +511,12 @@ export class GmodExplorerItem extends vscode.TreeItem {
             case 'resourceGroup':
                 this.iconPath = new vscode.ThemeIcon('folder-opened');
                 break;
+            case 'loadedFolder':
+                this.iconPath = new vscode.ThemeIcon(d.icon ?? 'folder');
+                this.description = d.description;
+                this.tooltip = d.uri?.fsPath;
+                this.command = { command: 'revealInExplorer', title: 'Reveal in Explorer', arguments: [d.uri] };
+                break;
             case 'file':
                 if (d.uri) {
                     const ext = path.extname(d.uri.fsPath).toLowerCase();
@@ -590,12 +599,23 @@ function isResourceFileForCategory(uri: vscode.Uri, rcType: ResourceCategory): b
     return RESOURCE_FILE_EXTENSIONS[rcType].has(ext);
 }
 
+export interface GmodLoadedFolders {
+    readonly roots: readonly GmodRoot[];
+    readonly onDidChange: vscode.Event<void>;
+}
+
 export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplorerItem>, vscode.Disposable {
     private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<GmodExplorerItem | undefined | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
     private scriptedClassCache?: ScriptedClassCache;
     private resourceCache?: Map<ResourceCategory, Map<string, vscode.Uri[]>>;
+
+    constructor(private readonly loadedFolders?: GmodLoadedFolders) {
+        this.loadedFoldersListener = loadedFolders?.onDidChange(() => this.refresh());
+    }
+
+    private readonly loadedFoldersListener?: vscode.Disposable;
 
     refresh(): void {
         this.scriptedClassCache = undefined;
@@ -613,7 +633,11 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         if (!element) {
+            const workspaceCategory = this.loadedFolders?.roots.length
+                ? [new GmodExplorerItem({ type: 'category', label: 'Workspace', collapsible: vscode.TreeItemCollapsibleState.Expanded })]
+                : [];
             return [
+                ...workspaceCategory,
                 new GmodExplorerItem({ type: 'category', label: 'Scripted Classes', collapsible: vscode.TreeItemCollapsibleState.Expanded }),
                 new GmodExplorerItem({
                     type: 'scriptedClassType',
@@ -632,6 +656,8 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
 
         if (d.type === 'category') {
             switch (d.label) {
+                case 'Workspace':
+                    return this.getLoadedFolderItems();
                 case 'Scripted Classes':
                     return this.getScriptedClassTypeItems(undefined);
                 case 'Resources':
@@ -692,6 +718,31 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
         }
 
         return [];
+    }
+
+    private getLoadedFolderItems(): GmodExplorerItem[] {
+        const roots = this.loadedFolders?.roots ?? [];
+        const items: GmodExplorerItem[] = [];
+        for (const root of roots) {
+            const gamemodes = new Set(root.gamemodes.map((gamemode) => gamemode.uri));
+            const addons = new Set(root.addons);
+            const loaded = [...root.loaded].sort((a, b) => {
+                const rank = (uri: string) => (gamemodes.has(uri) ? 0 : addons.has(uri) ? 1 : 2);
+                return rank(a) - rank(b) || uriBasename(a).localeCompare(uriBasename(b));
+            });
+            for (const folderUri of loaded) {
+                const kind = gamemodes.has(folderUri) ? 'gamemode' : addons.has(folderUri) ? 'addon' : 'folder';
+                items.push(new GmodExplorerItem({
+                    type: 'loadedFolder',
+                    label: uriBasename(folderUri),
+                    collapsible: vscode.TreeItemCollapsibleState.None,
+                    icon: kind === 'gamemode' ? 'game' : kind === 'addon' ? 'extensions' : 'folder',
+                    description: roots.length > 1 ? `${kind} - ${uriBasename(root.folderUri)}` : kind,
+                    uri: vscode.Uri.parse(folderUri),
+                }));
+            }
+        }
+        return items;
     }
 
     public async resolveItemUri(target: unknown, preferFolder: boolean = false): Promise<vscode.Uri | undefined> {
@@ -981,12 +1032,16 @@ export class GmodExplorerProvider implements vscode.TreeDataProvider<GmodExplore
             clearTimeout(pendingStartupRefresh);
             pendingStartupRefresh = undefined;
         }
+        this.loadedFoldersListener?.dispose();
         this.onDidChangeTreeDataEmitter.dispose();
     }
 }
 
-export function registerGmodExplorer(context: vscode.ExtensionContext): GmodExplorerProvider {
-    const provider = new GmodExplorerProvider();
+export function registerGmodExplorer(
+    context: vscode.ExtensionContext,
+    loadedFolders?: GmodLoadedFolders,
+): GmodExplorerProvider {
+    const provider = new GmodExplorerProvider(loadedFolders);
     registeredGmodExplorerProvider = provider;
     const treeView = vscode.window.createTreeView('gluals.gmodExplorer', {
         treeDataProvider: provider,
