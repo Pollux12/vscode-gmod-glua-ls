@@ -42,6 +42,17 @@ function request(port: number, options: { method?: string; path?: string; body?:
     });
 }
 
+function postRaw(port: number, size: number): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const req = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/mcp', headers: { 'Content-Type': 'application/json' } }, (res) => {
+            res.resume();
+            res.on('end', () => resolve(res.statusCode ?? 0));
+        });
+        req.on('error', reject);
+        req.end(Buffer.alloc(size, 0x20));
+    });
+}
+
 suite('MCP HTTP server', () => {
     let server: McpHttpServer;
     let port: number;
@@ -165,5 +176,8 @@ suite('MCP HTTP server', () => {
         });
         assert.strictEqual(reply.status, 400);
         assert.strictEqual(JSON.parse(reply.body).error.code, -32700);
+    });
+    test('answers an oversized request with 413 instead of dropping the connection', async () => {
+        assert.strictEqual(await postRaw(port, 5 * 1024 * 1024), 413);
     });
 });

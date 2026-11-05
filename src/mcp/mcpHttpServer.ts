@@ -242,6 +242,7 @@ export class McpHttpServer {
         try {
             body = await readBody(req);
         } catch (error) {
+            res.setHeader('Connection', 'close');
             this.sendPlain(res, 413, error instanceof Error ? error.message : 'Request body too large.');
             return;
         }
@@ -357,11 +358,16 @@ function readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
         let size = 0;
+        let tooLarge = false;
         req.on('data', (chunk: Buffer) => {
+            if (tooLarge) {
+                return; // drained and dropped, so the 413 reply can still be written
+            }
             size += chunk.length;
             if (size > MAX_BODY_BYTES) {
+                tooLarge = true;
+                chunks.length = 0;
                 reject(new Error('Request body too large.'));
-                req.destroy();
                 return;
             }
             chunks.push(chunk);

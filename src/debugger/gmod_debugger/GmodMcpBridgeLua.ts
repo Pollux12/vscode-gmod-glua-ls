@@ -417,9 +417,15 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
 
     -- "running" is how many of the wrapper's frames belong to the caller (1 inside the wrapper).
     local function reportUnreturned(trace, running)
+        -- A call inside a coroutine that yielded is still running, just not on this stack.
+        local thread = trace.pendingThread
+        if thread and coroutine.status(thread) == "suspended" then
+            return
+        end
         if trace.pending and countOnStack(trace.wrapper) <= running then
             print(string.format("[trace %s] #%d did not return: it raised an error (server_errors has it with the stack, unless the caller caught it with pcall)", trace.path, trace.pending))
             trace.pending = nil
+            trace.pendingThread = nil
         end
     end
 
@@ -488,10 +494,12 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
             local outermost = trace.pending == nil
             if outermost then
                 trace.pending = n
+                trace.pendingThread = coroutine.running()
             end
             local results = pack(tracedFunction(...))
             if outermost then
                 trace.pending = nil
+                trace.pendingThread = nil
             end
             local rendered = {}
             for i = 1, results.n do

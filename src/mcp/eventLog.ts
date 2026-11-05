@@ -106,7 +106,8 @@ export class McpEventLog {
             time: this.now(),
             text: line.length > MAX_LINE_LENGTH ? `${line.slice(0, MAX_LINE_LENGTH)}... (${line.length} chars)` : line,
         });
-        if (this.consoleEntries.length > this.consoleCapacity) {
+        // Trim in batches: dropping one line per new line would shift the whole buffer every time.
+        if (this.consoleEntries.length > this.consoleCapacity + Math.max(1, Math.floor(this.consoleCapacity / 10))) {
             this.consoleEntries.splice(0, this.consoleEntries.length - this.consoleCapacity);
         }
         const entry = this.consoleEntries[this.consoleEntries.length - 1];

@@ -76,6 +76,8 @@ interface TrackedSession {
 }
 
 const RESUME_SETTLE_MS = 2000;
+/** Set on the debug configuration of sessions the MCP starts. */
+const AGENT_SESSION_MARKER = '__gluaslMcpAgent';
 
 export type StepKind = 'continue' | 'step_over' | 'step_in' | 'step_out';
 
@@ -356,6 +358,8 @@ export class GmodDebugBridge implements vscode.Disposable {
         }
         // A stop on entry would freeze the server the moment an agent connects.
         config.stopOnEntry = false;
+        // Marks the session as the agent's, so detach never disconnects one the user started.
+        config[AGENT_SESSION_MARKER] = true;
 
         const waitForStart = new Promise<boolean>((resolve) => {
             const timer = setTimeout(() => {
@@ -363,7 +367,7 @@ export class GmodDebugBridge implements vscode.Disposable {
                 resolve(false);
             }, 10_000);
             const listener = vscode.debug.onDidStartDebugSession((session) => {
-                if (session.type === GMOD_SERVER_DEBUG_TYPE) {
+                if (session.type === GMOD_SERVER_DEBUG_TYPE && session.configuration?.[AGENT_SESSION_MARKER] === true) {
                     this.agentStarted.add(session.id);
                     clearTimeout(timer);
                     listener.dispose();

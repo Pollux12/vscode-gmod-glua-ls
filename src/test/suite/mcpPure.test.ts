@@ -150,20 +150,21 @@ suite('MCP logpoints', () => {
     });
 
     test('a hit condition counts on the server under the given key', () => {
-        assert.strictEqual(
-            buildLogpointCondition('x', 'a.lua:1', undefined, '<= 2', 'a.lua:1#7'),
-            '((function(n) return n <= 2 end)((_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint("a.lua:1#7") or 1)) and (print("[logpoint a.lua:1] " .. "x") and false))'
-        );
+        const condition = buildLogpointCondition('x', 'a.lua:1', undefined, '<= 2', 'a.lua:1#7');
+        assert.ok(condition.includes('if (function(n) return n <= 2 end)((_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint("a.lua:1#7") or 1)) then print("[logpoint a.lua:1] " .. "x") end'), condition);
     });
 
-    test('builds a condition that prints and never pauses', () => {
+    // LRDB treats a condition that raises an error as true, so everything must run inside pcall
+    // and the condition must always end in false; otherwise a bad expression pauses the server.
+    test('builds a condition that prints, reports its own errors and never pauses', () => {
+        const wrap = (body: string, label: string) => `(function() local ok, err = pcall(function() ${body} end) if not ok then print("[logpoint ${label}] error: " .. (tostring(err):gsub("^%b[]:%d+: ", ""))) end return false end)()`;
         assert.strictEqual(
             buildLogpointCondition('hp={hp}', 'lua/x.lua:3'),
-            '(print("[logpoint lua/x.lua:3] " .. "hp=" .. (_GLUALS and _GLUALS.format or tostring)((hp))) and false)'
+            wrap('print("[logpoint lua/x.lua:3] " .. "hp=" .. (_GLUALS and _GLUALS.format or tostring)((hp)))', 'lua/x.lua:3')
         );
         assert.strictEqual(
             buildLogpointCondition('hit', 'lua/x.lua:3', 'ply:IsAdmin()'),
-            '((ply:IsAdmin()) and (print("[logpoint lua/x.lua:3] " .. "hit") and false))'
+            wrap('if (ply:IsAdmin()) then print("[logpoint lua/x.lua:3] " .. "hit") end', 'lua/x.lua:3')
         );
     });
 });

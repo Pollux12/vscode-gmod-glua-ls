@@ -185,6 +185,10 @@ export class GmodDebugSession extends DebugSession {
   private _debug_client?: LRDBClient.Client
 
   private _breakPointID = 1000
+  /** Per file: logpoint -> its server hit counter key, kept while VS Code re-sends the same logpoint. */
+  private _logpointCounterKeys = new Map<string, Map<string, string>>()
+  /** Console and error notifications gm_rdb is still replaying from before this connection. */
+  private _replayRemaining = 0
 
   private _variableHandles = new Handles<VariableReference>()
 
@@ -580,6 +584,10 @@ export class GmodDebugSession extends DebugSession {
           this.sendEvent(new OutputEvent(`Warning: failed to clear breakpoints for '${debuggerFilePath}': ${err.message}\n`, 'stderr'))
         })
 
+      const previousCounterKeys = this._logpointCounterKeys.get(debuggerFilePath)
+      const counterKeys = new Map<string, string>()
+      this._logpointCounterKeys.set(debuggerFilePath, counterKeys)
+
       if (args.breakpoints) {
         // verify breakpoint locations
         for (const souceBreakpoint of args.breakpoints) {
@@ -605,15 +613,21 @@ export class GmodDebugSession extends DebugSession {
           if (verified) {
             // LRDB has no logpoints, so a logpoint is a condition that prints and never pauses.
             const label = logpointLabel(debuggerFilePath, this.convertDebuggerLineToClient(l))
-            const condition = souceBreakpoint.logMessage
-              ? buildLogpointCondition(
+            let condition = souceBreakpoint.condition
+            if (souceBreakpoint.logMessage) {
+              // VS Code re-sends every breakpoint in the file when one changes; an unchanged logpoint
+              // keeps its hit count, while a new or edited one starts from zero.
+              const identity = JSON.stringify([l, souceBreakpoint.logMessage, souceBreakpoint.condition, souceBreakpoint.hitCondition])
+              const counterKey = previousCounterKeys?.get(identity) ?? `${label}#${bp.id}`
+              counterKeys.set(identity, counterKey)
+              condition = buildLogpointCondition(
                 souceBreakpoint.logMessage,
                 label,
                 souceBreakpoint.condition,
                 souceBreakpoint.hitCondition,
-                `${label}#${bp.id}`
+                counterKey
               )
-              : souceBreakpoint.condition
+            }
             const sendbreakpoint = {
               line: l,
               file: debuggerFilePath,
@@ -1314,13 +1328,17 @@ export class GmodDebugSession extends DebugSession {
               `Debugger metadata: protocol=${this._debuggee_protocol_version ?? 'unknown'}, module=${this._debuggee_module_version ?? 'unknown'}\n`
             )
           )
+          this.startReplay(event.params?.backlog)
           break
 
         case 'output':
           this._consoleOutput.push(event.params)
+          this.consumeReplay()
           break
 
         case 'error':
+          // An error from before this connection must not pause the server now.
+          const replayedError = this.consumeReplay()
           const { message, stackTrace } = parseGmodLuaError(event.params.message, event.params.raw_message)
           const fingerprint = typeof event.params.fingerprint === 'string' && event.params.fingerprint.trim().length > 0
             ? event.params.fingerprint
@@ -1338,7 +1356,7 @@ export class GmodDebugSession extends DebugSession {
             timestamp: typeof event.params.timestamp === 'number' ? event.params.timestamp : undefined,
           }))
 
-          if (this._stopOnError) {
+          if (this._stopOnError && !replayedError) {
             this._debug_client?.pauseNow().catch((error) => {
               this.sendEvent(
                 new OutputEvent(
@@ -1372,6 +1390,27 @@ export class GmodDebugSession extends DebugSession {
       return command as GmodControlCommand
     }
     return undefined
+  }
+
+  /** gm_rdb sends `backlog` console lines and errors from before this connection right after "connected". */
+  private startReplay(backlog: unknown): void {
+    this._replayRemaining = typeof backlog === 'number' && backlog > 0 ? Math.floor(backlog) : 0
+    if (this._replayRemaining > 0) {
+      this.sendEvent(new OutputEvent(`--- ${this._replayRemaining} console message(s) from before the debugger attached ---\n`, 'console'))
+    }
+  }
+
+  /** Counts one replayed message off; returns true while messages are still from before this connection. */
+  private consumeReplay(): boolean {
+    if (this._replayRemaining <= 0) {
+      return false
+    }
+    this._replayRemaining -= 1
+    if (this._replayRemaining === 0) {
+      this._consoleOutput.flush()
+      this.sendEvent(new OutputEvent('--- End of earlier output ---\n', 'console'))
+    }
+    return true
   }
 
   /**

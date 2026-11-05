@@ -172,10 +172,12 @@ export class GmodMcpHost implements vscode.Disposable {
         if (this.server && this.status.kind === 'running' && this.status.port === settings.port) {
             return;
         }
-        await this.stop();
+        // A port change restarts only the HTTP server. The bridge keeps the console and error log and
+        // remembers which breakpoints the agent set, so its clear and detach still find them.
+        await this.stopServer();
 
-        this.bridge = new GmodDebugBridge((message) => this.output.appendLine(`[MCP] ${message}`));
-        this.watcher = new DiagnosticsWatcher();
+        this.bridge ??= new GmodDebugBridge((message) => this.output.appendLine(`[MCP] ${message}`));
+        this.watcher ??= new DiagnosticsWatcher();
         const bridge = this.bridge;
         const tools = buildMcpTools({ bridge, settings: () => readSettings() }, this.watcher);
         const server = new McpHttpServer({
@@ -192,10 +194,6 @@ export class GmodMcpHost implements vscode.Disposable {
                 ? `Port ${settings.port} is already in use. Choose another in gluals.mcp.port.`
                 : `Could not start the MCP server on port ${settings.port}: ${error instanceof Error ? error.message : String(error)}`;
             this.output.appendLine(`[MCP] ${message}`);
-            bridge.dispose();
-            this.watcher.dispose();
-            this.bridge = undefined;
-            this.watcher = undefined;
             this.setStatus({ kind: 'error', port: settings.port, message });
             void vscode.window.showWarningMessage(`GLuaLS MCP: ${message}`);
             return;
@@ -206,18 +204,24 @@ export class GmodMcpHost implements vscode.Disposable {
         this.setStatus({ kind: 'running', port: settings.port });
     }
 
-    private async stop(): Promise<void> {
+    /** Stops the HTTP server only. */
+    private async stopServer(): Promise<void> {
         this.unregisterCursor();
         const server = this.server;
         this.server = undefined;
-        this.bridge?.dispose();
-        this.bridge = undefined;
-        this.watcher?.dispose();
-        this.watcher = undefined;
         if (server) {
             await server.stop();
             this.output.appendLine('[MCP] Stopped.');
         }
+    }
+
+    /** Stops everything: the server, the debug bridge and the diagnostics watcher. */
+    private async stop(): Promise<void> {
+        await this.stopServer();
+        this.bridge?.dispose();
+        this.bridge = undefined;
+        this.watcher?.dispose();
+        this.watcher = undefined;
     }
 
     private setStatus(status: McpHostStatus): void {

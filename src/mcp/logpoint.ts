@@ -130,18 +130,20 @@ export function hitConditionTest(hitCondition: string): string | undefined {
 /**
  * Builds the LRDB condition for a logpoint. When `condition` is set the message is
  * only printed while it holds. A `hitCondition` counts hits on the server under
- * `counterKey` (unique per breakpoint), so "<= 3" prints exactly three times.
- * Interpolated values go through `_GLUALS.format` when the bridge is loaded and
- * `tostring` otherwise.
+ * `counterKey`, so "<= 3" prints exactly three times. Interpolated values go through
+ * `_GLUALS.format` when the bridge is loaded and `tostring` otherwise.
+ *
+ * Everything runs inside pcall and the condition always returns false: LRDB treats a
+ * condition that raises an error as true, so an error (say `ply` is nil in
+ * "{ply:Health()}") would otherwise pause the server. The error is printed instead.
  */
 export function buildLogpointCondition(logMessage: string, label: string, condition?: string, hitCondition?: string, counterKey?: string): string {
     const formatter = '(_GLUALS and _GLUALS.format or tostring)';
-    const pieces = [luaStringLiteral(`${logpointLinePrefix(label)} `)];
+    const prefix = `${logpointLinePrefix(label)} `;
+    const pieces = [luaStringLiteral(prefix)];
     for (const part of parseLogMessage(logMessage)) {
         pieces.push(part.kind === 'text' ? luaStringLiteral(part.value) : `${formatter}((${part.value}))`);
     }
-    // print returns nothing, so `print(...) and false` is nil and the line never pauses.
-    const printCall = `(print(${pieces.join(' .. ')}) and false)`;
     const gates: string[] = [];
     const trimmed = condition?.trim();
     if (trimmed) {
@@ -152,5 +154,7 @@ export function buildLogpointCondition(logMessage: string, label: string, condit
         const counter = `(_GLUALS and _GLUALS.countLogpoint and _GLUALS.countLogpoint(${luaStringLiteral(counterKey ?? label)}) or 1)`;
         gates.push(`(function(n) return ${test} end)(${counter})`);
     }
-    return gates.length > 0 ? `(${gates.join(' and ')} and ${printCall})` : printCall;
+    const printCall = `print(${pieces.join(' .. ')})`;
+    const body = gates.length > 0 ? `if ${gates.join(' and ')} then ${printCall} end` : printCall;
+    return `(function() local ok, err = pcall(function() ${body} end) if not ok then print(${luaStringLiteral(`${prefix}error: `)} .. (tostring(err):gsub("^%b[]:%d+: ", ""))) end return false end)()`;
 }

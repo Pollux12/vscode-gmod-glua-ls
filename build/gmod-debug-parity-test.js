@@ -154,7 +154,38 @@ async function run() {
     assert.strictEqual(addedBreakpoints.length, 1)
     assert.strictEqual(addedBreakpoints[0].line, 1)
     assert.strictEqual(addedBreakpoints[0].hit_condition, undefined)
-    assert.match(addedBreakpoints[0].condition, /^\(print\(".*\[logpoint sample\.lua:1\] " \.\. "log me"\) and false\)$/)
+    assert.match(addedBreakpoints[0].condition, /^\(function\(\) local ok, err = pcall\(function\(\) print\(".*\[logpoint sample\.lua:1\] " \.\. "log me"\) end\).* return false end\)\(\)$/)
+
+    // A logpoint with a hit condition keeps its server-side counter while VS Code re-sends it unchanged,
+    // and gets a fresh one when it is edited.
+    const counterKey = (condition) => /countLogpoint\("([^"]+)"\)/.exec(condition)?.[1]
+    const sendLogpoint = async (logMessage) => {
+      addedBreakpoints.length = 0
+      session.setBreakPointsRequest(makeResponse('setBreakpoints'), {
+        source: { path: sourcePath },
+        breakpoints: [{ line: 1, logMessage, hitCondition: '<= 3' }],
+      })
+      await session.nextResponse()
+      return counterKey(addedBreakpoints[0].condition)
+    }
+    const firstKey = await sendLogpoint('counted')
+    assert.ok(firstKey, 'the hit condition should use a server counter')
+    assert.strictEqual(await sendLogpoint('counted'), firstKey, 're-sending an unchanged logpoint keeps its counter')
+    assert.notStrictEqual(await sendLogpoint('edited'), firstKey, 'an edited logpoint starts a new counter')
+
+    // Errors gm_rdb replays from before the connection must not trigger stop-on-error; a live one must.
+    let pauses = 0
+    const savedClient = session._debug_client
+    session._debug_client = { ...savedClient, pauseNow() { pauses += 1; return Promise.resolve() } }
+    session._stopOnError = true
+    session.handleServerEvents({ method: 'connected', params: { protocol_version: 'gmod-2', module_version: 'test', backlog: 2 } })
+    session.handleServerEvents({ method: 'output', params: { message: 'old line\n' } })
+    session.handleServerEvents({ method: 'error', params: { message: 'old error', fingerprint: 'f-old', count: 1, source: 'lua' } })
+    assert.strictEqual(pauses, 0, 'a replayed error must not pause the server')
+    session.handleServerEvents({ method: 'error', params: { message: 'new error', fingerprint: 'f-new', count: 1, source: 'lua' } })
+    assert.strictEqual(pauses, 1, 'a live error still stops on error')
+    session._stopOnError = false
+    session._debug_client = savedClient
 
     const setVariableResponse = makeResponse('setVariable')
     session.setVariableRequest(setVariableResponse, {
