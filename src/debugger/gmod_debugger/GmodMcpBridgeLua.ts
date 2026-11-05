@@ -418,7 +418,7 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
     -- "running" is how many of the wrapper's frames belong to the caller (1 inside the wrapper).
     local function reportUnreturned(trace, running)
         if trace.pending and countOnStack(trace.wrapper) <= running then
-            print(string.format("[trace %s] #%d did not return: it raised an error (see server_errors)", trace.path, trace.pending))
+            print(string.format("[trace %s] #%d did not return: it raised an error (server_errors has it with the stack, unless the caller caught it with pcall)", trace.path, trace.pending))
             trace.pending = nil
         end
     end
@@ -526,6 +526,22 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
         end
         return { ok = true, path = path, params = names, hooks = hookNames, maxCalls = maxCalls, maxSeconds = maxSeconds }
     end
+
+    -- A call that raised an error never returns to the wrapper. Report it on the next tick,
+    -- when no traced call can still be running, and stop a trace whose last call that was.
+    hook.Add("Think", "GLuaLS.MCP.Traces", function()
+        if next(activeTraces) == nil then
+            return
+        end
+        for _, trace in pairs(activeTraces) do
+            if trace.pending then
+                reportUnreturned(trace, 0)
+            end
+            if not trace.pending and trace.calls >= trace.maxCalls then
+                stopTrace(trace, "reached max_calls")
+            end
+        end
+    end)
 
     local function decodeArgs(code)
         local ok, args = pcall(util.JSONToTable, code)

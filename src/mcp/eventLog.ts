@@ -27,9 +27,9 @@ export interface ErrorEntry {
 export interface ErrorReport {
     message: string;
     fingerprint: string;
-    /** The server's running total for this fingerprint. */
-    count: number;
     stackTrace?: string[];
+    /** When the server raised it (ms since epoch); defaults to now. Replayed errors are older. */
+    time?: number;
 }
 
 export interface QueryOptions {
@@ -76,8 +76,6 @@ export class McpEventLog {
     private seq = 0;
     private readonly consoleEntries: ConsoleEntry[] = [];
     private readonly errors = new Map<string, ErrorEntry>();
-    /** The server's running total for each fingerprint when errors were last cleared. */
-    private readonly errorBaselines = new Map<string, number>();
     private readonly listeners = new Set<() => void>();
     private readonly consoleListeners = new Set<(entry: ConsoleEntry) => void>();
 
@@ -115,21 +113,15 @@ export class McpEventLog {
     }
 
     recordError(report: ErrorReport): void {
-        const time = this.now();
-        const total = Number.isFinite(report.count) ? Math.max(1, Math.floor(report.count)) : 1;
-        let baseline = this.errorBaselines.get(report.fingerprint) ?? 0;
-        if (total <= baseline) {
-            // The server's counter restarted (map change or cache clear).
-            baseline = 0;
-            this.errorBaselines.delete(report.fingerprint);
-        }
+        // Counted here rather than from the server's total, which does not reset when the
+        // debugger reattaches and includes errors from before the log was listening.
+        const time = report.time ?? this.now();
         const existing = this.errors.get(report.fingerprint);
-        const count = Math.max(1, total - baseline);
         const entry: ErrorEntry = {
             fingerprint: report.fingerprint,
             message: report.message,
             stackTrace: report.stackTrace && report.stackTrace.length > 0 ? report.stackTrace : existing?.stackTrace ?? [],
-            count: existing ? Math.max(existing.count + 1, count) : count,
+            count: (existing?.count ?? 0) + 1,
             firstSeen: existing?.firstSeen ?? time,
             lastSeen: time,
             lastSeq: ++this.seq,
@@ -149,9 +141,6 @@ export class McpEventLog {
     /** Forgets every error; later occurrences count from zero. Returns how many were cleared. */
     clearErrors(): number {
         const cleared = this.errors.size;
-        for (const entry of this.errors.values()) {
-            this.errorBaselines.set(entry.fingerprint, (this.errorBaselines.get(entry.fingerprint) ?? 0) + entry.count);
-        }
         this.errors.clear();
         return cleared;
     }

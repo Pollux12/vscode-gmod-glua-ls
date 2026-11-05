@@ -45,28 +45,28 @@ suite('MCP event log', () => {
     test('errors are grouped by fingerprint, newest first, and counted from the last clear', () => {
         let now = 1000;
         const log = new McpEventLog(100, 100, () => now);
-        log.recordError({ message: 'a', fingerprint: 'fa', count: 1, stackTrace: ['1. f - x.lua:1'] });
+        log.recordError({ message: 'a', fingerprint: 'fa', stackTrace: ['1. f - x.lua:1'] });
         now += 10;
-        log.recordError({ message: 'b', fingerprint: 'fb', count: 4 });
+        log.recordError({ message: 'b', fingerprint: 'fb' });
         now += 10;
-        log.recordError({ message: 'a', fingerprint: 'fa', count: 2 });
+        log.recordError({ message: 'a', fingerprint: 'fa' });
         let result = log.queryErrors();
-        assert.deepStrictEqual(result.entries.map((entry) => [entry.message, entry.count]), [['a', 2], ['b', 4]]);
+        assert.deepStrictEqual(result.entries.map((entry) => [entry.message, entry.count]), [['a', 2], ['b', 1]]);
         assert.deepStrictEqual(result.entries[0].stackTrace, ['1. f - x.lua:1']);
 
         assert.strictEqual(log.clearErrors(), 2);
         assert.strictEqual(log.queryErrors().entries.length, 0);
-        log.recordError({ message: 'a', fingerprint: 'fa', count: 3 });
+        log.recordError({ message: 'a', fingerprint: 'fa' });
         result = log.queryErrors();
         assert.deepStrictEqual(result.entries.map((entry) => [entry.message, entry.count]), [['a', 1]]);
     });
 
-    test('a restarted server counter is not treated as a negative count', () => {
-        const log = new McpEventLog();
-        log.recordError({ message: 'a', fingerprint: 'fa', count: 5 });
-        log.clearErrors();
-        log.recordError({ message: 'a', fingerprint: 'fa', count: 1 });
-        assert.strictEqual(log.queryErrors().entries[0].count, 1);
+    test('a replayed error keeps the time the server raised it', () => {
+        const log = new McpEventLog(100, 100, () => 50_000);
+        log.recordError({ message: 'old', fingerprint: 'fo', time: 20_000 });
+        const [entry] = log.queryErrors().entries;
+        assert.strictEqual(entry.firstSeen, 20_000);
+        assert.strictEqual(entry.lastSeen, 20_000);
     });
 
     test('waitFor resolves on a new entry and times out otherwise', async () => {

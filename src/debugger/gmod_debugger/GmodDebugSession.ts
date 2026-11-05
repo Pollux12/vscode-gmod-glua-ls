@@ -108,6 +108,7 @@ export interface ConnectedNotify extends JsonRpcNotify {
     working_directory?: string,
     protocol_version?: string
     module_version?: string
+    backlog?: number
   }
 }
 
@@ -1305,6 +1306,8 @@ export class GmodDebugSession extends DebugSession {
           this.sendEvent(new DebugEvent('gmod.connected', {
             protocolVersion: this._debuggee_protocol_version,
             moduleVersion: this._debuggee_module_version,
+            // How many console lines and errors from before the connection gm_rdb replays next.
+            backlog: typeof event.params?.backlog === 'number' ? event.params.backlog : undefined,
           }))
           this.sendEvent(
             new OutputEvent(
@@ -1332,6 +1335,7 @@ export class GmodDebugSession extends DebugSession {
             count,
             source,
             stackTrace,
+            timestamp: typeof event.params.timestamp === 'number' ? event.params.timestamp : undefined,
           }))
 
           if (this._stopOnError) {

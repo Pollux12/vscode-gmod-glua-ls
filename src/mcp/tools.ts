@@ -22,7 +22,7 @@ Rules:
 - "Still running" from debugger wait is normal: trigger the code and wait again.
 - Replies include a cursor. Pass it as "after" to server_console or server_errors to see only what happened since.
 - Paths are workspace-relative or absolute local paths; lines are 1-based.
-- Clean up when done: debugger {"action":"detach"} removes your breakpoints and traces and disconnects. To keep the debugger attached, use breakpoints {"action":"clear"} instead.`;
+- Clean up when done: debugger {"action":"detach"} removes your breakpoints and traces, resumes, and disconnects if you attached it. To keep the debugger attached, use breakpoints {"action":"clear"} instead.`;
 
 /** Builds the MCP tools. Every reply warns when the server is paused and reports runs that finished late. */
 export function buildMcpTools(context: McpToolContext, watcher: DiagnosticsWatcher): McpTool[] {

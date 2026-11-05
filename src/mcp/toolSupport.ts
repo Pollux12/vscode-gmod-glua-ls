@@ -94,6 +94,13 @@ export function resolveWorkspacePath(input: string, sourceRoot?: string): string
             return candidate;
         }
     }
+    // Paths as include() and logpoint labels write them, relative to lua/ ("myaddon/sv_init.lua").
+    for (const root of roots) {
+        const candidate = path.resolve(root, 'lua', trimmed);
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
     // Multi-root workspaces: allow "<folder name>/rest/of/path".
     for (const folder of vscode.workspace.workspaceFolders ?? []) {
         const prefix = `${folder.name}/`;

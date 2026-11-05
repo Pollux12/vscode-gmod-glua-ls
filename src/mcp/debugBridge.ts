@@ -98,9 +98,13 @@ export class GmodDebugBridge implements vscode.Disposable {
     readonly limitedLogpoints = new Map<string, LimitedLogpoint>();
     /** Where "new" output starts for a wait without a cursor: see buildMcpTools. */
     lastReplyCursor?: number;
+    /** Console lines and errors gm_rdb replayed from before the latest connection; undefined for older modules. */
+    lastBacklog?: number;
     /** Where the latest described pause stopped, for the banner on other tools' replies. */
     lastPauseLocation?: { pauseId: number; text: string };
     private readonly sessions = new Map<string, TrackedSession>();
+    /** Sessions the MCP started, which detach may disconnect. The user's own stay attached. */
+    private readonly agentStarted = new Set<string>();
     /** Sessions that ended. Their late messages must not bring them back. */
     private readonly ended = new Set<string>();
     private readonly disposables: vscode.Disposable[] = [];
@@ -360,6 +364,7 @@ export class GmodDebugBridge implements vscode.Disposable {
             }, 10_000);
             const listener = vscode.debug.onDidStartDebugSession((session) => {
                 if (session.type === GMOD_SERVER_DEBUG_TYPE) {
+                    this.agentStarted.add(session.id);
                     clearTimeout(timer);
                     listener.dispose();
                     resolve(true);
@@ -472,6 +477,11 @@ export class GmodDebugBridge implements vscode.Disposable {
         return this.pauseCounter;
     }
 
+    /** True when the MCP started this debug session rather than the user. */
+    startedByAgent(session: vscode.DebugSession): boolean {
+        return this.agentStarted.has(session.id);
+    }
+
     private markEnded(session: vscode.DebugSession): void {
         this.ended.add(session.id);
         const tracked = this.sessions.get(session.id);
@@ -544,13 +554,14 @@ export class GmodDebugBridge implements vscode.Disposable {
                 this.events.recordError({
                     message: typeof body.message === 'string' ? body.message : parsed.message,
                     fingerprint: typeof body.fingerprint === 'string' ? body.fingerprint : `error:${parsed.message}`,
-                    count: typeof body.count === 'number' ? body.count : 1,
                     stackTrace: Array.isArray(body.stackTrace) ? body.stackTrace.filter((line): line is string => typeof line === 'string') : [],
+                    time: typeof body.timestamp === 'number' ? body.timestamp : undefined,
                 });
                 break;
             }
             case 'gmod.connected':
                 this.log(`GMod debugger connected (module ${String(body.moduleVersion ?? 'unknown')}).`);
+                this.lastBacklog = typeof body.backlog === 'number' ? body.backlog : undefined;
                 break;
         }
     }

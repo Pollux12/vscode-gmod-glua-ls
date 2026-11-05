@@ -459,8 +459,8 @@ function debuggerTool(context: McpToolContext): ToolSpec {
             title: 'Control the GMod server debugger',
             description: [
                 'Status and control of the VS Code debugger attached to the Garry\'s Mod server.',
-                'status: connection, run state and, when paused, the paused location with source, stack, locals and upvalues (choose a frame with `frame`).',
-                'attach: connect the debugger (other tools attach automatically). detach: remove your breakpoints and traces, resume if paused and disconnect, leaving the server as you found it.',
+                'status (the default): connection, run state and, when paused, the paused location with source, stack, locals and upvalues (choose a frame with `frame`).',
+                'attach: connect the debugger (other tools attach automatically). detach: remove your breakpoints and traces and resume if paused; it also disconnects when you attached the debugger (a session the user started stays attached).',
                 'wait: block until a breakpoint is hit (up to timeout_ms, default 25000). "Still running" is a normal answer: trigger the code (server_run_lua, a client MCP or the user) and call wait again.',
                 'continue: resume; by default returns at once, or pass timeout_ms to also wait for the next hit.',
                 'step_over / step_in / step_out: step while paused and return the new location.',
@@ -474,12 +474,11 @@ function debuggerTool(context: McpToolContext): ToolSpec {
                     frame: { type: 'integer', minimum: 0, description: 'Stack frame to show locals for when paused (default 0).' },
                     timeout_ms: { type: 'integer', minimum: 0, maximum: 55000, description: 'How long to wait for a stop.' },
                 },
-                required: ['action'],
             },
             annotations: { title: 'Debugger', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         },
         handler: async (args, signal) => {
-            const action = enumArg(args, 'action', DEBUGGER_ACTIONS);
+            const action = enumArg(args, 'action', DEBUGGER_ACTIONS, 'status');
             const frame = Math.floor(numberArg(args, 'frame', { min: 0, fallback: 0 })!);
             const onAbort = (listener: () => void) => signal.onAbort(listener);
 
@@ -496,6 +495,9 @@ function debuggerTool(context: McpToolContext): ToolSpec {
                     await context.bridge.step(current, 'continue', 0).catch(() => undefined);
                     // A server_run_lua stopped at a breakpoint usually finishes right after resuming.
                     await context.bridge.waitForLateRuns(2000);
+                }
+                if (!context.bridge.startedByAgent(current)) {
+                    return { text: `${cleaned}The user started this debug session, so it stays attached. The server is running.` };
                 }
                 await vscode.debug.stopDebugging(current);
                 return { text: `${cleaned}Detached the debugger; the server keeps running.` };
@@ -555,7 +557,8 @@ function debuggerTool(context: McpToolContext): ToolSpec {
 }
 
 async function describeRunning(context: McpToolContext, session: vscode.DebugSession, state: SessionState): Promise<string> {
-    const lines = [`Debugger: attached (gm_rdb ${state.moduleVersion ?? 'unknown'}, protocol ${state.protocolVersion ?? 'unknown'}). The server is RUNNING.`];
+    const who = context.bridge.startedByAgent(session) ? 'by you' : 'by the user';
+    const lines = [`Debugger: attached ${who} (gm_rdb ${state.moduleVersion ?? 'unknown'}, protocol ${state.protocolVersion ?? 'unknown'}). The server is RUNNING.`];
     const sourceBreakpoints = vscode.debug.breakpoints.filter((bp): bp is vscode.SourceBreakpoint => bp instanceof vscode.SourceBreakpoint);
     const agent = sourceBreakpoints.filter((bp) => context.bridge.agentBreakpointIds.has(bp.id)).length;
     const logpoints = sourceBreakpoints.filter((bp) => bp.logMessage).length;
@@ -564,7 +567,6 @@ async function describeRunning(context: McpToolContext, session: vscode.DebugSes
     if (state.sourceRoot) {
         lines.push(`Game paths map to: ${state.sourceRoot}`);
     }
-    void session;
     return lines.join('\n');
 }
 
@@ -757,7 +759,7 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                 'set: items [{file, line, condition?, hit_condition?, log_message?, max_hits?, max_seconds?}]. Lines are 1-based; blank or comment lines move to the next code line.',
                 '`condition` is a Lua expression using the frame\'s locals; `hit_condition` like ">= 3" or "% 10" (for logpoints too).',
                 '`log_message` makes a LOGPOINT: it prints e.g. "hp={ply:Health()}" to server_console before the line runs and never pauses. `max_hits` / `max_seconds` make it remove itself.',
-                'trace: items [{function, max_calls?, max_seconds?}] logs every call of a function, e.g. "MyAddon.Score" or "Player:Nick": its arguments, return values and time (a call that errors is reported as not returning). Stops by itself after max_calls (default 20) or max_seconds (default 120).',
+                'trace: items [{function, max_calls?, max_seconds?}] logs every call of a function, e.g. "MyAddon.Score" or "Player:Nick": its arguments, return values and time (a call that errors is reported as not returning; server_errors has the error). Stops by itself after max_calls (default 20) or max_seconds (default 120).',
                 'Prefer logpoints and traces when something else (a client MCP or a player) is driving the game, because a breakpoint freezes the whole server.',
                 'list: breakpoints with hit counts, and active traces. remove: items [{file, line?}] or [{function}]. clear: removes everything you set (never the user\'s breakpoints), optionally only in `file`.',
                 'Breakpoints in clientside files never hit on the server.',
@@ -825,7 +827,8 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     }
                 }
                 lines.push(`Each call prints "[trace <function>] #n called (...)" and "#n returned ..." to server_console; calls you make with server_run_lua also show under "Printed". `
-                    + 'Code that saved its own copy of the function (local f = MyAddon.Score, a timer callback) is not traced.');
+                    + 'Code that saved its own copy of the function (local f = MyAddon.Score, a timer callback) is not traced. '
+                    + 'While traced, the function is a wrapper, so debug.getinfo on it points at lua/autorun/debug.lua.');
                 return { text: lines.join('\n') };
             }
 
@@ -872,7 +875,11 @@ function breakpointsTool(context: McpToolContext): ToolSpec {
                     if (limits.length > 0) {
                         notes.push(`removes itself after ${limits.join(' or ')}`);
                     }
-                    const head = `SET ${describeBreakpoint(context, bp, undefined).replace(/\s+\[user\]$/, '')}`;
+                    let head = `SET ${describeBreakpoint(context, bp, undefined).replace(/\s+\[user\]$/, '')}`;
+                    if (item.log_message && item.max_hits !== undefined) {
+                        // max_hits is carried by the hit condition; the note below already says it.
+                        head = head.replace(`  hits ${hitCondition}`, '');
+                    }
                     lines.push(`${head}${item.log_message ? `  prints "${prefix} ..."` : ''}${notes.length ? ` (${notes.join('; ')})` : ''}`);
                 }
                 if (replaced.length > 0) {

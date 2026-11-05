@@ -379,6 +379,8 @@ export interface ConnectedNotify extends JsonRpcNotify {
   params?: {
     protocol_version?: string
     module_version?: string
+    /** Console lines and errors kept while no client was connected, sent right after this. */
+    backlog?: number
   }
 }
 export interface ExitNotify extends JsonRpcNotify {
@@ -398,6 +400,8 @@ export interface GmodErrorNotify extends JsonRpcNotify {
     count: number
     source: 'lua' | 'console'
     raw_message?: string
+    /** When the server raised it, in ms since the epoch. */
+    timestamp?: number
   }
 }
 
