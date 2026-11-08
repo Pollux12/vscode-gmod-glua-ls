@@ -85,6 +85,8 @@ let currentStartupRunId: number | undefined;
 const cancelledStartupRuns = new Set<number>();
 // Lets Stop invalidate a Restart that is still cleaning up before its replacement start is published.
 let serverStopGeneration = 0;
+// The server auto-starts for the first GLua document only; afterwards only the start and restart commands start it.
+let autoStartPending = true;
 
 class StartupCancelledError extends Error {
     constructor() {
@@ -182,7 +184,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await refreshGmodDebugConfigContext();
 
     if (vscode.workspace.textDocuments.some(isLuaDocumentForLanguageServer)) {
-        await startServer();
+        await autoStartServer();
     }
 }
 
@@ -464,7 +466,15 @@ function onDidOpenTextDocument(document: vscode.TextDocument): void {
         return;
     }
 
-    void startServer();
+    void autoStartServer();
+}
+
+async function autoStartServer(): Promise<void> {
+    if (!autoStartPending) {
+        return;
+    }
+    autoStartPending = false;
+    await startServer();
 }
 
 function onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent): void {
@@ -1161,6 +1171,7 @@ async function startServerCommand(): Promise<void> {
 }
 
 async function stopServer(): Promise<void> {
+    autoStartPending = false;
     serverStopGeneration += 1;
     const pendingStart = serverStartPromise;
     try {

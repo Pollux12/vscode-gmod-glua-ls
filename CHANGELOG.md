@@ -22,14 +22,15 @@
 - Fix the explorer's scripted classes not updating when the loaded gamemode changes.
 - Fix a gamemode pick saved to `.gluarc.json` being overridden by inherited settings or the `loadEverything` default.
 - Fix the gamemode prompt closing when focus moves away.
+- Fix the language server attempting to start each time a file is opened. 
 
 ## Language Server
 
-- Add loading of a whole Garry's Mod folder, including Steam's `GarrysMod` folder, as its addons and the picked gamemode, each checked with its own config.
+- Add support for loading of a whole Garry's Mod folder, with it being parsed into each addon/gamemode and selection for active gamemode. This means multi-root workspace is not required for having multiple folders open.
 - Add layered `.gluarc.json` files: a config in an addon or gamemode builds on the configs in the folders above it and applies only to that addon or gamemode.
 - Add loading of a gamemode as soon as one of its files is opened.
-- Improve default ignores to skip only the folders GLuaTest loads tests from (`lua/tests` and `gamemode/tests`), so addons and gamemodes named `test` or `tests` load.
-- Improve settings changes so a burst of changes reloads once.
+- Fix default ignores to skip only the folders GLuaTest loads tests from (`lua/tests` and `gamemode/tests`), so addons and gamemodes named `test` or `tests` load.
+- Fix settings changes so a burst of changes reloads once.
 - Fix a derived gamemode not seeing its base gamemode's `GM` methods, and base gamemodes such as `terrortown` not loading for gamemodes derived from them.
 - Fix settings in a later workspace folder's `.gluarc.json` being ignored.
 - Fix an open folder showing no diagnostics when another folder lists it in `workspace.library`.
@@ -45,7 +46,7 @@
 
 ## Annotations
 
-- Fix the 1.3.0 annotation changes never being published, which left false positives such as `os.date` results not matching.
+- Fix failing CI for pre-release annotation branch, causing it to never be published.
 - Add narrowing of an entity to `Weapon` when `IsWeapon` returns `true`.
 - Improve Derma, spawn menu, skin and sandbox tool types to match what the engine passes.
 - Fix false positives from shipped Lua that omits arguments or passes `nil`.

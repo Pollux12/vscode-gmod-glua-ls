@@ -262,6 +262,23 @@ suite('Extension Integration', () => {
                 1,
                 'A failed restart command must make exactly one language-server startup attempt.'
             );
+
+            await vscode.commands.executeCommand('gluals.stopServer');
+            const reopenedDocument = await vscode.workspace.openTextDocument(
+                getFixtureUri('standalone-addon/lua/autorun/server/example.lua')
+            );
+            assert.strictEqual(reopenedDocument.languageId, extensionContext.LANGUAGE_ID);
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            assert.strictEqual(
+                extensionContext.serverStatus.state,
+                ServerState.Stopped,
+                'Opening a Lua file must not restart a manually stopped server.'
+            );
+            assert.strictEqual(
+                await countFailedStartupAttempts('gluals.startServer'),
+                1,
+                'The start command must start a manually stopped server.'
+            );
         } finally {
             await glualsConfig.update(
                 'ls.executablePath',
