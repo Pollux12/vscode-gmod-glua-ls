@@ -174,11 +174,10 @@ function isDirectory(target: string): boolean {
     }
 }
 
-/** Mirrors the language server's root discovery: a `garrysmod` folder or child, an `addons` folder, or `addons/` beside `gamemodes/`. */
+/** Mirrors the language server's root discovery: a `garrysmod` folder or child, or `addons/` beside `gamemodes/`. */
 export function isGmodWorkspaceRoot(folderPath: string): boolean {
     const name = path.basename(folderPath).toLowerCase();
     return name === 'garrysmod'
-        || name === 'addons'
         || isDirectory(path.join(folderPath, 'garrysmod'))
         || (isDirectory(path.join(folderPath, 'addons')) && isDirectory(path.join(folderPath, 'gamemodes')));
 }

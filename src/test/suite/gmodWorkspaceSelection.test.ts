@@ -213,18 +213,18 @@ suite('GMod workspace root detection', () => {
         return target;
     }
 
-    test('recognises a folder with a garrysmod child, named garrysmod or addons, or holding addons and gamemodes', () => {
+    test('recognises a folder with a garrysmod child, named garrysmod, or holding addons and gamemodes', () => {
         folder('srcds', 'garrysmod');
         assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'srcds')), true);
         assert.strictEqual(isGmodWorkspaceRoot(folder('x', 'GarrysMod')), true);
-        assert.strictEqual(isGmodWorkspaceRoot(folder('y', 'addons')), true);
         folder('both', 'addons');
         folder('both', 'gamemodes');
         assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'both')), true);
     });
 
-    test('rejects plain folders and folders with only one of addons or gamemodes', () => {
+    test('rejects plain folders, addons folders and folders with only one of addons or gamemodes', () => {
         folder('plain', 'src');
+        assert.strictEqual(isGmodWorkspaceRoot(folder('y', 'addons')), false);
         folder('half', 'gamemodes');
         assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'plain')), false);
         assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'half')), false);

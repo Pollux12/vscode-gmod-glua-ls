@@ -43,7 +43,6 @@
         "onLanguage:lua",
         "workspaceContains:garrysmod/gamemodes/*/gamemode",
         "workspaceContains:gamemodes/*/gamemode",
-        "workspaceContains:addons/*/lua",
         "onMcpCollection:gluals.mcp"
     ],
     "contributes": {
