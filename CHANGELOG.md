@@ -2,6 +2,62 @@
 
 ---
 
+## [1.4.0] [Pre-Release] - 2026-11-11
+> MCP v2 + Workspace Selection + Fixes
+
+## VS Code Extension
+
+- Add a new MCP server that lets AI agents work with a running Garry's Mod server and your code. It is off by default and turned on with `gluals.mcp.enabled`.
+- Add MCP tools to run Lua on the server and get its return values and output, read the server console and Lua errors, and read GLuaLS diagnostics and look up symbols, including GMod API functions.
+- Add MCP tools to set breakpoints and logpoints, trace every call of a function without pausing, wait for hits, step, and inspect frames. Logpoints and traces can remove themselves after a number of hits or seconds.
+- Add the `gluals.mcp.allowCodeExecution` setting, which is required for running Lua, breakpoint conditions, logpoints and traces.
+- Add cleanup when an agent detaches or the MCP server is turned off, removing the agent's breakpoints and traces and resuming a paused server.
+- Add automatic MCP discovery in Copilot and Cursor, and a setup command that configures Claude Code, Codex, Cursor and VS Code.
+- Add an AI Agents (MCP) section to the settings panel to turn the MCP server on, set its port, see its status and set up agents.
+- Add debugger logpoints, which print a message without pausing.
+- Add support for opening a whole Garry's Mod folder. Its addons load, and you pick which gamemode loads.
+- Add a gamemode picker that opens when a Garry's Mod folder loads, and a status bar item that shows the loaded gamemode and stays highlighted until one is picked.
+- Add the `gluals.gmod.activeGamemode` and `gluals.gmod.loadEverything` settings to choose what a Garry's Mod folder loads, and save a pick to `.gluarc.json`.
+- Add the folder's addons and gamemodes to the explorer.
+- Fix the explorer's scripted classes not updating when the loaded gamemode changes.
+- Fix a gamemode pick saved to `.gluarc.json` being overridden by inherited settings or the `loadEverything` default.
+- Fix the gamemode prompt closing when focus moves away.
+- Fix the language server attempting to start each time a file is opened. 
+
+## Language Server
+
+- Add support for loading of a whole Garry's Mod folder, with it being parsed into each addon/gamemode and selection for active gamemode. This means multi-root workspace is not required for having multiple folders open.
+- Add layered `.gluarc.json` files: a config in an addon or gamemode builds on the configs in the folders above it and applies only to that addon or gamemode.
+- Add loading of a gamemode as soon as one of its files is opened.
+- Fix default ignores to skip only the folders GLuaTest loads tests from (`lua/tests` and `gamemode/tests`), so addons and gamemodes named `test` or `tests` load.
+- Fix settings changes so a burst of changes reloads once.
+- Fix a derived gamemode not seeing its base gamemode's `GM` methods, and base gamemodes such as `terrortown` not loading for gamemodes derived from them.
+- Fix settings in a later workspace folder's `.gluarc.json` being ignored.
+- Fix an open folder showing no diagnostics when another folder lists it in `workspace.library`.
+- Fix `workspace.packageDirs` entries that share a parent folder being missed.
+- Fix `glua_check` resolving a relative annotations path from the wrong folder.
+- Fix panels registered with `vgui.Register` and no base not getting `Panel` methods.
+- Fix `vgui.GetControlTable` and similar lookups being treated as possibly `nil` for a known class.
+- Fix fields and methods added by a helper function not being recognised on the table passed to it.
+- Fix false `need-check-nil` warnings on table literals indexed with a computed key, unless `strict.arrayIndex` is on.
+- Fix generic names such as `T` showing up as the type returned by a call.
+- Fix methods defined later in a file being treated as already defined in code that runs before them.
+- Fix false net message warnings for reads and sends inside `and`/`or` expressions, nested calls, and `net.Start` wrapped in a branch.
+
+## Annotations
+
+- Fix failing CI for pre-release annotation branch, causing it to never be published.
+- Add narrowing of an entity to `Weapon` when `IsWeapon` returns `true`.
+- Improve Derma, spawn menu, skin and sandbox tool types to match what the engine passes.
+- Fix false positives from shipped Lua that omits arguments or passes `nil`.
+- Fix `undefined-field` warnings on a tool weapon's `Tool` table.
+
+## Debugger
+
+- Add replay of the last 2000 console lines and Lua errors from before the debugger connected, marked in the Debug Console.
+
+---
+
 ## [1.3.0] [Pre-Release] - 2026-11-01
 > Incremental Analysis System + Fixes
 

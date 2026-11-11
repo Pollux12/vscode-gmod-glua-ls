@@ -163,6 +163,11 @@
                 "category": "GLuaLS"
             },
             {
+                "command": "gluals.gmod.selectGamemode",
+                "title": "Select Gamemode",
+                "category": "GLuaLS"
+            },
+            {
                 "command": "gluals.gmod.showRealmMenu",
                 "title": "Open GMod Realm Menu",
                 "category": "GLua"
@@ -1668,6 +1673,39 @@
                         "default": true,
                         "scope": "resource",
                         "markdownDescription": "Automatically detect when a gamemode derives from a base gamemode (via the `\"base\"` field in the gamemode `.txt` file) and add the base gamemode as a library. This enables autocompletion and goto-definition for code defined in the base gamemode. Disable this if you want to manage gamemode libraries manually via `workspace.library`."
+                    },
+                    "gluals.gmod.activeGamemode": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "default": null,
+                        "scope": "resource",
+                        "markdownDescription": "The gamemode a whole Garry's Mod folder loads with its addons, together with the custom gamemodes it derives from. Use `*` to load every custom gamemode, or an empty string for none when working on addons. Leave unset to be asked when the folder has several custom gamemodes."
+                    },
+                    "gluals.gmod.loadEverything": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "enum": [
+                            null,
+                            true,
+                            false
+                        ],
+                        "enumItemLabels": [
+                            "Default",
+                            "On",
+                            "Off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "%config.common.enum.default.description%",
+                            "%config.common.enum.on.description%",
+                            "%config.common.enum.off.description%"
+                        ],
+                        "default": null,
+                        "scope": "resource",
+                        "markdownDescription": "Load a whole Garry's Mod folder unscoped, `lua/` and the built-in gamemodes included, instead of its addons and active gamemode."
                     },
                     "gluals.gmod.annotationUpdateCheckIntervalMinutes": {
                         "type": "number",
