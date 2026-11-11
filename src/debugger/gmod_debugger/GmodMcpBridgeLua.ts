@@ -499,7 +499,9 @@ export const GLUALS_MCP_BRIDGE_LUA = String.raw`
             local count = select("#", ...)
             local parts = {}
             for i = 1, count do
-                parts[#parts + 1] = (names[i] or ("arg" .. i)) .. " = " .. formatValue((select(i, ...)), 1, "", {})
+                -- A method's self is usually a large table that would crowd out the other arguments.
+                local depth = (i == 1 and names[1] == "self") and 0 or 1
+                parts[#parts + 1] = (names[i] or ("arg" .. i)) .. " = " .. formatValue((select(i, ...)), depth, "", {})
             end
             print(clampLine(string.format("%s #%d called (%s)", label, n, table.concat(parts, ", "))))
             local started = SysTime()
