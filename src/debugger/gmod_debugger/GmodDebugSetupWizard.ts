@@ -1342,16 +1342,13 @@ async function askWizardChoice<T>(title: string, question: string, choices: Wiza
 }
 
 export function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
-    const sourceFileMap: Record<string, string> = {
+    return {
         [`${sourceRoot}/addons`]: 'addons',
         [`${sourceRoot}/lua`]: 'lua',
         [`${sourceRoot}/gamemodes/base`]: 'gamemodes/base',
         [`${sourceRoot}/gamemodes/sandbox`]: 'gamemodes/sandbox',
+        '${workspaceFolder}': workspaceRemotePath,
     };
-    if (workspaceRemotePath.length > 0) {
-        sourceFileMap['${workspaceFolder}'] = workspaceRemotePath;
-    }
-    return sourceFileMap;
 }
 
 const GARRYSMOD_ROOT_REMOTE_PATH_INPUT = '.';

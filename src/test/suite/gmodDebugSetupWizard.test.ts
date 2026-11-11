@@ -88,11 +88,11 @@ suite('GMod debug source file map', () => {
         assert.strictEqual(map['${workspaceFolder}/../../lua'], 'lua');
     });
 
-    test('leaves the workspace folder to sourceRoot when it is the garrysmod folder', () => {
-        const map = buildSourceFileMap('${workspaceFolder}', '');
+    test('maps a garrysmod workspace to the root of a separate server install', () => {
+        const map = buildSourceFileMap('D:/Servers/GMod/garrysmod', '');
 
-        assert.ok(!('${workspaceFolder}' in map));
-        assert.strictEqual(map['${workspaceFolder}/addons'], 'addons');
+        assert.strictEqual(map['${workspaceFolder}'], '');
+        assert.strictEqual(map['D:/Servers/GMod/garrysmod/lua'], 'lua');
     });
 
     test('reads "." as the garrysmod root and strips leading slashes', () => {
