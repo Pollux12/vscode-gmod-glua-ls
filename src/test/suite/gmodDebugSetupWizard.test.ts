@@ -65,7 +65,7 @@ suite('GMod debug setup wizard layout detection', () => {
         assert.strictEqual(addons?.garrysmodPath, garrysmod);
     });
 
-    test('ignores a Garry\'s Mod client folder without a server executable', () => {
+    test('ignores a garrysmod folder whose parent has no server executable', () => {
         const client = path.join(temp, 'client');
         fs.mkdirSync(path.join(client, 'garrysmod', 'addons', 'pac3'), { recursive: true });
         fs.writeFileSync(path.join(client, 'gmod.exe'), '');
