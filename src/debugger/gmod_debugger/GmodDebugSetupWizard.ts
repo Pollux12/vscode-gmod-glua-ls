@@ -1147,16 +1147,14 @@ async function promptForSrcdsPath(
 
         const resolved = normalizeSrcdsRootInput(rawPath);
         if (!hasSrcdsExecutable(resolved.srcdsRoot)) {
-            const action = await vscode.window.showWarningMessage(
-                `No server executable (srcds) found in "${resolved.srcdsRoot}". Choose a different folder, or continue anyway if your setup uses custom scripts or symlinks.`,
-                'Choose Different Path',
-                'Use Anyway',
-                'Cancel Setup'
-            );
-            if (action === 'Choose Different Path') {
+            const action = await askWizardChoice('SRCDS Root Path', `No server executable (srcds) found in "${resolved.srcdsRoot}"`, [
+                { label: '$(folder-opened) Choose a different folder', value: 'retry' as const },
+                { label: '$(check) Use anyway', description: 'for setups with custom scripts or symlinks', value: 'use' as const },
+            ]);
+            if (action === 'retry') {
                 continue;
             }
-            if (action !== 'Use Anyway') {
+            if (action !== 'use') {
                 return undefined;
             }
         }
@@ -1263,12 +1261,11 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
             ignoreFocusOut: true,
         });
         if (!picked) {
-            const cancelAction = await vscode.window.showWarningMessage(
-                'Client install path selection was cancelled.',
-                'Back to Path Selection',
-                'Skip Client Debugger Step'
-            );
-            if (cancelAction === 'Back to Path Selection') {
+            const cancelAction = await askWizardChoice('GMod Client Debugger', 'Client install path selection was cancelled', [
+                { label: '$(arrow-left) Back to path selection', value: 'back' as const },
+                { label: '$(remove) Skip the client debugger step', value: 'skip' as const },
+            ]);
+            if (cancelAction === 'back') {
                 continue;
             }
             return undefined;
@@ -1308,16 +1305,14 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
         const resolved = normalizeClientInstallInput(rawPath);
         const validation = validateClientInstallPath(resolved.gameRoot);
         if (validation.warnings.length > 0) {
-            const action = await vscode.window.showWarningMessage(
-                `This path may not be a valid Garry's Mod client install:\n- ${validation.warnings.join('\n- ')}`,
-                'Choose Different Path',
-                'Use Anyway',
-                'Cancel Setup'
-            );
-            if (action === 'Choose Different Path') {
+            const action = await askWizardChoice('Garry\'s Mod Install Path', `This may not be a Garry's Mod client install: ${validation.warnings.join('; ')}`, [
+                { label: '$(folder-opened) Choose a different folder', value: 'retry' as const },
+                { label: '$(check) Use anyway', value: 'use' as const },
+            ]);
+            if (action === 'retry') {
                 continue;
             }
-            if (action !== 'Use Anyway') {
+            if (action !== 'use') {
                 return undefined;
             }
         }
@@ -1332,6 +1327,18 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
 
         return resolved.garrysmodPath;
     }
+}
+
+interface WizardChoice<T> {
+    label: string;
+    description?: string;
+    value: T;
+}
+
+/** Asks a question inside the wizard as a quick pick: answering a notification can leave the wizard's next quick pick hidden. */
+async function askWizardChoice<T>(title: string, question: string, choices: WizardChoice<T>[]): Promise<T | undefined> {
+    const picked = await vscode.window.showQuickPick(choices, { title, placeHolder: question, ignoreFocusOut: true });
+    return picked?.value;
 }
 
 export function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
@@ -1475,14 +1482,15 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     const existingDlls = detectInstalledGmRdbModules(srcdsSelection.garrysmodPath);
     const existingDll = existingDlls[0];
     if (existingDlls.length === 0) {
-        const installChoice = await vscode.window.showWarningMessage(
-            'gm_rdb debugger module was not found in garrysmod/lua/bin/. Install it now?',
-            { modal: false },
-            'Install',
-            'Skip'
-        );
+        const installChoice = await askWizardChoice('GMod Debugger Setup — gm_rdb', 'gm_rdb debugger module was not found in garrysmod/lua/bin/', [
+            { label: '$(cloud-download) Install gm_rdb', value: 'install' as const },
+            { label: '$(remove) Skip for now', value: 'skip' as const },
+        ]);
+        if (installChoice === undefined) {
+            return;
+        }
 
-        if (installChoice === 'Install') {
+        if (installChoice === 'install') {
             try {
                 await runGmRdbInstaller(srcdsSelection.garrysmodPath, DEFAULT_RDB_PORT);
             } catch (error) {
@@ -1491,15 +1499,18 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         }
     } else {
         const latestRelease = await fetchReleaseForCurrentExtensionChannel().catch(() => null);
-        const versionInfo = latestRelease ? ` Latest release: ${latestRelease.tag_name}.` : '';
-        const updateChoice = await vscode.window.showInformationMessage(
-            `gm_rdb (${existingDlls.join(', ')}) is already installed.${versionInfo} Update to the latest release?`,
-            { modal: false },
-            'Update',
-            'Skip'
-        );
+        const updateChoice = await askWizardChoice('GMod Debugger Setup — gm_rdb', `gm_rdb (${existingDlls.join(', ')}) is already installed`, [
+            {
+                label: latestRelease ? `$(cloud-download) Update to ${latestRelease.tag_name}` : '$(cloud-download) Update to the latest release',
+                value: 'update' as const,
+            },
+            { label: '$(check) Keep the installed version', value: 'keep' as const },
+        ]);
+        if (updateChoice === undefined) {
+            return;
+        }
 
-        if (updateChoice === 'Update') {
+        if (updateChoice === 'update') {
             try {
                 await runGmRdbInstaller(srcdsSelection.garrysmodPath, DEFAULT_RDB_PORT);
             } catch (error) {
