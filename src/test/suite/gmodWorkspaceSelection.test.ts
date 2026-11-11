@@ -16,7 +16,7 @@ import {
     statusText,
     statusTooltip,
 } from '../../gmodWorkspaceSelection';
-import { alignSettingsWithGluarc, GmodWorkspaceSelection } from '../../gmodWorkspaceSelectionController';
+import { alignSettingsWithGluarc, GmodWorkspaceSelection, saveLoadEverythingSetting } from '../../gmodWorkspaceSelectionController';
 
 function makeRoot(overrides: Partial<GmodRoot> = {}): GmodRoot {
     return {
@@ -229,6 +229,28 @@ suite('GMod Workspace Selection', () => {
             ['activeGamemode', undefined, vscode.ConfigurationTarget.WorkspaceFolder],
             ['loadEverything', false, vscode.ConfigurationTarget.WorkspaceFolder],
         ]);
+    });
+});
+
+suite('GMod loadEverything setting', () => {
+    test('removes the folder value when off, and writes it when on', async () => {
+        const off = fakeConfig({ loadEverything: { workspaceFolderValue: false } });
+        await saveLoadEverythingSetting(off.config, false, false);
+        assert.deepStrictEqual(off.updates, [['loadEverything', undefined, vscode.ConfigurationTarget.WorkspaceFolder]]);
+
+        const on = fakeConfig({});
+        await saveLoadEverythingSetting(on.config, false, true);
+        assert.deepStrictEqual(on.updates, [['loadEverything', true, vscode.ConfigurationTarget.WorkspaceFolder]]);
+    });
+
+    test('writes false when an inherited true would otherwise load everything', async () => {
+        const user = fakeConfig({ loadEverything: { globalValue: true } });
+        await saveLoadEverythingSetting(user.config, false, false);
+        assert.deepStrictEqual(user.updates, [['loadEverything', false, vscode.ConfigurationTarget.WorkspaceFolder]]);
+
+        const workspace = fakeConfig({ loadEverything: { workspaceValue: true } });
+        await saveLoadEverythingSetting(workspace.config, true, false);
+        assert.deepStrictEqual(workspace.updates, [['loadEverything', false, vscode.ConfigurationTarget.WorkspaceFolder]]);
     });
 });
 
