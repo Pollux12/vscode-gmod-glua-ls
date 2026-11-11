@@ -58,11 +58,13 @@ export function buildMcpTools(context: McpToolContext, watcher: DiagnosticsWatch
                     : formatRunReport(late.report ?? null, {}).text;
                 sections.push(`[An earlier server_run_lua (${late.label}) has now finished]\n${body}`);
             }
-            // "Since your previous call" covers what that call caused, except output a console or
-            // errors read already showed.
-            context.bridge.lastReplyCursor = spec.definition.name === 'server_console' || spec.definition.name === 'server_errors'
-                ? context.bridge.events.cursor
-                : startCursor;
+            // "Since your previous call" covers what that call caused, except what its own reply
+            // already showed: console lines for server_console, errors for server_errors.
+            const endCursor = context.bridge.events.cursor;
+            context.bridge.lastReplyCursors = {
+                console: spec.definition.name === 'server_console' ? endCursor : startCursor,
+                errors: spec.definition.name === 'server_errors' ? endCursor : startCursor,
+            };
             return textResult(sections.join('\n\n'), reply.isError === true);
         },
     }));

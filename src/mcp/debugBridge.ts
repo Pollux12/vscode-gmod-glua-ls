@@ -99,8 +99,8 @@ export class GmodDebugBridge implements vscode.Disposable {
     readonly agentBreakpointIds = new Set<string>();
     /** Agent logpoints that remove themselves after a number of hits or seconds. */
     readonly limitedLogpoints = new Map<string, LimitedLogpoint>();
-    /** Where "new" output starts for a wait without a cursor: see buildMcpTools. */
-    lastReplyCursor?: number;
+    /** Where "new" output starts per stream for a wait without a cursor: see buildMcpTools. */
+    lastReplyCursors: { console?: number; errors?: number } = {};
     /** Console lines and errors gm_rdb replayed from before the latest connection; undefined for older modules. */
     lastBacklog?: number;
     /** Where the latest described pause stopped, for the banner on other tools' replies. */
