@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { buildSourceFileMap, detectSrcdsLayoutAt, parseWorkspaceRemotePathInput } from '../../debugger/gmod_debugger/GmodDebugSetupWizard';
+import { clientPathToGamePath } from '../../debugger/gmod_debugger/GmodSourcePaths';
 
 function srcdsMarker(): string {
     return process.platform === 'win32' ? 'srcds.exe' : 'srcds_run';
@@ -45,6 +46,7 @@ suite('GMod debug setup wizard layout detection', () => {
         assert.strictEqual(detection?.workspaceRemotePath, '');
         assert.strictEqual(detection?.sourceRootExpression, '${workspaceFolder}/garrysmod');
         assert.strictEqual(detection?.srcdsRootExpression, '${workspaceFolder}');
+        assert.strictEqual(detection?.mappedFolderExpression, '${workspaceFolder}/garrysmod');
     });
 
     test('keeps the addon and gamemode remote paths', () => {
@@ -81,18 +83,30 @@ suite('GMod debug setup wizard layout detection', () => {
 });
 
 suite('GMod debug source file map', () => {
-    test('maps the workspace folder to its remote path', () => {
-        const map = buildSourceFileMap('${workspaceFolder}/../..', 'addons/pac3');
+    const workspace = '/home/dev/srcds';
+    const separateInstall = '/srv/gmod/garrysmod';
 
-        assert.strictEqual(map['${workspaceFolder}'], 'addons/pac3');
-        assert.strictEqual(map['${workspaceFolder}/../../lua'], 'lua');
+    /** Resolves `${workspaceFolder}` the way VS Code does, then maps the file the way the debugger does. */
+    function gamePath(sourceRoot: string, mappedFolder: string, remotePath: string, file: string): string | undefined {
+        const resolve = (value: string) => value.split('${workspaceFolder}').join(workspace);
+        const sourceFileMap = Object.fromEntries(
+            Object.entries(buildSourceFileMap(sourceRoot, mappedFolder, remotePath)).map(([source, target]) => [resolve(source), target]),
+        );
+        return clientPathToGamePath(`${workspace}/${file}`, { sourceRoot: resolve(sourceRoot), sourceFileMap }, path.posix);
+    }
+
+    test('maps an addon workspace to its remote path', () => {
+        assert.strictEqual(gamePath(separateInstall, '${workspaceFolder}', 'addons/pac3', 'lua/autorun/pac.lua'), 'addons/pac3/lua/autorun/pac.lua');
     });
 
     test('maps a garrysmod workspace to the root of a separate server install', () => {
-        const map = buildSourceFileMap('D:/Servers/GMod/garrysmod', '');
+        assert.strictEqual(gamePath(separateInstall, '${workspaceFolder}', '', 'gamemodes/helix/gamemode/init.lua'), 'gamemodes/helix/gamemode/init.lua');
+    });
 
-        assert.strictEqual(map['${workspaceFolder}'], '');
-        assert.strictEqual(map['D:/Servers/GMod/garrysmod/lua'], 'lua');
+    test('maps an SRCDS root workspace through its garrysmod folder, for its own and a separate install', () => {
+        const file = 'garrysmod/gamemodes/helix/gamemode/init.lua';
+        assert.strictEqual(gamePath('${workspaceFolder}/garrysmod', '${workspaceFolder}/garrysmod', '', file), 'gamemodes/helix/gamemode/init.lua');
+        assert.strictEqual(gamePath(separateInstall, '${workspaceFolder}/garrysmod', '', file), 'gamemodes/helix/gamemode/init.lua');
     });
 
     test('reads "." as the garrysmod root and strips leading slashes', () => {

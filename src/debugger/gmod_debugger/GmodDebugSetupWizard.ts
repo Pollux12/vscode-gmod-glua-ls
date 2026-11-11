@@ -73,6 +73,8 @@ export interface WorkspaceAutoDetection {
     garrysmodPath: string;
     sourceRootExpression: string;
     srcdsRootExpression: string;
+    /** The local folder that `workspaceRemotePath` names: the workspace, or the garrysmod folder below an SRCDS root. */
+    mappedFolderExpression: string;
     workspaceRemotePath: string;
 }
 
@@ -114,12 +116,14 @@ function samePath(left: string, right: string): boolean {
     return leftResolved === rightResolved;
 }
 
+const WORKSPACE_FOLDER_EXPRESSION = '${workspaceFolder}';
+
 function toWorkspaceExpression(relativePath: string): string {
     const normalized = toPosixPath(relativePath);
     if (!normalized || normalized === '.') {
-        return '${workspaceFolder}';
+        return WORKSPACE_FOLDER_EXPRESSION;
     }
-    return `${'${workspaceFolder}'}/${normalized}`;
+    return `${WORKSPACE_FOLDER_EXPRESSION}/${normalized}`;
 }
 
 function isMacGarrysModAppBundleName(name: string): boolean {
@@ -220,12 +224,14 @@ export function detectSrcdsLayoutAt(workspaceDirectory: string): WorkspaceAutoDe
     const insideGarrysmod = !relativeToGarrysmod.startsWith('..');
     const relativeParts = insideGarrysmod ? relativeToGarrysmod.split(path.sep).filter((part) => part.length > 0) : [];
 
+    const sourceRootExpression = toWorkspaceExpression(path.relative(workspacePath, garrysmodPath));
     return {
         kind: insideGarrysmod ? classifyWorkspaceInsideGarrysmod(relativeParts) : 'garrysmod',
         srcdsRoot,
         garrysmodPath,
-        sourceRootExpression: toWorkspaceExpression(path.relative(workspacePath, garrysmodPath)),
+        sourceRootExpression,
         srcdsRootExpression: toWorkspaceExpression(path.relative(workspacePath, srcdsRoot)),
+        mappedFolderExpression: insideGarrysmod ? WORKSPACE_FOLDER_EXPRESSION : sourceRootExpression,
         workspaceRemotePath: relativeParts.join('/'),
     };
 }
@@ -1341,13 +1347,13 @@ async function askWizardChoice<T>(title: string, question: string, choices: Wiza
     return picked?.value;
 }
 
-export function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
+export function buildSourceFileMap(sourceRoot: string, mappedFolder: string, remotePath: string): Record<string, string> {
     return {
         [`${sourceRoot}/addons`]: 'addons',
         [`${sourceRoot}/lua`]: 'lua',
         [`${sourceRoot}/gamemodes/base`]: 'gamemodes/base',
         [`${sourceRoot}/gamemodes/sandbox`]: 'gamemodes/sandbox',
-        '${workspaceFolder}': workspaceRemotePath,
+        [mappedFolder]: remotePath,
     };
 }
 
@@ -1572,6 +1578,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     }
 
     let workspaceRemotePath = suggestedWorkspaceRemotePath;
+    let mappedFolder = workspaceDetection?.mappedFolderExpression ?? WORKSPACE_FOLDER_EXPRESSION;
     if (mappingPick.value === 'custom') {
         const typed = await vscode.window.showInputBox({
             title: 'Workspace Remote Path',
@@ -1583,9 +1590,10 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
             return;
         }
         workspaceRemotePath = parseWorkspaceRemotePathInput(typed);
+        mappedFolder = WORKSPACE_FOLDER_EXPRESSION;
     }
 
-    const sourceFileMap = buildSourceFileMap(sourceRoot, workspaceRemotePath);
+    const sourceFileMap = buildSourceFileMap(sourceRoot, mappedFolder, workspaceRemotePath);
 
     const config: DebugConfig = {
         type: GMOD_DEBUGGER_TYPE,
