@@ -37,6 +37,7 @@ export interface GamemodePickItem {
     description?: string;
     choice?: GamemodeChoice;
     showBuiltins?: boolean;
+    back?: boolean;
 }
 
 export interface GamemodeSettings {
@@ -70,6 +71,44 @@ function gamemodeItem(gamemode: GmodGamemode): GamemodePickItem {
     };
 }
 
+/** The choice saved for `root`, or undefined before the first pick. */
+export function currentChoice(root: GmodRoot): GamemodeChoice | undefined {
+    if (root.loadEverything) {
+        return { kind: 'everything' };
+    }
+    switch (root.activeGamemode) {
+        case null:
+            return undefined;
+        case NO_GAMEMODE:
+            return { kind: 'addonsOnly' };
+        case ALL_CUSTOM_GAMEMODES:
+            return { kind: 'allCustom' };
+        default:
+            return { kind: 'gamemode', name: root.activeGamemode };
+    }
+}
+
+function sameChoice(left: GamemodeChoice, right: GamemodeChoice): boolean {
+    return left.kind === right.kind
+        && (left.kind !== 'gamemode' || (right.kind === 'gamemode' && left.name === right.name));
+}
+
+function currentBuiltin(root: GmodRoot): string | undefined {
+    const current = currentChoice(root);
+    return current?.kind === 'gamemode' && root.gamemodes.some((gamemode) => gamemode.builtin && gamemode.name === current.name)
+        ? current.name
+        : undefined;
+}
+
+function markCurrent(item: GamemodePickItem, what = 'current'): GamemodePickItem {
+    return { ...item, description: item.description ? `✓ ${what} · ${item.description}` : `✓ ${what}` };
+}
+
+function markCurrentChoice(items: GamemodePickItem[], root: GmodRoot): GamemodePickItem[] {
+    const current = currentChoice(root);
+    return items.map((item) => (current && item.choice && sameChoice(item.choice, current) ? markCurrent(item) : item));
+}
+
 export function buildPickItems(root: GmodRoot): GamemodePickItem[] {
     const items: GamemodePickItem[] = [
         {
@@ -80,11 +119,13 @@ export function buildPickItems(root: GmodRoot): GamemodePickItem[] {
         ...root.gamemodes.filter((gamemode) => !gamemode.builtin).map(gamemodeItem),
     ];
     if (root.gamemodes.some((gamemode) => gamemode.builtin)) {
-        items.push({
+        const showBuiltins: GamemodePickItem = {
             label: 'Show built-in gamemodes...',
             description: 'loads their source on top of the annotations',
             showBuiltins: true,
-        });
+        };
+        const builtin = currentBuiltin(root);
+        items.push(builtin ? markCurrent(showBuiltins, `current: ${builtin}`) : showBuiltins);
     }
     items.push(
         { label: 'Load all custom', description: 'every custom gamemode', choice: { kind: 'allCustom' } },
@@ -94,11 +135,25 @@ export function buildPickItems(root: GmodRoot): GamemodePickItem[] {
             choice: { kind: 'everything' },
         },
     );
-    return items;
+    return markCurrentChoice(items, root);
 }
 
 export function buildBuiltinItems(root: GmodRoot): GamemodePickItem[] {
-    return root.gamemodes.filter((gamemode) => gamemode.builtin).map(gamemodeItem);
+    return [
+        { label: '$(arrow-left) Back', back: true },
+        ...markCurrentChoice(root.gamemodes.filter((gamemode) => gamemode.builtin).map(gamemodeItem), root),
+    ];
+}
+
+/** The item the picker starts on: the saved choice, or else a gamemode loaded because one of its files is open. */
+export function initialPickItem(items: readonly GamemodePickItem[], root: GmodRoot): GamemodePickItem | undefined {
+    const openGamemode = loadedCustomGamemodes(root)[0];
+    const target = currentChoice(root) ?? (openGamemode !== undefined ? { kind: 'gamemode', name: openGamemode } as const : undefined);
+    if (!target) {
+        return undefined;
+    }
+    return items.find((item) => item.choice && sameChoice(item.choice, target))
+        ?? (currentBuiltin(root) !== undefined ? items.find((item) => item.showBuiltins) : undefined);
 }
 
 export function choiceToSettings(choice: GamemodeChoice): GamemodeSettings {

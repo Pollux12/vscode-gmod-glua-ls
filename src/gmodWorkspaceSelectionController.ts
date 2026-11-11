@@ -12,6 +12,7 @@ import {
     GamemodePickItem,
     GamemodeSettings,
     GmodRoot,
+    initialPickItem,
     ProjectsChangedParams,
     statusBackground,
     statusText,
@@ -207,31 +208,58 @@ export class GmodWorkspaceSelection implements vscode.Disposable {
 
     private async pickChoice(root: GmodRoot, keepOpen: boolean): Promise<GamemodeChoice | undefined> {
         const folderName = uriBasename(root.folderUri);
-        const picked = await this.showItems(
-            buildPickItems(root),
-            `Select Gamemode (${folderName})`,
-            'Gamemode to load with the addons',
-            keepOpen,
-        );
-        if (picked?.showBuiltins) {
+        for (;;) {
+            const picked = await this.showItems(
+                buildPickItems(root),
+                root,
+                `Select Gamemode (${folderName})`,
+                'Gamemode to load with the addons',
+                keepOpen,
+            );
+            if (!picked?.showBuiltins) {
+                return picked?.choice;
+            }
             const builtin = await this.showItems(
                 buildBuiltinItems(root),
+                root,
                 `Built-in gamemodes (${folderName})`,
                 'Built-in gamemode to load with the addons',
                 keepOpen,
             );
-            return builtin?.choice;
+            if (!builtin?.back) {
+                return builtin?.choice;
+            }
         }
-        return picked?.choice;
     }
 
     private showItems(
         items: GamemodePickItem[],
+        root: GmodRoot,
         title: string,
         placeHolder: string,
         keepOpen: boolean,
-    ): Thenable<GamemodePickItem | undefined> {
-        return vscode.window.showQuickPick(items, { title, placeHolder, ignoreFocusOut: keepOpen });
+    ): Promise<GamemodePickItem | undefined> {
+        const quickPick = vscode.window.createQuickPick<GamemodePickItem>();
+        quickPick.items = items;
+        quickPick.title = title;
+        quickPick.placeholder = placeHolder;
+        quickPick.ignoreFocusOut = keepOpen;
+        const initial = initialPickItem(items, root);
+        if (initial) {
+            quickPick.activeItems = [initial];
+        }
+        return new Promise((resolve) => {
+            let accepted: GamemodePickItem | undefined;
+            quickPick.onDidAccept(() => {
+                accepted = quickPick.selectedItems[0];
+                quickPick.hide();
+            });
+            quickPick.onDidHide(() => {
+                quickPick.dispose();
+                resolve(accepted);
+            });
+            quickPick.show();
+        });
     }
 
     private async pickAndSave(root: GmodRoot, keepOpen: boolean): Promise<void> {
