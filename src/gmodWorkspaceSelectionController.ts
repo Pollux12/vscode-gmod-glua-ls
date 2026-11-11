@@ -115,25 +115,17 @@ export async function alignSettingsWithGluarc(
     }
 }
 
-/** Saves `loadEverything` to the folder only when it is on, or when an inherited `true` would otherwise win. */
-export async function saveLoadEverythingSetting(
-    config: Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>,
-    multiRoot: boolean,
-    loadEverything: boolean,
-): Promise<void> {
-    const inspected = config.inspect('loadEverything');
-    const inherited = multiRoot ? inspected?.workspaceValue ?? inspected?.globalValue : inspected?.globalValue;
-    const value = loadEverything || inherited === true ? loadEverything : undefined;
-    await config.update('loadEverything', value, vscode.ConfigurationTarget.WorkspaceFolder);
-}
-
 async function saveToWorkspaceFolderSettings(folder: vscode.WorkspaceFolder, settings: GamemodeSettings): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('gluals.gmod', folder.uri);
     try {
         if (settings.activeGamemode !== undefined) {
             await config.update('activeGamemode', settings.activeGamemode, vscode.ConfigurationTarget.WorkspaceFolder);
         }
-        await saveLoadEverythingSetting(config, vscode.workspace.workspaceFile !== undefined, settings.loadEverything);
+        await config.update(
+            'loadEverything',
+            settings.loadEverything,
+            vscode.ConfigurationTarget.WorkspaceFolder,
+        );
         return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
