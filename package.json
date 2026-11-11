@@ -41,8 +41,8 @@
     "main": "./out/extension",
     "activationEvents": [
         "onLanguage:lua",
-        "workspaceContains:garrysmod/gamemodes/*/gamemode",
-        "workspaceContains:gamemodes/*/gamemode",
+        "workspaceContains:garrysmod/gamemodes/*/*.txt",
+        "workspaceContains:gamemodes/*/*.txt",
         "onMcpCollection:gluals.mcp"
     ],
     "contributes": {
