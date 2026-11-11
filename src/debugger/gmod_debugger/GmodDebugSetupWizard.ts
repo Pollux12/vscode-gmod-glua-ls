@@ -65,9 +65,9 @@ export interface GmRdbRelease {
     assets: ReleaseAsset[];
 }
 
-type WorkspaceKind = 'addon' | 'gamemode' | 'unknown';
+type WorkspaceKind = 'addon' | 'gamemode' | 'garrysmod' | 'unknown';
 
-interface WorkspaceAutoDetection {
+export interface WorkspaceAutoDetection {
     kind: WorkspaceKind;
     srcdsRoot: string;
     garrysmodPath: string;
@@ -179,47 +179,59 @@ function buildSuggestedWorkspaceRemotePath(workspaceFolder: vscode.WorkspaceFold
     return `addons/${workspaceName}`;
 }
 
-function detectWorkspaceSrcdsLayout(workspaceFolder: vscode.WorkspaceFolder): WorkspaceAutoDetection | undefined {
-    const workspacePath = path.resolve(workspaceFolder.uri.fsPath);
-    const parsed = path.parse(workspacePath);
-    const parts = path.relative(parsed.root, workspacePath)
-        .split(path.sep)
-        .filter((part) => part.length > 0);
-
-    for (let index = 0; index < parts.length - 2; index += 1) {
-        const current = parts[index].toLowerCase();
-        const next = parts[index + 1].toLowerCase();
-        if (current !== 'garrysmod' || (next !== 'addons' && next !== 'gamemodes')) {
-            continue;
+function findGarrysmodFolder(workspacePath: string): string | undefined {
+    for (let current = workspacePath; ; current = path.dirname(current)) {
+        if (path.basename(current).toLowerCase() === 'garrysmod' && hasSrcdsExecutable(path.dirname(current))) {
+            return current;
         }
-
-        const workspaceInsideType = parts.slice(index + 2);
-        if (workspaceInsideType.length === 0) {
-            continue;
+        if (path.dirname(current) === current) {
+            break;
         }
+    }
+    const child = path.join(workspacePath, 'garrysmod');
+    return hasSrcdsExecutable(workspacePath) && fs.existsSync(child) ? child : undefined;
+}
 
-        const projectName = workspaceInsideType[0];
-        const rest = workspaceInsideType.slice(1).map((part) => toPosixPath(part)).join('/');
-        const kind: WorkspaceKind = next === 'addons' ? 'addon' : 'gamemode';
-        const remoteBase = next === 'addons' ? `addons/${projectName}` : `gamemodes/${projectName}`;
-        const workspaceRemotePath = rest.length > 0 ? `${remoteBase}/${rest}` : remoteBase;
+function classifyWorkspaceInsideGarrysmod(relativeParts: string[]): WorkspaceKind {
+    if (relativeParts.length === 0) {
+        return 'garrysmod';
+    }
+    if (relativeParts.length >= 2) {
+        const container = relativeParts[0].toLowerCase();
+        if (container === 'addons') {
+            return 'addon';
+        }
+        if (container === 'gamemodes') {
+            return 'gamemode';
+        }
+    }
+    return 'unknown';
+}
 
-        const garrysmodPath = path.join(parsed.root, ...parts.slice(0, index + 1));
-        const srcdsRoot = path.dirname(garrysmodPath);
-        const sourceRootExpression = toWorkspaceExpression(path.relative(workspacePath, garrysmodPath));
-        const srcdsRootExpression = toWorkspaceExpression(path.relative(workspacePath, srcdsRoot));
-
-        return {
-            kind,
-            srcdsRoot,
-            garrysmodPath,
-            sourceRootExpression,
-            srcdsRootExpression,
-            workspaceRemotePath,
-        };
+export function detectSrcdsLayoutAt(workspaceDirectory: string): WorkspaceAutoDetection | undefined {
+    const workspacePath = path.resolve(workspaceDirectory);
+    const garrysmodPath = findGarrysmodFolder(workspacePath);
+    if (!garrysmodPath) {
+        return undefined;
     }
 
-    return undefined;
+    const srcdsRoot = path.dirname(garrysmodPath);
+    const relativeToGarrysmod = path.relative(garrysmodPath, workspacePath);
+    const insideGarrysmod = !relativeToGarrysmod.startsWith('..');
+    const relativeParts = insideGarrysmod ? relativeToGarrysmod.split(path.sep).filter((part) => part.length > 0) : [];
+
+    return {
+        kind: insideGarrysmod ? classifyWorkspaceInsideGarrysmod(relativeParts) : 'garrysmod',
+        srcdsRoot,
+        garrysmodPath,
+        sourceRootExpression: toWorkspaceExpression(path.relative(workspacePath, garrysmodPath)),
+        srcdsRootExpression: toWorkspaceExpression(path.relative(workspacePath, srcdsRoot)),
+        workspaceRemotePath: relativeParts.join('/'),
+    };
+}
+
+function detectWorkspaceSrcdsLayout(workspaceFolder: vscode.WorkspaceFolder): WorkspaceAutoDetection | undefined {
+    return detectSrcdsLayoutAt(workspaceFolder.uri.fsPath);
 }
 
 export function detectInstalledGmRdbModules(garrysmodPath: string): string[] {
@@ -1322,15 +1334,30 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
     }
 }
 
-function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
+export function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
     const sourceFileMap: Record<string, string> = {
         [`${sourceRoot}/addons`]: 'addons',
         [`${sourceRoot}/lua`]: 'lua',
         [`${sourceRoot}/gamemodes/base`]: 'gamemodes/base',
         [`${sourceRoot}/gamemodes/sandbox`]: 'gamemodes/sandbox',
-        '${workspaceFolder}': workspaceRemotePath,
     };
+    if (workspaceRemotePath.length > 0) {
+        sourceFileMap['${workspaceFolder}'] = workspaceRemotePath;
+    }
     return sourceFileMap;
+}
+
+const GARRYSMOD_ROOT_REMOTE_PATH_INPUT = '.';
+
+export function parseWorkspaceRemotePathInput(typed: string): string {
+    const trimmed = typed.trim();
+    return trimmed === GARRYSMOD_ROOT_REMOTE_PATH_INPUT ? '' : toPosixPath(trimmed.replace(/^\/+/, ''));
+}
+
+function describeWorkspaceDetection(detection: WorkspaceAutoDetection): string {
+    return detection.kind === 'garrysmod'
+        ? "Detected from workspace location (whole Garry's Mod folder)"
+        : `Detected from workspace location (${detection.kind})`;
 }
 
 function pickLaunchProgram(srcdsRoot: string, srcdsRootExpression?: string): LaunchProgramSelection {
@@ -1514,9 +1541,9 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     const mappingPick = await vscode.window.showQuickPick(
         [
             {
-                label: `$(check) ${suggestedWorkspaceRemotePath}`,
+                label: `$(check) ${suggestedWorkspaceRemotePath || GARRYSMOD_ROOT_REMOTE_PATH_INPUT}`,
                 description: workspaceDetection
-                    ? `Detected from workspace location (${workspaceDetection.kind})`
+                    ? describeWorkspaceDetection(workspaceDetection)
                     : 'Suggested from workspace name',
                 value: 'suggested' as const,
             },
@@ -1540,14 +1567,14 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     if (mappingPick.value === 'custom') {
         const typed = await vscode.window.showInputBox({
             title: 'Workspace Remote Path',
-            prompt: 'Path as seen by the debugger (example: addons/my_addon or gamemodes/cityrp)',
-            value: suggestedWorkspaceRemotePath,
+            prompt: `Path as seen by the debugger (example: addons/my_addon or gamemodes/cityrp). Enter ${GARRYSMOD_ROOT_REMOTE_PATH_INPUT} when the workspace is the garrysmod folder itself.`,
+            value: suggestedWorkspaceRemotePath || GARRYSMOD_ROOT_REMOTE_PATH_INPUT,
             ignoreFocusOut: true,
         });
         if (!typed?.trim()) {
             return;
         }
-        workspaceRemotePath = toPosixPath(typed.trim().replace(/^\/+/, ''));
+        workspaceRemotePath = parseWorkspaceRemotePathInput(typed);
     }
 
     const sourceFileMap = buildSourceFileMap(sourceRoot, workspaceRemotePath);

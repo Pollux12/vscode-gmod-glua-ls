@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { McpEventLog } from './eventLog';
 import { parseGmodLuaError } from '../debugger/gmod_debugger/GmodLuaError';
+import { getAutoDetectedWorkspaceGarrysmodPath } from '../debugger/gmod_debugger/GmodDebugSetupWizard';
 
 /** The server-realm debugger type. The client debugger (`gluals_gmod_client`) is out of scope. */
 export const GMOD_SERVER_DEBUG_TYPE = 'gluals_gmod';
@@ -355,6 +356,10 @@ export class GmodDebugBridge implements vscode.Disposable {
         if (!config) {
             folder = folders[0];
             config = { type: GMOD_SERVER_DEBUG_TYPE, request: 'attach', name: 'GLuaLS MCP: Attach to GMod server' };
+            const sourceRoot = folder && getAutoDetectedWorkspaceGarrysmodPath(folder);
+            if (sourceRoot) {
+                config.sourceRoot = sourceRoot;
+            }
         }
         // A stop on entry would freeze the server the moment an agent connects.
         config.stopOnEntry = false;
