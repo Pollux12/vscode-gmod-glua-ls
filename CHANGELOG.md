@@ -2,8 +2,8 @@
 
 ---
 
-## [Unreleased]
-> MCP v2 for AI Agents + Garry's Mod Folder Workspaces + Fixes
+## [1.4.0] [Pre-Release] - 2026-11-11
+> MCP v2 + Workspace Selection + Fixes
 
 ## VS Code Extension
 
