@@ -1,4 +1,7 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 import {
@@ -7,6 +10,7 @@ import {
     choiceToSettings,
     chooseSaveTarget,
     GmodRoot,
+    isGmodWorkspaceRoot,
     statusBackground,
     statusText,
     statusTooltip,
@@ -191,3 +195,39 @@ function fakeConfig(values: Record<string, Inspected>) {
     } as unknown as Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>;
     return { config, updates };
 }
+
+suite('GMod workspace root detection', () => {
+    let temp: string;
+
+    setup(() => {
+        temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-root-'));
+    });
+
+    teardown(() => {
+        fs.rmSync(temp, { recursive: true, force: true });
+    });
+
+    function folder(...segments: string[]): string {
+        const target = path.join(temp, ...segments);
+        fs.mkdirSync(target, { recursive: true });
+        return target;
+    }
+
+    test('recognises a folder with a garrysmod child, named garrysmod or addons, or holding addons and gamemodes', () => {
+        folder('srcds', 'garrysmod');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'srcds')), true);
+        assert.strictEqual(isGmodWorkspaceRoot(folder('x', 'GarrysMod')), true);
+        assert.strictEqual(isGmodWorkspaceRoot(folder('y', 'addons')), true);
+        folder('both', 'addons');
+        folder('both', 'gamemodes');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'both')), true);
+    });
+
+    test('rejects plain folders and folders with only one of addons or gamemodes', () => {
+        folder('plain', 'src');
+        folder('half', 'gamemodes');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'plain')), false);
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'half')), false);
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'missing')), false);
+    });
+});

@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 export interface GmodGamemode {
     name: string;
     uri: string;
@@ -161,4 +164,21 @@ export function statusTooltip(roots: readonly GmodRoot[]): string {
     }
     lines.push('Click to select the gamemode');
     return lines.join('\n');
+}
+
+function isDirectory(target: string): boolean {
+    try {
+        return fs.statSync(target).isDirectory();
+    } catch {
+        return false;
+    }
+}
+
+/** Mirrors the language server's root discovery: a `garrysmod` folder or child, an `addons` folder, or `addons/` beside `gamemodes/`. */
+export function isGmodWorkspaceRoot(folderPath: string): boolean {
+    const name = path.basename(folderPath).toLowerCase();
+    return name === 'garrysmod'
+        || name === 'addons'
+        || isDirectory(path.join(folderPath, 'garrysmod'))
+        || (isDirectory(path.join(folderPath, 'addons')) && isDirectory(path.join(folderPath, 'gamemodes')));
 }

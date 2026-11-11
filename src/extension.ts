@@ -20,7 +20,7 @@ import { registerDebuggers } from './debugger';
 import { GmodAnnotationManager } from './gmodAnnotationManager';
 import { GMOD_REALMS, GmodControlResult, GmodRealm, normalizeGmodRealm } from './debugger/gmod_debugger/GmodDebugControlService';
 import { GmodWorkspaceSelection, PROJECTS_CHANGED_NOTIFICATION } from './gmodWorkspaceSelectionController';
-import type { ProjectsChangedParams } from './gmodWorkspaceSelection';
+import { isGmodWorkspaceRoot, type ProjectsChangedParams } from './gmodWorkspaceSelection';
 import { GmodExplorerItem, GmodExplorerProvider, registerGmodExplorer } from './gmodExplorer';
 import { GmodRealmStatusBar, registerGmodRealmView } from './gmodRealmView';
 import {
@@ -189,7 +189,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerNonLanguageFeatures(context);
     await refreshGmodDebugConfigContext();
 
-    if (vscode.workspace.textDocuments.some(isLuaDocumentForLanguageServer)) {
+    if (vscode.workspace.textDocuments.some(isLuaDocumentForLanguageServer)
+        || vscode.workspace.workspaceFolders?.some((folder) => isGmodWorkspaceRoot(folder.uri.fsPath))) {
         await autoStartServer();
     }
 }
