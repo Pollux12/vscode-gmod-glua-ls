@@ -40,7 +40,8 @@
     "markdown": "github",
     "main": "./out/extension",
     "activationEvents": [
-        "onLanguage:lua"
+        "onLanguage:lua",
+        "onMcpCollection:gluals.mcp"
     ],
     "contributes": {
         "commands": [
@@ -270,6 +271,16 @@
                 "title": "Explorer: Reveal in Explorer",
                 "category": "GLuaLS",
                 "icon": "$(go-to-file)"
+            },
+            {
+                "command": "gluals.mcp.setup",
+                "title": "%command.mcp.setup.title%",
+                "category": "GLuaLS"
+            },
+            {
+                "command": "gluals.mcp.copyUrl",
+                "title": "%command.mcp.copyUrl.title%",
+                "category": "GLuaLS"
             }
         ],
         "languages": [
@@ -1851,6 +1862,38 @@
                         "markdownDescription": "Look for language server on this port instead of starting it from an executable"
                     }
                 }
+            },
+            {
+                "title": "AI Agents (MCP)",
+                "order": 15,
+                "properties": {
+                    "gluals.mcp.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "scope": "window",
+                        "markdownDescription": "%config.mcp.enabled.description%"
+                    },
+                    "gluals.mcp.port": {
+                        "type": "integer",
+                        "default": 21120,
+                        "minimum": 1024,
+                        "maximum": 65535,
+                        "scope": "window",
+                        "markdownDescription": "%config.mcp.port.description%"
+                    },
+                    "gluals.mcp.allowCodeExecution": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "window",
+                        "markdownDescription": "%config.mcp.allowCodeExecution.description%"
+                    },
+                    "gluals.mcp.autoAttach": {
+                        "type": "boolean",
+                        "default": true,
+                        "scope": "window",
+                        "markdownDescription": "%config.mcp.autoAttach.description%"
+                    }
+                }
             }
         ],
         "configurationDefaults": {
@@ -2297,6 +2340,12 @@
                         ]
                     }
                 ]
+            }
+        ],
+        "mcpServerDefinitionProviders": [
+            {
+                "id": "gluals.mcp",
+                "label": "GLuaLS (GMod server)"
             }
         ]
     },

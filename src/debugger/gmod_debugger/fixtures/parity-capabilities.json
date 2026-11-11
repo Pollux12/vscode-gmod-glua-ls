@@ -9,24 +9,24 @@
         "supportsSetVariable": true,
         "supportsSetExpression": false,
         "supportTerminateDebuggee": false,
-        "supportsLogPoints": false
+        "supportsLogPoints": true
     },
     "unsupportedRationale": {
         "setExpression": "LRDB protocol has no assignment/eval-set request.",
-        "terminateDebuggee": "Adapter can only disconnect its transport and helper process, not terminate the Garry's Mod runtime.",
-        "logpoints": "LRDB add_breakpoint does not accept log message payloads."
+        "terminateDebuggee": "Adapter can only disconnect its transport and helper process, not terminate the Garry's Mod runtime."
     },
     "mandatoryParityScenarios": [
         "initializeCapabilities",
         "setExpressionUnsupported",
         "terminateDebuggeeUnsupported",
-        "logpointUnsupported",
+        "logpointAsCondition",
         "setVariableRoundTrip"
     ],
     "dapMappings": {
         "setBreakpoints": {
             "request": "add_breakpoint",
-            "fields": ["file", "line", "condition", "hit_condition"]
+            "fields": ["file", "line", "condition", "hit_condition"],
+            "logMessage": "sent as a condition that prints the message and evaluates to false"
         },
         "continue": "continue",
         "pause": "pause",

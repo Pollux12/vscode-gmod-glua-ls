@@ -1681,3 +1681,28 @@
     gap: 6px;
     align-items: center;
 }
+
+.mcp-status-control {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mcp-status {
+    color: var(--vscode-descriptionForeground);
+}
+
+.mcp-status[data-kind="running"] {
+    color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
+}
+
+.mcp-status[data-kind="error"],
+.mcp-status[data-kind="untrusted"] {
+    color: var(--vscode-editorWarning-foreground, var(--vscode-foreground));
+}
+
+.mcp-status-control [hidden] {
+    display: none;
+}
