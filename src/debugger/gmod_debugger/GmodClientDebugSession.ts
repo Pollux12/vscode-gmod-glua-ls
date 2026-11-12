@@ -15,7 +15,7 @@ import {
 } from '@vscode/debugadapter'
 import { DebugProtocol } from '@vscode/debugprotocol'
 import { readFileSync } from 'fs'
-import * as path from 'path'
+import { debuggerPathConverters } from './GmodSourcePaths'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
 import { parseGmodLuaError } from './GmodLuaError'
@@ -194,44 +194,9 @@ export class GmodClientDebugSession extends DebugSession {
 
     this.convertDebuggerLineToClient = (line: number): number => line
 
-    this.convertClientPathToDebugger = (clientPath: string): string => {
-      if (sourceFileMap) {
-        for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
-          const sourceFileMapTarget = sourceFileMap[sourceFileMapSource]
-          const resolvedSource = path.resolve(sourceFileMapSource)
-          const resolvedClient = path.resolve(clientPath)
-          const relativePath = path.relative(resolvedSource, resolvedClient)
-          if (!relativePath.startsWith('..')) {
-            return path.join(sourceFileMapTarget, relativePath)
-          }
-        }
-      }
-
-      return path.relative(sourceRoot, clientPath)
-    }
-
-    this.convertDebuggerPathToClient = (debuggerPath: string): string => {
-      if (!debuggerPath.startsWith('@')) {
-        return ''
-      }
-
-      const filename = debuggerPath.substr(1)
-      if (sourceFileMap) {
-        for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
-          const sourceFileMapTarget = sourceFileMap[sourceFileMapSource]
-          const relativePath = path.relative(sourceFileMapTarget, filename)
-          if (!relativePath.startsWith('..')) {
-            return path.join(sourceFileMapSource, relativePath)
-          }
-        }
-      }
-
-      if (path.isAbsolute(filename)) {
-        return filename
-      } else {
-        return path.join(sourceRoot, filename)
-      }
-    }
+    const paths = debuggerPathConverters(sourceRoot, sourceFileMap)
+    this.convertClientPathToDebugger = paths.toDebugger
+    this.convertDebuggerPathToClient = paths.toClient
   }
 
   protected attachRequest(

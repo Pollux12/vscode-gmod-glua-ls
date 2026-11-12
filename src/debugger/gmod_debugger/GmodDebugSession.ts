@@ -16,7 +16,6 @@ import {
 import { DebugProtocol } from '@vscode/debugprotocol'
 import { readFileSync } from 'fs'
 import { spawn, ChildProcess } from 'child_process'
-import * as path from 'path'
 import { LRDBAdapter, LRDBClient } from './lrdb'
 import { JsonRpcNotify } from './lrdb/JsonRpc'
 import { parseGmodLuaError } from './GmodLuaError'
@@ -46,7 +45,7 @@ import {
   GmodRealm,
   normalizeGmodRealm,
 } from './GmodDebugControlService'
-import { GmodSourceMapping } from './GmodSourcePaths'
+import { debuggerPathConverters, GmodSourceMapping } from './GmodSourcePaths'
 
 export interface LaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
@@ -283,46 +282,9 @@ export class GmodDebugSession extends DebugSession {
       return line
     }
 
-    this.convertClientPathToDebugger = (clientPath: string): string => {
-      if (sourceFileMap) {
-        for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
-          const sourceFileMapTarget = sourceFileMap[sourceFileMapSource]
-          const resolvedSource = path.resolve(sourceFileMapSource)
-          const resolvedClient = path.resolve(clientPath)
-          const relativePath = path.relative(resolvedSource, resolvedClient)
-          if (!relativePath.startsWith('..')) {
-            // client is child of source
-            return path.join(sourceFileMapTarget, relativePath)
-          }
-        }
-      }
-
-      return path.relative(sourceRoot, clientPath)
-    }
-
-    this.convertDebuggerPathToClient = (debuggerPath: string): string => {
-      if (!debuggerPath.startsWith('@')) {
-        return ''
-      }
-
-      const filename = debuggerPath.substr(1)
-      if (sourceFileMap) {
-        for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
-          const sourceFileMapTarget = sourceFileMap[sourceFileMapSource]
-          const relativePath = path.relative(sourceFileMapTarget, filename)
-          if (!relativePath.startsWith('..')) {
-            // filename is child of target
-            return path.join(sourceFileMapSource, relativePath)
-          }
-        }
-      }
-
-      if (path.isAbsolute(filename)) {
-        return filename
-      } else {
-        return path.join(sourceRoot, filename)
-      }
-    }
+    const paths = debuggerPathConverters(sourceRoot, sourceFileMap)
+    this.convertClientPathToDebugger = paths.toDebugger
+    this.convertDebuggerPathToClient = paths.toClient
   }
 
   protected launchRequest(

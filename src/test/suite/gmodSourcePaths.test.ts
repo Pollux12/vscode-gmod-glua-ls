@@ -1,7 +1,13 @@
 import * as assert from 'assert';
 import * as path from 'path';
 
-import { clientPathToGamePath, gamePathToClientPath, gamePathToLuaPath, relativeWithin } from '../../debugger/gmod_debugger/GmodSourcePaths';
+import {
+    clientPathToGamePath,
+    debuggerPathConverters,
+    gamePathToClientPath,
+    gamePathToLuaPath,
+    relativeWithin,
+} from '../../debugger/gmod_debugger/GmodSourcePaths';
 
 suite('GMod Source Paths', () => {
     test('treats Windows roots as contained regardless of drive-letter or path casing', () => {
@@ -91,5 +97,51 @@ suite('GMod Source Paths', () => {
         assert.strictEqual(gamePathToLuaPath('addons/cityrp/x.lua'), undefined);
         assert.strictEqual(gamePathToLuaPath('addons/cityrp/materials/lua/x.lua'), undefined);
         assert.strictEqual(gamePathToLuaPath('lua'), undefined);
+    });
+
+    suite('a checkout separate from the server install', () => {
+        const server = 'D:/Servers/GMod/garrysmod';
+        const serverMap = {
+            [`${server}/addons`]: 'addons',
+            [`${server}/lua`]: 'lua',
+            [`${server}/gamemodes/base`]: 'gamemodes/base',
+        };
+
+        test('sends a breakpoint from another drive as its game path', () => {
+            const paths = debuggerPathConverters(server, { ...serverMap, 'C:/Users/dev/repo': 'addons/repo' }, path.win32);
+
+            assert.strictEqual(paths.toDebugger('C:\\Users\\dev\\repo\\lua\\autorun\\x.lua'), 'addons\\repo\\lua\\autorun\\x.lua');
+        });
+
+        test('opens an addon checkout over the server copy, whatever the map order', () => {
+            const paths = debuggerPathConverters(server, { ...serverMap, 'D:/Source/pac3': 'addons/pac3' }, path.win32);
+
+            assert.strictEqual(paths.toClient('@addons/pac3/lua/autorun/pac.lua'), 'D:\\Source\\pac3\\lua\\autorun\\pac.lua');
+            assert.strictEqual(paths.toClient('@addons/other/lua/x.lua'), 'D:\\Servers\\GMod\\garrysmod\\addons\\other\\lua\\x.lua');
+            assert.strictEqual(paths.toClient('=[C]'), '');
+        });
+
+        test('opens a whole garrysmod checkout over the server copy when the checkout has the file', () => {
+            const mapping = { sourceRoot: server, sourceFileMap: { ...serverMap, 'C:/repo/garrysmod': '' } };
+            const inCheckout = (file: string) => file.startsWith('C:');
+
+            assert.strictEqual(
+                gamePathToClientPath('addons/pac3/lua/x.lua', mapping, path.win32, inCheckout),
+                'C:\\repo\\garrysmod\\addons\\pac3\\lua\\x.lua'
+            );
+            assert.strictEqual(
+                gamePathToClientPath('addons/pac3/lua/x.lua', mapping, path.win32, () => false),
+                'D:\\Servers\\GMod\\garrysmod\\addons\\pac3\\lua\\x.lua'
+            );
+        });
+
+        test('keeps the most specific folder when the checkout is the server install itself', () => {
+            const mapping = { sourceRoot: server, sourceFileMap: { ...serverMap, [server]: '' } };
+
+            assert.strictEqual(
+                gamePathToClientPath('addons/pac3/lua/x.lua', mapping, path.win32, () => true),
+                'D:\\Servers\\GMod\\garrysmod\\addons\\pac3\\lua\\x.lua'
+            );
+        });
     });
 });

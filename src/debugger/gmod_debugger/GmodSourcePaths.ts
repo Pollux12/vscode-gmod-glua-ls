@@ -1,3 +1,4 @@
+import * as fs from 'fs'
 import * as path from 'path'
 
 export type PathApi = Pick<typeof path, 'relative' | 'resolve' | 'isAbsolute' | 'join' | 'sep'>
@@ -36,25 +37,49 @@ export function clientPathToGamePath(
   return mapping.sourceRoot === undefined ? undefined : relativeWithin(mapping.sourceRoot, clientPath, pathApi)
 }
 
-/** Maps a garrysmod-relative path to a local file through the most specific `sourceFileMap` folder, then `sourceRoot`. */
+/**
+ * Maps a garrysmod-relative path to a local file through the most specific `sourceFileMap` folder, then `sourceRoot`.
+ * A mapped folder outside `sourceRoot` that holds the file wins, as it is the checkout the server's copy came from.
+ */
 export function gamePathToClientPath(
   gamePath: string,
   mapping: GmodSourceMapping,
-  pathApi: PathApi = path
+  pathApi: PathApi = path,
+  exists: (file: string) => boolean = fs.existsSync
 ): string | undefined {
   const anchored = (gameRelative: string) => pathApi.resolve(pathApi.sep, gameRelative)
-  let best: { rootLength: number; clientPath: string } | undefined
+  const candidates: Array<{ rootLength: number; clientPath: string }> = []
   for (const [source, target] of Object.entries(mapping.sourceFileMap ?? {})) {
     const relative = relativeWithin(anchored(target), anchored(gamePath), pathApi)
-    const rootLength = anchored(target).length
-    if (relative !== undefined && (!best || rootLength > best.rootLength)) {
-      best = { rootLength, clientPath: pathApi.join(source, relative) }
+    if (relative !== undefined) {
+      candidates.push({ rootLength: anchored(target).length, clientPath: pathApi.join(source, relative) })
     }
   }
-  if (best) {
-    return best.clientPath
+  candidates.sort((a, b) => b.rootLength - a.rootLength)
+  const { sourceRoot } = mapping
+  const inCheckout = (clientPath: string) =>
+    sourceRoot !== undefined && relativeWithin(sourceRoot, clientPath, pathApi) === undefined && exists(clientPath)
+  const chosen = candidates.find((candidate) => inCheckout(candidate.clientPath)) ?? candidates[0]
+  if (chosen) {
+    return chosen.clientPath
   }
-  return mapping.sourceRoot === undefined ? undefined : pathApi.join(mapping.sourceRoot, gamePath)
+  return sourceRoot === undefined ? undefined : pathApi.join(sourceRoot, gamePath)
+}
+
+/** The debug adapter's conversions between local files and the paths gm_rdb uses, where a chunk name starts with `@`. */
+export function debuggerPathConverters(sourceRoot: string, sourceFileMap?: Record<string, string>, pathApi: PathApi = path) {
+  const mapping = { sourceRoot, sourceFileMap }
+  return {
+    toDebugger: (clientPath: string): string =>
+      clientPathToGamePath(clientPath, mapping, pathApi) ?? pathApi.relative(sourceRoot, clientPath),
+    toClient: (chunkName: string): string => {
+      if (!chunkName.startsWith('@')) {
+        return ''
+      }
+      const file = chunkName.slice(1)
+      return pathApi.isAbsolute(file) ? file : gamePathToClientPath(file, mapping, pathApi) ?? file
+    },
+  }
 }
 
 /** Returns the Lua search path `include` takes for a garrysmod-relative file, or undefined when the file is not on it. */
