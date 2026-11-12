@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { buildSourceFileMap, detectSrcdsLayoutAt, parseWorkspaceRemotePathInput } from '../../debugger/gmod_debugger/GmodDebugSetupWizard';
+import { buildSourceFileMap, detectSrcdsLayoutAt, parseWorkspaceRemotePathInput, suggestWorkspaceMapping } from '../../debugger/gmod_debugger/GmodDebugSetupWizard';
 import { clientPathToGamePath } from '../../debugger/gmod_debugger/GmodSourcePaths';
 
 function srcdsMarker(): string {
@@ -79,6 +79,26 @@ suite('GMod debug setup wizard layout detection', () => {
 
     test('ignores folders outside any garrysmod folder', () => {
         assert.strictEqual(detectSrcdsLayoutAt(temp), undefined);
+    });
+
+    test("suggests the root for a Garry's Mod folder with no server around it", () => {
+        const repo = path.join(temp, 'repo');
+        fs.mkdirSync(path.join(repo, 'addons'), { recursive: true });
+        fs.mkdirSync(path.join(repo, 'gamemodes'), { recursive: true });
+        const parent = path.join(temp, 'parent');
+        fs.mkdirSync(path.join(parent, 'garrysmod'), { recursive: true });
+        const addon = path.join(temp, 'pac3');
+        fs.mkdirSync(path.join(addon, 'lua'), { recursive: true });
+
+        assert.deepStrictEqual(
+            [suggestWorkspaceMapping(repo).mappedFolderExpression, suggestWorkspaceMapping(repo).workspaceRemotePath],
+            ['${workspaceFolder}', ''],
+        );
+        assert.deepStrictEqual(
+            [suggestWorkspaceMapping(parent).mappedFolderExpression, suggestWorkspaceMapping(parent).workspaceRemotePath],
+            ['${workspaceFolder}/garrysmod', ''],
+        );
+        assert.strictEqual(suggestWorkspaceMapping(addon).workspaceRemotePath, 'addons/pac3');
     });
 });
 

@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getExtensionChannel } from '../../extensionChannel';
 import { fetchJson, downloadFile } from '../../netHelpers';
+import { isGmodWorkspaceRoot } from '../../gmodWorkspaceSelection';
 import { GLUALS_MCP_BRIDGE_LUA } from './GmodMcpBridgeLua';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
@@ -163,8 +164,7 @@ function normalizeSrcdsRootInput(rawPath: string): ResolvedSrcdsPath {
     };
 }
 
-function detectWorkspaceKind(workspaceFolder: vscode.WorkspaceFolder): WorkspaceKind {
-    const root = workspaceFolder.uri.fsPath;
+function detectWorkspaceKind(root: string): WorkspaceKind {
     if (fs.existsSync(path.join(root, 'addon.txt')) || fs.existsSync(path.join(root, 'addon.json'))) {
         return 'addon';
     }
@@ -174,13 +174,30 @@ function detectWorkspaceKind(workspaceFolder: vscode.WorkspaceFolder): Workspace
     return 'unknown';
 }
 
-function buildSuggestedWorkspaceRemotePath(workspaceFolder: vscode.WorkspaceFolder): string {
-    const kind = detectWorkspaceKind(workspaceFolder);
-    const workspaceName = path.basename(workspaceFolder.uri.fsPath);
-    if (kind === 'gamemode') {
-        return `gamemodes/${workspaceName}`;
+export interface WorkspaceMappingSuggestion {
+    mappedFolderExpression: string;
+    workspaceRemotePath: string;
+    description: string;
+}
+
+/** Suggests the mapping for a workspace with no server around it: a Garry's Mod root maps to the root, else by its name. */
+export function suggestWorkspaceMapping(workspacePath: string): WorkspaceMappingSuggestion {
+    if (isGmodWorkspaceRoot(workspacePath)) {
+        const hasGarrysmodChild = path.basename(workspacePath).toLowerCase() !== 'garrysmod'
+            && fs.existsSync(path.join(workspacePath, 'garrysmod'));
+        return {
+            mappedFolderExpression: hasGarrysmodChild ? `${WORKSPACE_FOLDER_EXPRESSION}/garrysmod` : WORKSPACE_FOLDER_EXPRESSION,
+            workspaceRemotePath: '',
+            description: "Detected from workspace contents (whole Garry's Mod folder)",
+        };
     }
-    return `addons/${workspaceName}`;
+    const kind = detectWorkspaceKind(workspacePath);
+    const workspaceName = path.basename(workspacePath);
+    return {
+        mappedFolderExpression: WORKSPACE_FOLDER_EXPRESSION,
+        workspaceRemotePath: kind === 'gamemode' ? `gamemodes/${workspaceName}` : `addons/${workspaceName}`,
+        description: 'Suggested from workspace name',
+    };
 }
 
 function findGarrysmodFolder(workspacePath: string): string | undefined {
@@ -1551,14 +1568,19 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         return;
     }
 
-    const suggestedWorkspaceRemotePath = workspaceDetection?.workspaceRemotePath ?? buildSuggestedWorkspaceRemotePath(workspaceFolder);
+    const suggestion: WorkspaceMappingSuggestion = workspaceDetection
+        ? {
+            mappedFolderExpression: workspaceDetection.mappedFolderExpression,
+            workspaceRemotePath: workspaceDetection.workspaceRemotePath,
+            description: describeWorkspaceDetection(workspaceDetection),
+        }
+        : suggestWorkspaceMapping(workspaceFolder.uri.fsPath);
+    const suggestedWorkspaceRemotePath = suggestion.workspaceRemotePath;
     const mappingPick = await vscode.window.showQuickPick(
         [
             {
                 label: `$(check) ${suggestedWorkspaceRemotePath || GARRYSMOD_ROOT_REMOTE_PATH_INPUT}`,
-                description: workspaceDetection
-                    ? describeWorkspaceDetection(workspaceDetection)
-                    : 'Suggested from workspace name',
+                description: suggestion.description,
                 value: 'suggested' as const,
             },
             {
@@ -1578,7 +1600,7 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     }
 
     let workspaceRemotePath = suggestedWorkspaceRemotePath;
-    let mappedFolder = workspaceDetection?.mappedFolderExpression ?? WORKSPACE_FOLDER_EXPRESSION;
+    let mappedFolder = suggestion.mappedFolderExpression;
     if (mappingPick.value === 'custom') {
         const typed = await vscode.window.showInputBox({
             title: 'Workspace Remote Path',
