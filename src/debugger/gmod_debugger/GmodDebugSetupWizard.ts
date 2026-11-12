@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getExtensionChannel } from '../../extensionChannel';
 import { fetchJson, downloadFile } from '../../netHelpers';
+import { isGmodWorkspaceRoot } from '../../gmodWorkspaceSelection';
 import { GLUALS_MCP_BRIDGE_LUA } from './GmodMcpBridgeLua';
 
 const SRCDS_ROOT_STATE_KEY = 'gluals.gmod.srcdsRootPath';
@@ -65,14 +66,16 @@ export interface GmRdbRelease {
     assets: ReleaseAsset[];
 }
 
-type WorkspaceKind = 'addon' | 'gamemode' | 'unknown';
+type WorkspaceKind = 'addon' | 'gamemode' | 'garrysmod' | 'unknown';
 
-interface WorkspaceAutoDetection {
+export interface WorkspaceAutoDetection {
     kind: WorkspaceKind;
     srcdsRoot: string;
     garrysmodPath: string;
     sourceRootExpression: string;
     srcdsRootExpression: string;
+    /** The local folder that `workspaceRemotePath` names: the workspace, or the garrysmod folder below an SRCDS root. */
+    mappedFolderExpression: string;
     workspaceRemotePath: string;
 }
 
@@ -114,12 +117,14 @@ function samePath(left: string, right: string): boolean {
     return leftResolved === rightResolved;
 }
 
+const WORKSPACE_FOLDER_EXPRESSION = '${workspaceFolder}';
+
 function toWorkspaceExpression(relativePath: string): string {
     const normalized = toPosixPath(relativePath);
     if (!normalized || normalized === '.') {
-        return '${workspaceFolder}';
+        return WORKSPACE_FOLDER_EXPRESSION;
     }
-    return `${'${workspaceFolder}'}/${normalized}`;
+    return `${WORKSPACE_FOLDER_EXPRESSION}/${normalized}`;
 }
 
 function isMacGarrysModAppBundleName(name: string): boolean {
@@ -159,8 +164,7 @@ function normalizeSrcdsRootInput(rawPath: string): ResolvedSrcdsPath {
     };
 }
 
-function detectWorkspaceKind(workspaceFolder: vscode.WorkspaceFolder): WorkspaceKind {
-    const root = workspaceFolder.uri.fsPath;
+function detectWorkspaceKind(root: string): WorkspaceKind {
     if (fs.existsSync(path.join(root, 'addon.txt')) || fs.existsSync(path.join(root, 'addon.json'))) {
         return 'addon';
     }
@@ -170,56 +174,87 @@ function detectWorkspaceKind(workspaceFolder: vscode.WorkspaceFolder): Workspace
     return 'unknown';
 }
 
-function buildSuggestedWorkspaceRemotePath(workspaceFolder: vscode.WorkspaceFolder): string {
-    const kind = detectWorkspaceKind(workspaceFolder);
-    const workspaceName = path.basename(workspaceFolder.uri.fsPath);
-    if (kind === 'gamemode') {
-        return `gamemodes/${workspaceName}`;
+export interface WorkspaceMappingSuggestion {
+    mappedFolderExpression: string;
+    workspaceRemotePath: string;
+    description: string;
+}
+
+/** Suggests the mapping for a workspace with no server around it: a Garry's Mod root maps to the root, else by its name. */
+export function suggestWorkspaceMapping(workspacePath: string): WorkspaceMappingSuggestion {
+    if (isGmodWorkspaceRoot(workspacePath)) {
+        const hasGarrysmodChild = path.basename(workspacePath).toLowerCase() !== 'garrysmod'
+            && fs.existsSync(path.join(workspacePath, 'garrysmod'));
+        return {
+            mappedFolderExpression: hasGarrysmodChild ? `${WORKSPACE_FOLDER_EXPRESSION}/garrysmod` : WORKSPACE_FOLDER_EXPRESSION,
+            workspaceRemotePath: '',
+            description: "Detected from workspace contents (whole Garry's Mod folder)",
+        };
     }
-    return `addons/${workspaceName}`;
+    const kind = detectWorkspaceKind(workspacePath);
+    const workspaceName = path.basename(workspacePath);
+    return {
+        mappedFolderExpression: WORKSPACE_FOLDER_EXPRESSION,
+        workspaceRemotePath: kind === 'gamemode' ? `gamemodes/${workspaceName}` : `addons/${workspaceName}`,
+        description: 'Suggested from workspace name',
+    };
+}
+
+function findGarrysmodFolder(workspacePath: string): string | undefined {
+    for (let current = workspacePath; ; current = path.dirname(current)) {
+        if (path.basename(current).toLowerCase() === 'garrysmod' && hasSrcdsExecutable(path.dirname(current))) {
+            return current;
+        }
+        if (path.dirname(current) === current) {
+            break;
+        }
+    }
+    const child = path.join(workspacePath, 'garrysmod');
+    return hasSrcdsExecutable(workspacePath) && fs.existsSync(child) ? child : undefined;
+}
+
+function classifyWorkspaceInsideGarrysmod(relativeParts: string[]): WorkspaceKind {
+    if (relativeParts.length === 0) {
+        return 'garrysmod';
+    }
+    if (relativeParts.length >= 2) {
+        const container = relativeParts[0].toLowerCase();
+        if (container === 'addons') {
+            return 'addon';
+        }
+        if (container === 'gamemodes') {
+            return 'gamemode';
+        }
+    }
+    return 'unknown';
+}
+
+export function detectSrcdsLayoutAt(workspaceDirectory: string): WorkspaceAutoDetection | undefined {
+    const workspacePath = path.resolve(workspaceDirectory);
+    const garrysmodPath = findGarrysmodFolder(workspacePath);
+    if (!garrysmodPath) {
+        return undefined;
+    }
+
+    const srcdsRoot = path.dirname(garrysmodPath);
+    const relativeToGarrysmod = path.relative(garrysmodPath, workspacePath);
+    const insideGarrysmod = !relativeToGarrysmod.startsWith('..');
+    const relativeParts = insideGarrysmod ? relativeToGarrysmod.split(path.sep).filter((part) => part.length > 0) : [];
+
+    const sourceRootExpression = toWorkspaceExpression(path.relative(workspacePath, garrysmodPath));
+    return {
+        kind: insideGarrysmod ? classifyWorkspaceInsideGarrysmod(relativeParts) : 'garrysmod',
+        srcdsRoot,
+        garrysmodPath,
+        sourceRootExpression,
+        srcdsRootExpression: toWorkspaceExpression(path.relative(workspacePath, srcdsRoot)),
+        mappedFolderExpression: insideGarrysmod ? WORKSPACE_FOLDER_EXPRESSION : sourceRootExpression,
+        workspaceRemotePath: relativeParts.join('/'),
+    };
 }
 
 function detectWorkspaceSrcdsLayout(workspaceFolder: vscode.WorkspaceFolder): WorkspaceAutoDetection | undefined {
-    const workspacePath = path.resolve(workspaceFolder.uri.fsPath);
-    const parsed = path.parse(workspacePath);
-    const parts = path.relative(parsed.root, workspacePath)
-        .split(path.sep)
-        .filter((part) => part.length > 0);
-
-    for (let index = 0; index < parts.length - 2; index += 1) {
-        const current = parts[index].toLowerCase();
-        const next = parts[index + 1].toLowerCase();
-        if (current !== 'garrysmod' || (next !== 'addons' && next !== 'gamemodes')) {
-            continue;
-        }
-
-        const workspaceInsideType = parts.slice(index + 2);
-        if (workspaceInsideType.length === 0) {
-            continue;
-        }
-
-        const projectName = workspaceInsideType[0];
-        const rest = workspaceInsideType.slice(1).map((part) => toPosixPath(part)).join('/');
-        const kind: WorkspaceKind = next === 'addons' ? 'addon' : 'gamemode';
-        const remoteBase = next === 'addons' ? `addons/${projectName}` : `gamemodes/${projectName}`;
-        const workspaceRemotePath = rest.length > 0 ? `${remoteBase}/${rest}` : remoteBase;
-
-        const garrysmodPath = path.join(parsed.root, ...parts.slice(0, index + 1));
-        const srcdsRoot = path.dirname(garrysmodPath);
-        const sourceRootExpression = toWorkspaceExpression(path.relative(workspacePath, garrysmodPath));
-        const srcdsRootExpression = toWorkspaceExpression(path.relative(workspacePath, srcdsRoot));
-
-        return {
-            kind,
-            srcdsRoot,
-            garrysmodPath,
-            sourceRootExpression,
-            srcdsRootExpression,
-            workspaceRemotePath,
-        };
-    }
-
-    return undefined;
+    return detectSrcdsLayoutAt(workspaceFolder.uri.fsPath);
 }
 
 export function detectInstalledGmRdbModules(garrysmodPath: string): string[] {
@@ -1135,16 +1170,14 @@ async function promptForSrcdsPath(
 
         const resolved = normalizeSrcdsRootInput(rawPath);
         if (!hasSrcdsExecutable(resolved.srcdsRoot)) {
-            const action = await vscode.window.showWarningMessage(
-                `No server executable (srcds) found in "${resolved.srcdsRoot}". Choose a different folder, or continue anyway if your setup uses custom scripts or symlinks.`,
-                'Choose Different Path',
-                'Use Anyway',
-                'Cancel Setup'
-            );
-            if (action === 'Choose Different Path') {
+            const action = await askWizardChoice('SRCDS Root Path', `No server executable (srcds) found in "${resolved.srcdsRoot}"`, [
+                { label: '$(folder-opened) Choose a different folder', value: 'retry' as const },
+                { label: '$(check) Use anyway', description: 'for setups with custom scripts or symlinks', value: 'use' as const },
+            ]);
+            if (action === 'retry') {
                 continue;
             }
-            if (action !== 'Use Anyway') {
+            if (action !== 'use') {
                 return undefined;
             }
         }
@@ -1251,12 +1284,11 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
             ignoreFocusOut: true,
         });
         if (!picked) {
-            const cancelAction = await vscode.window.showWarningMessage(
-                'Client install path selection was cancelled.',
-                'Back to Path Selection',
-                'Skip Client Debugger Step'
-            );
-            if (cancelAction === 'Back to Path Selection') {
+            const cancelAction = await askWizardChoice('GMod Client Debugger', 'Client install path selection was cancelled', [
+                { label: '$(arrow-left) Back to path selection', value: 'back' as const },
+                { label: '$(remove) Skip the client debugger step', value: 'skip' as const },
+            ]);
+            if (cancelAction === 'back') {
                 continue;
             }
             return undefined;
@@ -1296,16 +1328,14 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
         const resolved = normalizeClientInstallInput(rawPath);
         const validation = validateClientInstallPath(resolved.gameRoot);
         if (validation.warnings.length > 0) {
-            const action = await vscode.window.showWarningMessage(
-                `This path may not be a valid Garry's Mod client install:\n- ${validation.warnings.join('\n- ')}`,
-                'Choose Different Path',
-                'Use Anyway',
-                'Cancel Setup'
-            );
-            if (action === 'Choose Different Path') {
+            const action = await askWizardChoice('Garry\'s Mod Install Path', `This may not be a Garry's Mod client install: ${validation.warnings.join('; ')}`, [
+                { label: '$(folder-opened) Choose a different folder', value: 'retry' as const },
+                { label: '$(check) Use anyway', value: 'use' as const },
+            ]);
+            if (action === 'retry') {
                 continue;
             }
-            if (action !== 'Use Anyway') {
+            if (action !== 'use') {
                 return undefined;
             }
         }
@@ -1322,15 +1352,39 @@ export async function promptForClientGarrysmodPath(context: vscode.ExtensionCont
     }
 }
 
-function buildSourceFileMap(sourceRoot: string, workspaceRemotePath: string): Record<string, string> {
-    const sourceFileMap: Record<string, string> = {
+interface WizardChoice<T> {
+    label: string;
+    description?: string;
+    value: T;
+}
+
+/** Asks a question inside the wizard as a quick pick: answering a notification can leave the wizard's next quick pick hidden. */
+async function askWizardChoice<T>(title: string, question: string, choices: WizardChoice<T>[]): Promise<T | undefined> {
+    const picked = await vscode.window.showQuickPick(choices, { title, placeHolder: question, ignoreFocusOut: true });
+    return picked?.value;
+}
+
+export function buildSourceFileMap(sourceRoot: string, mappedFolder: string, remotePath: string): Record<string, string> {
+    return {
         [`${sourceRoot}/addons`]: 'addons',
         [`${sourceRoot}/lua`]: 'lua',
         [`${sourceRoot}/gamemodes/base`]: 'gamemodes/base',
         [`${sourceRoot}/gamemodes/sandbox`]: 'gamemodes/sandbox',
-        '${workspaceFolder}': workspaceRemotePath,
+        [mappedFolder]: remotePath,
     };
-    return sourceFileMap;
+}
+
+const GARRYSMOD_ROOT_REMOTE_PATH_INPUT = '.';
+
+export function parseWorkspaceRemotePathInput(typed: string): string {
+    const trimmed = typed.trim();
+    return trimmed === GARRYSMOD_ROOT_REMOTE_PATH_INPUT ? '' : toPosixPath(trimmed.replace(/^\/+/, ''));
+}
+
+function describeWorkspaceDetection(detection: WorkspaceAutoDetection): string {
+    return detection.kind === 'garrysmod'
+        ? "Detected from workspace location (whole Garry's Mod folder)"
+        : `Detected from workspace location (${detection.kind})`;
 }
 
 function pickLaunchProgram(srcdsRoot: string, srcdsRootExpression?: string): LaunchProgramSelection {
@@ -1448,14 +1502,15 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     const existingDlls = detectInstalledGmRdbModules(srcdsSelection.garrysmodPath);
     const existingDll = existingDlls[0];
     if (existingDlls.length === 0) {
-        const installChoice = await vscode.window.showWarningMessage(
-            'gm_rdb debugger module was not found in garrysmod/lua/bin/. Install it now?',
-            { modal: false },
-            'Install',
-            'Skip'
-        );
+        const installChoice = await askWizardChoice('GMod Debugger Setup — gm_rdb', 'gm_rdb debugger module was not found in garrysmod/lua/bin/', [
+            { label: '$(cloud-download) Install gm_rdb', value: 'install' as const },
+            { label: '$(remove) Skip for now', value: 'skip' as const },
+        ]);
+        if (installChoice === undefined) {
+            return;
+        }
 
-        if (installChoice === 'Install') {
+        if (installChoice === 'install') {
             try {
                 await runGmRdbInstaller(srcdsSelection.garrysmodPath, DEFAULT_RDB_PORT);
             } catch (error) {
@@ -1464,15 +1519,18 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         }
     } else {
         const latestRelease = await fetchReleaseForCurrentExtensionChannel().catch(() => null);
-        const versionInfo = latestRelease ? ` Latest release: ${latestRelease.tag_name}.` : '';
-        const updateChoice = await vscode.window.showInformationMessage(
-            `gm_rdb (${existingDlls.join(', ')}) is already installed.${versionInfo} Update to the latest release?`,
-            { modal: false },
-            'Update',
-            'Skip'
-        );
+        const updateChoice = await askWizardChoice('GMod Debugger Setup — gm_rdb', `gm_rdb (${existingDlls.join(', ')}) is already installed`, [
+            {
+                label: latestRelease ? `$(cloud-download) Update to ${latestRelease.tag_name}` : '$(cloud-download) Update to the latest release',
+                value: 'update' as const,
+            },
+            { label: '$(check) Keep the installed version', value: 'keep' as const },
+        ]);
+        if (updateChoice === undefined) {
+            return;
+        }
 
-        if (updateChoice === 'Update') {
+        if (updateChoice === 'update') {
             try {
                 await runGmRdbInstaller(srcdsSelection.garrysmodPath, DEFAULT_RDB_PORT);
             } catch (error) {
@@ -1510,14 +1568,19 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
         return;
     }
 
-    const suggestedWorkspaceRemotePath = workspaceDetection?.workspaceRemotePath ?? buildSuggestedWorkspaceRemotePath(workspaceFolder);
+    const suggestion: WorkspaceMappingSuggestion = workspaceDetection
+        ? {
+            mappedFolderExpression: workspaceDetection.mappedFolderExpression,
+            workspaceRemotePath: workspaceDetection.workspaceRemotePath,
+            description: describeWorkspaceDetection(workspaceDetection),
+        }
+        : suggestWorkspaceMapping(workspaceFolder.uri.fsPath);
+    const suggestedWorkspaceRemotePath = suggestion.workspaceRemotePath;
     const mappingPick = await vscode.window.showQuickPick(
         [
             {
-                label: `$(check) ${suggestedWorkspaceRemotePath}`,
-                description: workspaceDetection
-                    ? `Detected from workspace location (${workspaceDetection.kind})`
-                    : 'Suggested from workspace name',
+                label: `$(check) ${suggestedWorkspaceRemotePath || GARRYSMOD_ROOT_REMOTE_PATH_INPUT}`,
+                description: suggestion.description,
                 value: 'suggested' as const,
             },
             {
@@ -1537,20 +1600,22 @@ export async function runGmodDebugSetupWizard(context: vscode.ExtensionContext, 
     }
 
     let workspaceRemotePath = suggestedWorkspaceRemotePath;
+    let mappedFolder = suggestion.mappedFolderExpression;
     if (mappingPick.value === 'custom') {
         const typed = await vscode.window.showInputBox({
             title: 'Workspace Remote Path',
-            prompt: 'Path as seen by the debugger (example: addons/my_addon or gamemodes/cityrp)',
-            value: suggestedWorkspaceRemotePath,
+            prompt: `Path as seen by the debugger (example: addons/my_addon or gamemodes/cityrp). Enter ${GARRYSMOD_ROOT_REMOTE_PATH_INPUT} when the workspace is the garrysmod folder itself.`,
+            value: suggestedWorkspaceRemotePath || GARRYSMOD_ROOT_REMOTE_PATH_INPUT,
             ignoreFocusOut: true,
         });
         if (!typed?.trim()) {
             return;
         }
-        workspaceRemotePath = toPosixPath(typed.trim().replace(/^\/+/, ''));
+        workspaceRemotePath = parseWorkspaceRemotePathInput(typed);
+        mappedFolder = WORKSPACE_FOLDER_EXPRESSION;
     }
 
-    const sourceFileMap = buildSourceFileMap(sourceRoot, workspaceRemotePath);
+    const sourceFileMap = buildSourceFileMap(sourceRoot, mappedFolder, workspaceRemotePath);
 
     const config: DebugConfig = {
         type: GMOD_DEBUGGER_TYPE,

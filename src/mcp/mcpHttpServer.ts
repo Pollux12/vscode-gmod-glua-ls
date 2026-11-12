@@ -361,18 +361,20 @@ function readBody(req: http.IncomingMessage): Promise<string> {
         let tooLarge = false;
         req.on('data', (chunk: Buffer) => {
             if (tooLarge) {
-                return; // drained and dropped, so the 413 reply can still be written
+                return;
             }
             size += chunk.length;
             if (size > MAX_BODY_BYTES) {
                 tooLarge = true;
                 chunks.length = 0;
-                reject(new Error('Request body too large.'));
                 return;
             }
             chunks.push(chunk);
         });
-        req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        // Closing a socket with unread data resets it, so the 413 waits for the whole body.
+        req.on('end', () => tooLarge
+            ? reject(new Error('Request body too large.'))
+            : resolve(Buffer.concat(chunks).toString('utf8')));
         req.on('error', reject);
     });
 }

@@ -25,7 +25,8 @@ suite('MCP breakpoints tool', () => {
         bp instanceof vscode.SourceBreakpoint && bp.location.uri.fsPath === file && bp.location.range.start.line === line - 1);
 
     setup(() => {
-        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-mcp-bp-'));
+        // VS Code reports paths with a lowercase drive letter on Windows.
+        dir = vscode.Uri.file(fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-mcp-bp-'))).fsPath;
         file = path.join(dir, 'sv_test.lua');
         fs.writeFileSync(file, 'local a = 1\nlocal b = 2\nlocal c = 3\n', 'utf8');
         bridge = new GmodDebugBridge(() => undefined);

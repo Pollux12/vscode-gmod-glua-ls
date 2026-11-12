@@ -127,7 +127,7 @@ function consoleTool(context: McpToolContext): ToolSpec {
             const after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
                 // Without a cursor, anything since the previous tool call counts as new.
-                const from = after ?? context.bridge.lastReplyCursor ?? events.cursor;
+                const from = after ?? context.bridge.lastReplyCursors.console ?? events.cursor;
                 const waitCount = Math.floor(numberArg(args, 'wait_count', { min: 1, max: 500, fallback: 1 })!);
                 const matching = () => {
                     const found = events.queryConsole({ after: from, search, limit: 1 });
@@ -205,7 +205,7 @@ function errorsTool(context: McpToolContext): ToolSpec {
             }
             let after = numberArg(args, 'after', { min: 0 });
             if (waitMs > 0) {
-                const from = after ?? context.bridge.lastReplyCursor ?? events.cursor;
+                const from = after ?? context.bridge.lastReplyCursors.errors ?? events.cursor;
                 await events.waitFor(() => events.queryErrors({ after: from, search, limit: 1 }).entries.length > 0, waitMs, (listener) => signal.onAbort(listener));
                 after = from;
             }

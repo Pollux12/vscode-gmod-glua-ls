@@ -1,12 +1,17 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 import {
     buildBuiltinItems,
     buildPickItems,
+    initialPickItem,
     choiceToSettings,
     chooseSaveTarget,
     GmodRoot,
+    isGmodWorkspaceRoot,
     statusBackground,
     statusText,
     statusTooltip,
@@ -57,7 +62,41 @@ suite('GMod Workspace Selection', () => {
         const customOnly = makeRoot({ gamemodes: root.gamemodes.filter((gamemode) => !gamemode.builtin) });
 
         assert.ok(!buildPickItems(customOnly).some((item) => item.showBuiltins));
-        assert.deepStrictEqual(buildBuiltinItems(root).map((item) => item.label), ['sandbox']);
+        assert.deepStrictEqual(buildBuiltinItems(root).map((item) => item.label), ['$(arrow-left) Back', 'sandbox']);
+        assert.strictEqual(buildBuiltinItems(root)[0].back, true);
+    });
+
+    test('marks the saved pick as current and starts the picker on it', () => {
+        const root = makeRoot({ activeGamemode: 'darkrp', needsPick: false });
+        const items = buildPickItems(root);
+
+        assert.deepStrictEqual(items.filter((item) => item.description?.startsWith('✓ current')).map((item) => item.label), ['darkrp']);
+        assert.strictEqual(initialPickItem(items, root)?.label, 'darkrp');
+
+        const addonsOnly = makeRoot({ activeGamemode: '', needsPick: false });
+        assert.strictEqual(initialPickItem(buildPickItems(addonsOnly), addonsOnly)?.label, 'Addons only');
+        const everything = makeRoot({ loadEverything: true, needsPick: false });
+        assert.strictEqual(initialPickItem(buildPickItems(everything), everything)?.label, 'Load all');
+    });
+
+    test('starts on the gamemode of an open file before the first pick, and on nothing without one', () => {
+        const root = makeRoot();
+        assert.strictEqual(initialPickItem(buildPickItems(root), root), undefined);
+        assert.ok(!buildPickItems(root).some((item) => item.description?.startsWith('✓')));
+
+        const helixOpen = makeRoot({ loaded: [...root.loaded, 'file:///games/GarrysMod/garrysmod/gamemodes/helix'] });
+        assert.strictEqual(initialPickItem(buildPickItems(helixOpen), helixOpen)?.label, 'helix');
+    });
+
+    test('a built-in pick marks the built-in entry and starts both lists on it', () => {
+        const root = makeRoot({ activeGamemode: 'sandbox', needsPick: false });
+        const items = buildPickItems(root);
+        const showBuiltins = items.find((item) => item.showBuiltins);
+
+        assert.strictEqual(showBuiltins?.description, '✓ current: sandbox · loads their source on top of the annotations');
+        assert.strictEqual(initialPickItem(items, root), showBuiltins);
+        const builtins = buildBuiltinItems(root);
+        assert.strictEqual(initialPickItem(builtins, root)?.label, 'sandbox');
     });
 
     test('maps each choice to the settings it writes', () => {
@@ -125,11 +164,25 @@ suite('GMod Workspace Selection', () => {
     });
 
     test('keeps the automatic prompt open when focus moves away, unlike a picker the user opened', async () => {
-        const originalShowQuickPick = vscode.window.showQuickPick;
+        const originalCreateQuickPick = vscode.window.createQuickPick;
         const keptOpen: (boolean | undefined)[] = [];
-        (vscode.window as any).showQuickPick = async (_items: unknown, options?: vscode.QuickPickOptions) => {
-            keptOpen.push(options?.ignoreFocusOut);
-            return undefined;
+        (vscode.window as any).createQuickPick = () => {
+            let onHide: (() => void) | undefined;
+            const quickPick = {
+                ignoreFocusOut: undefined as boolean | undefined,
+                selectedItems: [],
+                onDidAccept: () => ({ dispose: () => undefined }),
+                onDidHide: (listener: () => void) => {
+                    onHide = listener;
+                    return { dispose: () => undefined };
+                },
+                show: () => {
+                    keptOpen.push(quickPick.ignoreFocusOut);
+                    onHide?.();
+                },
+                dispose: () => undefined,
+            };
+            return quickPick;
         };
         const selection = new GmodWorkspaceSelection();
         try {
@@ -137,7 +190,7 @@ suite('GMod Workspace Selection', () => {
             await new Promise((resolve) => setTimeout(resolve, 0));
             await selection.selectGamemode();
         } finally {
-            (vscode.window as any).showQuickPick = originalShowQuickPick;
+            (vscode.window as any).createQuickPick = originalCreateQuickPick;
             selection.dispose();
         }
 
@@ -191,3 +244,39 @@ function fakeConfig(values: Record<string, Inspected>) {
     } as unknown as Pick<vscode.WorkspaceConfiguration, 'inspect' | 'update'>;
     return { config, updates };
 }
+
+suite('GMod workspace root detection', () => {
+    let temp: string;
+
+    setup(() => {
+        temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gluals-root-'));
+    });
+
+    teardown(() => {
+        fs.rmSync(temp, { recursive: true, force: true });
+    });
+
+    function folder(...segments: string[]): string {
+        const target = path.join(temp, ...segments);
+        fs.mkdirSync(target, { recursive: true });
+        return target;
+    }
+
+    test('recognises a folder with a garrysmod child, named garrysmod, or holding addons and gamemodes', () => {
+        folder('srcds', 'garrysmod');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'srcds')), true);
+        assert.strictEqual(isGmodWorkspaceRoot(folder('x', 'GarrysMod')), true);
+        folder('both', 'addons');
+        folder('both', 'gamemodes');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'both')), true);
+    });
+
+    test('rejects plain folders, addons folders and folders with only one of addons or gamemodes', () => {
+        folder('plain', 'src');
+        assert.strictEqual(isGmodWorkspaceRoot(folder('y', 'addons')), false);
+        folder('half', 'gamemodes');
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'plain')), false);
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'half')), false);
+        assert.strictEqual(isGmodWorkspaceRoot(path.join(temp, 'missing')), false);
+    });
+});

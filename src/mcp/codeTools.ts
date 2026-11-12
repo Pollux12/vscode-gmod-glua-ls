@@ -221,11 +221,11 @@ function diagnosticsTool(context: McpToolContext, watcher: DiagnosticsWatcher): 
                 } catch {
                     continue;
                 }
-                if ((last === undefined && (requested || changed > watcher.startedAt)) || (last !== undefined && changed > last)) {
+                if (changed > (last ?? watcher.startedAt)) {
                     pending.add(uri.toString());
-                    if (!vscode.workspace.textDocuments.some((document) => document.uri.fsPath === file)) {
-                        await vscode.workspace.openTextDocument(uri).then(undefined, () => undefined);
-                    }
+                }
+                if ((requested || pending.has(uri.toString())) && !vscode.workspace.textDocuments.some((document) => document.uri.fsPath === file)) {
+                    await vscode.workspace.openTextDocument(uri).then(undefined, () => undefined);
                 }
             }
             const waitedFor = pending.size;

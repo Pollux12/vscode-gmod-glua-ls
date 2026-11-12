@@ -326,6 +326,18 @@ export class GmodMcpHost implements vscode.Disposable {
         const inCursor = this.cursorApi() !== undefined;
         const items: Item[] = [];
 
+        const connectsAutomatically = (client: string, detail: string): Item => settings.enabled
+            ? { label: `$(check) ${client}: connected automatically`, detail }
+            : {
+                label: `$(sparkle) ${client}: available once enabled`,
+                detail: `Enables the server. ${detail}`,
+                run: async () => {
+                    if (this.status.kind === 'running') {
+                        void vscode.window.showInformationMessage(`GLuaLS MCP server enabled; ${client} connects to it automatically.`);
+                    }
+                },
+            };
+
         if (!settings.enabled) {
             items.push({
                 label: '$(play) Enable the GLuaLS MCP server',
@@ -359,7 +371,7 @@ export class GmodMcpHost implements vscode.Disposable {
             run: async () => this.writeCodexConfig(port),
         });
         items.push(inCursor
-            ? { label: '$(check) Cursor: connected automatically', detail: 'Nothing to set up.' }
+            ? connectsAutomatically('Cursor', 'Nothing to set up.')
             : {
                 label: '$(sparkle) Cursor: add to this project',
                 detail: 'Adds it to .cursor/mcp.json.',
@@ -367,7 +379,7 @@ export class GmodMcpHost implements vscode.Disposable {
             });
         const hasProvider = typeof (vscode as unknown as { lm?: McpDefinitionApi }).lm?.registerMcpServerDefinitionProvider === 'function';
         items.push(hasProvider
-            ? { label: '$(check) GitHub Copilot: connected automatically', detail: `Listed as "${SERVER_LABEL}" in VS Code's MCP servers.` }
+            ? connectsAutomatically('GitHub Copilot', `Listed as "${SERVER_LABEL}" in VS Code's MCP servers.`)
             : {
                 label: '$(sparkle) GitHub Copilot: add to this project',
                 detail: 'Adds it to .vscode/mcp.json.',

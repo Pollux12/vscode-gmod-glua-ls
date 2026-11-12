@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { McpEventLog } from './eventLog';
 import { parseGmodLuaError } from '../debugger/gmod_debugger/GmodLuaError';
+import { getAutoDetectedWorkspaceGarrysmodPath } from '../debugger/gmod_debugger/GmodDebugSetupWizard';
 
 /** The server-realm debugger type. The client debugger (`gluals_gmod_client`) is out of scope. */
 export const GMOD_SERVER_DEBUG_TYPE = 'gluals_gmod';
@@ -98,8 +99,8 @@ export class GmodDebugBridge implements vscode.Disposable {
     readonly agentBreakpointIds = new Set<string>();
     /** Agent logpoints that remove themselves after a number of hits or seconds. */
     readonly limitedLogpoints = new Map<string, LimitedLogpoint>();
-    /** Where "new" output starts for a wait without a cursor: see buildMcpTools. */
-    lastReplyCursor?: number;
+    /** Where "new" output starts per stream for a wait without a cursor: see buildMcpTools. */
+    lastReplyCursors: { console?: number; errors?: number } = {};
     /** Console lines and errors gm_rdb replayed from before the latest connection; undefined for older modules. */
     lastBacklog?: number;
     /** Where the latest described pause stopped, for the banner on other tools' replies. */
@@ -355,6 +356,10 @@ export class GmodDebugBridge implements vscode.Disposable {
         if (!config) {
             folder = folders[0];
             config = { type: GMOD_SERVER_DEBUG_TYPE, request: 'attach', name: 'GLuaLS MCP: Attach to GMod server' };
+            const sourceRoot = folder && getAutoDetectedWorkspaceGarrysmodPath(folder);
+            if (sourceRoot) {
+                config.sourceRoot = sourceRoot;
+            }
         }
         // A stop on entry would freeze the server the moment an agent connects.
         config.stopOnEntry = false;
