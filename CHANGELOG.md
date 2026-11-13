@@ -2,18 +2,19 @@
 
 ---
 
-## [Unreleased]
+## [1.4.1] [Pre-Release] - 2026-11-13
 > Class Factory Annotations + Fixes
 
 ## Language Server
 
-- Add the `adds_field` annotation, which marks the fields a function adds to a table passed to it.
-- Add the `base_class` annotation, which lets a class factory take the new class's parent as a name or as an existing class.
-- Fix fields set on one class showing up on its sibling classes.
-- Fix checks made through a local copy of a table not applying to the original, and the reverse.
-- Fix false `undefined-field` warnings on tables filled by a register function, such as `List[name] = value`.
-- Fix entries read by name from such tables not getting the type the register function stores.
-- Fix `include("folder/init.lua")` not finding the file, which gave files loaded through it the wrong realm and caused false realm mismatch warnings.
+- Add the `adds_field` annotation for functions that add fields to a table you pass them, such as `RegisterMetaTable`.
+- Add the `base_class` annotation, so a class factory can take the new class's parent by name or as an existing class.
+- Fix fields set on one class showing up on other classes that share its base class.
+- Fix checks made through a local copy of a table not applying to the original table, and the reverse.
+- Fix false `undefined-field` warnings on tables filled by a register function, such as `List[name] = value`, when an entry is read by name.
+- Fix entries read by name from those tables not getting the type the register function stores.
+- Fix `include("folder/init.lua")` not finding the file, which gave the files it loads the wrong realm and caused false realm mismatch warnings, such as with ULib.
+- Improve the annotation documentation, with a page for every supported annotation and the ones meant for complex cases grouped separately.
 
 ## Annotations
 
