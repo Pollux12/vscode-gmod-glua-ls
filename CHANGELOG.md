@@ -23,6 +23,7 @@
 - Add the `MetaID` and `MetaName` fields to tables registered with `RegisterMetaTable`.
 - Add narrowing of an entity or weapon to its base class when `scripted_ents.IsBasedOn` or `weapons.IsBasedOn` returns `true`.
 - Mark `Entity:GetClass` with `self_class_name`, so comparing its result with a class name narrows the entity.
+- Add the `Owner` field to entities, which Garry's Mod reads through `Entity:GetOwner`, fixing false `undefined-field` warnings on `ent.Owner`.
 
 ---
 
