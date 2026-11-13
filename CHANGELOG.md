@@ -9,17 +9,20 @@
 
 - Add the `adds_field` annotation for functions that add fields to a table you pass them, such as `RegisterMetaTable`.
 - Add the `base_class` annotation, so a class factory can take the new class's parent by name or as an existing class.
+- Add the `self_class_name` annotation for methods that return the class name of the object they are called on, such as `Entity:GetClass`.
 - Fix fields set on one class showing up on other classes that share its base class.
 - Fix checks made through a local copy of a table not applying to the original table, and the reverse.
 - Fix false `undefined-field` warnings on tables filled by a register function, such as `List[name] = value`, when an entry is read by name.
 - Fix entries read by name from those tables not getting the type the register function stores.
 - Fix `include("folder/init.lua")` not finding the file, which gave the files it loads the wrong realm and caused false realm mismatch warnings, such as with ULib.
+- Fix class name checks narrowing an entity through any method without arguments, such as `ent:GetOwnerClass() == "name"`, which hid real warnings. Only methods marked with `self_class_name` narrow it now.
 - Improve the annotation documentation, with a page for every supported annotation and the ones meant for complex cases grouped separately.
 
 ## Annotations
 
 - Add the `MetaID` and `MetaName` fields to tables registered with `RegisterMetaTable`.
 - Add narrowing of an entity or weapon to its base class when `scripted_ents.IsBasedOn` or `weapons.IsBasedOn` returns `true`.
+- Mark `Entity:GetClass` with `self_class_name`, so comparing its result with a class name narrows the entity.
 
 ---
 
