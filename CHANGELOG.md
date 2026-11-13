@@ -2,6 +2,26 @@
 
 ---
 
+## [Unreleased]
+> Class Factory Annotations + Fixes
+
+## Language Server
+
+- Add the `adds_field` annotation, which marks the fields a function adds to a table passed to it.
+- Add the `base_class` annotation, which lets a class factory take the new class's parent as a name or as an existing class.
+- Fix fields set on one class showing up on its sibling classes.
+- Fix checks made through a local copy of a table not applying to the original, and the reverse.
+- Fix false `undefined-field` warnings on tables filled by a register function, such as `List[name] = value`.
+- Fix entries read by name from such tables not getting the type the register function stores.
+- Fix `include("folder/init.lua")` not finding the file, which gave files loaded through it the wrong realm and caused false realm mismatch warnings.
+
+## Annotations
+
+- Add the `MetaID` and `MetaName` fields to tables registered with `RegisterMetaTable`.
+- Add narrowing of an entity or weapon to its base class when `scripted_ents.IsBasedOn` or `weapons.IsBasedOn` returns `true`.
+
+---
+
 ## [1.4.0] [Pre-Release] - 2026-11-11
 > MCP v2 + Workspace Selection + Fixes
 
