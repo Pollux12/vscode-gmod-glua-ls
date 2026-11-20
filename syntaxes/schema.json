@@ -2536,14 +2536,6 @@
           },
           "type": "array"
         },
-        "requireLikeFunction": {
-          "default": [],
-          "description": "Functions that like require.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "requirePattern": {
           "default": [],
           "description": "Require pattern. eg. \"?.lua\", \"?/init.lua\"",
@@ -2589,7 +2581,6 @@
     "EmmyrcSpecialSymbol": {
       "enum": [
         "none",
-        "require",
         "error",
         "assert",
         "type",
@@ -3209,7 +3200,6 @@
           "&&",
           "!"
         ],
-        "requireLikeFunction": [],
         "requirePattern": [],
         "special": {},
         "version": "LuaJIT"

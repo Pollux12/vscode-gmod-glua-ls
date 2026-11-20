@@ -762,10 +762,6 @@
     "EmmyrcRuntime.nonstandardSymbol": {
         "en": "Non-standard symbols."
     },
-    "EmmyrcRuntime.requireLikeFunction": {
-        "en": "Functions that like require.",
-        "zh-CN": "类似 require 的函数列表。"
-    },
     "EmmyrcRuntime.requirePattern": {
         "en": "Require pattern. eg. \"?.lua\", \"?/init.lua\"",
         "zh-CN": "require 模式。例如：\"?.lua\", \"?/init.lua\""
