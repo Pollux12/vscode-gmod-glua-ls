@@ -2,6 +2,65 @@
 
 ---
 
+## [Unreleased]
+> Metatable Support + Fixes
+
+## Language Server
+
+- Add classes for tables registered with `RegisterMetaTable`, so `FindMetaTable` returns the class and tables given it with `setmetatable` are its instances.
+- Add support for `newproxy` and the metatables it creates.
+- Add classes made by factory and helper functions without annotations, such as `local function class(base)`, `extend` methods, `__call` constructors and libraries such as `classic`.
+- Add support for constructors that set their receiver as the metatable, such as `Class:new(o)`.
+- Add support for `__index` functions, including ones that use `rawget` or walk up to a parent table.
+- Add support for `__call`, operator metamethods and `__metatable`.
+- Add parameter types taken from what callers pass, for methods, global functions, callbacks and functions stored in tables.
+- Add types for net reads on the client, taken from what the server writes.
+- Add separate fields for each call that fills a table under a key built from its arguments, such as `Vehicles["Car" .. name] = data`.
+- Add return values for `include` and `CompileFile`, taken from what the loaded file returns.
+- Add file loading through functions that wrap `include`.
+- Add links and go to definition for paths passed to `include`, `AddCSLuaFile` and other loaders.
+- Improve type narrowing through your own check functions, including ones that error unless their argument is valid.
+- Improve inferred types for methods a function sets on the table passed to it, such as a base class `Setup(self)`.
+- Improve analysis speed when many files depend on each other, such as through fields set on entities and players.
+- Improve hovers to show a class's `__index = self` as `self`.
+- Remove the `runtime.requireLikeFunction` setting and the `"require"` option of `runtime.special`. Use `@call_arg("gmod.load", "require")` instead.
+- Fix parameters of local functions staying unknown when a call passes a loop variable.
+- Fix completion and hover missing members while typing in a large workspace.
+- Fix functions that replace a documented global, such as `IsValid`, losing the documented parameter and return types.
+- Fix functions in a `module()` file, such as those in `hook.lua`, losing their documented parameter types.
+- Fix methods and functions named `include`, `AddCSLuaFile`, `require` or `module` being treated as the built-in ones.
+- Fix fields and methods set on one panel or entity showing up on others of the same class.
+- Fix methods defined on a subclass showing up on its parent class and the parent's other subclasses.
+- Fix false type mismatch warnings on a base class field that one subclass sets without a known type.
+- Fix false `need-check-nil` warnings on fields a constructor or the metatable's `__index` always sets.
+- Fix false `undefined-field` warnings and missing accessors on classes made by helper functions.
+- Fix analysis never settling on a method that makes a subclass of `self`, such as `Base:extend()`.
+- Fix `getmetatable` returning `any` for a table given a metatable with `setmetatable`.
+- Fix registries filled by a local function accepting any name, and losing the fields each call gives an entry.
+- Fix tables filled under string or computed keys having entries typed as `any` or `nil` when read by name.
+- Fix parameter types from callers including `nil` after the caller already checked for it.
+- Fix `number` values compared with a constant not narrowing to that constant.
+- Fix `and`/`or` expressions after an `IsValid` or `type` check having the wrong type.
+- Fix `unpack` returning only the first value of a table filled from `...`.
+- Fix tables combined with `table.Inherit` losing nested fields or being rejected where a `table` is expected.
+- Fix false type mismatch warnings on values whose type is only partly known or was only guessed from their name.
+- Fix type mismatch messages for calls no overload accepts naming the wrong overload.
+- Fix false net message warnings when a workspace replaces `net.Receive` or aliases a net function.
+- Fix a local being retyped from how it is used later, or read back as its old value after an assignment.
+- Fix false `unchecked-nil-access` warnings when a method removes a field and sets it again before reading it.
+- Fix the same "inferred from usage" hint showing more than once for a local assigned in several branches.
+- Fix folding of `include` and `require` lines sometimes missing while a file is analysed.
+
+## Annotations
+
+- Mark `RegisterMetaTable` as registering its table as the named class.
+- Add types for `table.Inherit`'s result, and for the `Constraints` and `StatueInfo` tables stored on entities.
+- Mark functions the wiki says can return `nil` as possibly returning `nil`.
+- Fix false positives from shipped Lua that omits optional arguments.
+- Fix `draw.SimpleTextOutlined` being defined twice.
+
+---
+
 ## [1.4.1] [Pre-Release] - 2026-11-13
 > Class Factory Annotations + Fixes
 
