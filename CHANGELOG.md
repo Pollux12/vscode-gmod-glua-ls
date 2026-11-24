@@ -61,6 +61,12 @@
 
 ---
 
+## [1.4.2] [Stable] - 2026-11-24
+
+- All changes from 1.0.15 -> 1.4.2
+
+---
+
 ## [1.4.1] [Pre-Release] - 2026-11-13
 > Class Factory Annotations + Fixes
 
