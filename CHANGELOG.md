@@ -2,6 +2,20 @@
 
 ---
 
+## [1.4.4] [Stable] - 2026-11-26
+> Memory, Performance & Stability Hotfix
+
+- All changes from 1.4.2 -> 1.4.3
+
+## Additional Language Server Changes
+
+- Fix analysis looping or stalling on some large workspaces.
+- Fix queued edits and file watcher events building up in memory while the server is busy.
+- Fix false diagnostics on local variables used before being reassigned.
+- Improve indexing speed on large workspaces.
+
+---
+
 ## [1.4.3] [Pre-Release] - 2026-11-26
 > Memory Usage & Leak Hotfix
 
