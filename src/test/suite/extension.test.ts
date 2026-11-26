@@ -12,6 +12,7 @@ import { GmodRdbUpdater } from '../../debugger/gmod_debugger/GmodRdbUpdater';
 import { ServerState } from '../../emmyContext';
 import {
     createHoverMiddleware,
+    ensureHoverProviderRegistered,
     extensionContext,
     isHoverVerbosityProviderActiveFor,
     onDidStartDebugSession,
@@ -571,6 +572,9 @@ suite('Extension Integration', () => {
         } as unknown as LanguageClient;
 
         const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
         const middlewareProvideHover = createHoverMiddleware(() => mockClient);
         const handlers = registerLanguageClientStateHandlers(mockClient);
         extensionContext.client = mockClient;
@@ -648,6 +652,63 @@ suite('Extension Integration', () => {
             retireLanguageClient(mockClient);
             stateEmitter.dispose();
             extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
+            if (!previousClient) {
+                extensionContext.setServerStopped();
+            }
+        }
+    });
+
+    test('stops a crashed managed client even after State.Stopped clears extensionContext.client', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        await activateExtension(docUri);
+
+        const stateEmitter = new vscode.EventEmitter<{ oldState: State; newState: State }>();
+        const notificationListeners = new Map<string, (params: unknown) => void>();
+        let stopCalls = 0;
+
+        const mockClient = {
+            onDidChangeState: stateEmitter.event,
+            onNotification: (method: string, handler: (params: unknown) => void) => {
+                notificationListeners.set(method, handler);
+                return { dispose: () => notificationListeners.delete(method) };
+            },
+            stop: async () => {
+                stopCalls += 1;
+            },
+        } as unknown as LanguageClient;
+
+        const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
+        const handlers = registerLanguageClientStateHandlers(mockClient);
+        extensionContext.client = mockClient;
+
+        try {
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            notificationListeners.get('gluals/serverStatus')?.({ state: 'startupComplete' });
+            await handlers.completion;
+
+            // Crash clears extensionContext.client while managedClient is still pending auto-restart.
+            stateEmitter.fire({ oldState: State.Running, newState: State.Stopped });
+            assert.strictEqual(extensionContext.client, undefined);
+
+            await vscode.commands.executeCommand('gluals.stopServer');
+            assert.strictEqual(stopCalls, 1);
+
+            stateEmitter.fire({ oldState: State.Stopped, newState: State.Running });
+            assert.strictEqual(extensionContext.client, undefined);
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), false);
+        } finally {
+            retireLanguageClient(mockClient);
+            stateEmitter.dispose();
+            extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
             if (!previousClient) {
                 extensionContext.setServerStopped();
             }

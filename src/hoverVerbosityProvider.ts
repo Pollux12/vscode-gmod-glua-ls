@@ -77,6 +77,16 @@ function delayWithCancellation(ms: number, token: vscode.CancellationToken): Pro
     });
 }
 
+function enableHoverMarkdownFormatting(hover: vscode.Hover): vscode.Hover {
+    for (const entry of hover.contents) {
+        if (entry instanceof vscode.MarkdownString) {
+            entry.supportHtml = true;
+            entry.supportThemeIcons = true;
+        }
+    }
+    return hover;
+}
+
 function convertFallbackHover(result: unknown): vscode.Hover | null {
     if (!result) {
         return null;
@@ -275,7 +285,8 @@ export class HoverVerbosityProvider implements vscode.HoverProvider {
                 return null;
             }
             if (this.client.protocol2CodeConverter?.asHover) {
-                return this.client.protocol2CodeConverter.asHover(result) ?? null;
+                const hover = this.client.protocol2CodeConverter.asHover(result);
+                return hover ? enableHoverMarkdownFormatting(hover) : null;
             }
             return convertFallbackHover(result);
         } catch (error) {

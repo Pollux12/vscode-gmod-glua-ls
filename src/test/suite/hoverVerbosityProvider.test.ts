@@ -327,4 +327,35 @@ suite('Hover Verbosity Provider', () => {
         );
         assert.strictEqual(warnings.length, 1);
     });
+
+    test('enables HTML and theme icon formatting on protocol-converted fallback hovers while staying untrusted', async () => {
+        const client = {
+            protocol2CodeConverter: {
+                asHover: () => new vscode.Hover(new vscode.MarkdownString('$(info) <b>fallback</b>')),
+            },
+            sendRequest: async (methodOrType: string | { method: string }) => {
+                const method = typeof methodOrType === 'string' ? methodOrType : methodOrType.method;
+                if (method === 'gluals/hoverExpand') {
+                    throw new ResponseError(ErrorCodes.MethodNotFound, 'handler not found');
+                }
+                return {
+                    contents: { kind: 'markdown', value: '$(info) <b>fallback</b>' },
+                };
+            },
+        } as unknown as LanguageClient;
+        const provider = new HoverVerbosityProvider(client, { retryDelayMs: 0 });
+        const document = await vscode.workspace.openTextDocument({ language: 'glua', content: 'local value = 1' });
+
+        const hover = await provider.provideHover(
+            document,
+            new vscode.Position(0, 6),
+            new vscode.CancellationTokenSource().token,
+        );
+
+        assert.ok(hover);
+        const markdown = hover.contents[0] as vscode.MarkdownString;
+        assert.strictEqual(markdown.supportHtml, true);
+        assert.strictEqual(markdown.supportThemeIcons, true);
+        assert.notStrictEqual(markdown.isTrusted, true);
+    });
 });

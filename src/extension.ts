@@ -204,9 +204,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * Extension deactivation
  */
 export async function deactivate(): Promise<void> {
-    retireClient(managedClient ?? extensionContext?.client);
+    const clientToStop = managedClient ?? extensionContext?.client;
+    retireClient(clientToStop);
     disposeHoverProviderRegistration();
     try {
+        if (extensionContext && !extensionContext.client && clientToStop) {
+            extensionContext.client = clientToStop;
+        }
         await extensionContext?.stopServer();
     } catch {
         // Ignore stop errors during shutdown; extension host is unloading.
@@ -894,7 +898,7 @@ export function createHoverMiddleware(
     };
 }
 
-function ensureHoverProviderRegistered(client: LanguageClient): void {
+export function ensureHoverProviderRegistered(client: LanguageClient): void {
     if (isHoverVerbosityProviderActiveFor(client)) {
         return;
     }
@@ -1270,8 +1274,12 @@ async function stopServer(): Promise<void> {
             // Stopping while startup is in-flight is intentional, so suppress startup-failed toast.
             cancelPendingStartupRun();
         }
-        retireClient(managedClient ?? extensionContext.client);
+        const clientToStop = managedClient ?? extensionContext.client;
+        retireClient(clientToStop);
         disposeHoverProviderRegistration();
+        if (!extensionContext.client && clientToStop) {
+            extensionContext.client = clientToStop;
+        }
         await extensionContext.stopServer();
         if (pendingStart) {
             await pendingStart.catch(() => {
