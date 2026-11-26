@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
+import { LanguageClient, State } from 'vscode-languageclient/node';
 
 import {
     enableCompletionColorPreviewHtml,
@@ -11,10 +11,16 @@ import { GmodClientRdbUpdater } from '../../debugger/gmod_debugger/GmodClientRdb
 import { GmodRdbUpdater } from '../../debugger/gmod_debugger/GmodRdbUpdater';
 import { ServerState } from '../../emmyContext';
 import {
+    createHoverMiddleware,
+    ensureHoverProviderRegistered,
     extensionContext,
+    isHoverVerbosityProviderActiveFor,
     onDidStartDebugSession,
     onDidTerminateDebugSession,
+    registerLanguageClientStateHandlers,
+    retireLanguageClient,
 } from '../../extension';
+import { LuaLanguageConfiguration } from '../../languageConfiguration';
 import { GmodAnnotationManager } from '../../gmodAnnotationManager';
 import { activateExtension, getFixtureUri } from './helper';
 
@@ -533,5 +539,241 @@ suite('Extension Integration', () => {
         enableCompletionColorPreviewHtml(item);
 
         assert.strictEqual(item.detail, undefined);
+    });
+
+    test('recovers hover provider and active client after language client auto-restart', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        await activateExtension(docUri);
+        const document = await vscode.workspace.openTextDocument(docUri);
+        await vscode.window.showTextDocument(document);
+
+        const stateEmitter = new vscode.EventEmitter<{ oldState: State; newState: State }>();
+        const notificationListeners = new Map<string, (params: unknown) => void>();
+        let hoverExpandCalls = 0;
+
+        const mockClient = {
+            onDidChangeState: stateEmitter.event,
+            onNotification: (method: string, handler: (params: unknown) => void) => {
+                notificationListeners.set(method, handler);
+                return { dispose: () => notificationListeners.delete(method) };
+            },
+            sendRequest: async (methodOrType: string | { method: string }) => {
+                const method = typeof methodOrType === 'string' ? methodOrType : methodOrType.method;
+                if (method === 'gluals/hoverExpand') {
+                    hoverExpandCalls += 1;
+                    return {
+                        content: { kind: 'markdown', value: `hover-${hoverExpandCalls}` },
+                        maxLevel: 0,
+                    };
+                }
+                return null;
+            },
+            stop: async () => undefined,
+        } as unknown as LanguageClient;
+
+        const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
+        const middlewareProvideHover = createHoverMiddleware(() => mockClient);
+        const handlers = registerLanguageClientStateHandlers(mockClient);
+        extensionContext.client = mockClient;
+
+        try {
+            // Initial startup transitions to Running and registers HoverVerbosityProvider.
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            notificationListeners.get('gluals/serverStatus')?.({ state: 'startupComplete' });
+            await handlers.completion;
+
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), true);
+            assert.strictEqual(extensionContext.serverStatus.state, ServerState.Running);
+
+            // While HoverVerbosityProvider is active, middleware suppresses duplicate hover.
+            let nextCalls = 0;
+            const suppressed = await middlewareProvideHover(
+                document,
+                new vscode.Position(0, 0),
+                new vscode.CancellationTokenSource().token,
+                async () => {
+                    nextCalls += 1;
+                    return new vscode.Hover('fallback');
+                },
+            );
+            assert.strictEqual(suppressed, undefined);
+            assert.strictEqual(nextCalls, 0);
+
+            const initialHovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+                'vscode.executeHoverProvider',
+                document.uri,
+                new vscode.Position(0, 0),
+            );
+            assert.ok(initialHovers?.some((h) => (h.contents[0] as vscode.MarkdownString).value === 'hover-1'));
+
+            // Simulate server crash: Stopped disposes hover provider; middleware falls back to next.
+            stateEmitter.fire({ oldState: State.Running, newState: State.Stopped });
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), false);
+            assert.strictEqual(extensionContext.client, undefined);
+
+            const fallbackHover = await middlewareProvideHover(
+                document,
+                new vscode.Position(0, 0),
+                new vscode.CancellationTokenSource().token,
+                async () => {
+                    nextCalls += 1;
+                    return new vscode.Hover('fallback');
+                },
+            );
+            assert.ok(fallbackHover);
+            assert.strictEqual(nextCalls, 1);
+
+            // Simulate vscode-languageclient auto-restart (Stopped -> Starting -> Running).
+            stateEmitter.fire({ oldState: State.Stopped, newState: State.Starting });
+            assert.strictEqual(extensionContext.client, mockClient);
+            assert.strictEqual(extensionContext.serverStatus.state, ServerState.Starting);
+
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), true);
+            notificationListeners.get('gluals/serverStatus')?.({ state: 'startupComplete' });
+            assert.strictEqual(extensionContext.serverStatus.state, ServerState.Running);
+
+            const recoveredHovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+                'vscode.executeHoverProvider',
+                document.uri,
+                new vscode.Position(0, 0),
+            );
+            assert.ok(recoveredHovers?.some((h) => (h.contents[0] as vscode.MarkdownString).value === 'hover-2'));
+
+            // Retiring the client permanently disposes hover and ignores later state events.
+            retireLanguageClient(mockClient);
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), false);
+            stateEmitter.fire({ oldState: State.Stopped, newState: State.Running });
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), false);
+        } finally {
+            retireLanguageClient(mockClient);
+            stateEmitter.dispose();
+            extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
+            if (!previousClient) {
+                extensionContext.setServerStopped();
+            }
+        }
+    });
+
+    test('stops a crashed managed client even after State.Stopped clears extensionContext.client', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        await activateExtension(docUri);
+
+        const stateEmitter = new vscode.EventEmitter<{ oldState: State; newState: State }>();
+        const notificationListeners = new Map<string, (params: unknown) => void>();
+        let stopCalls = 0;
+
+        const mockClient = {
+            onDidChangeState: stateEmitter.event,
+            onNotification: (method: string, handler: (params: unknown) => void) => {
+                notificationListeners.set(method, handler);
+                return { dispose: () => notificationListeners.delete(method) };
+            },
+            stop: async () => {
+                stopCalls += 1;
+            },
+        } as unknown as LanguageClient;
+
+        const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
+        const handlers = registerLanguageClientStateHandlers(mockClient);
+        extensionContext.client = mockClient;
+
+        try {
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            notificationListeners.get('gluals/serverStatus')?.({ state: 'startupComplete' });
+            await handlers.completion;
+
+            // Crash clears extensionContext.client while managedClient is still pending auto-restart.
+            stateEmitter.fire({ oldState: State.Running, newState: State.Stopped });
+            assert.strictEqual(extensionContext.client, undefined);
+
+            await vscode.commands.executeCommand('gluals.stopServer');
+            assert.strictEqual(stopCalls, 1);
+
+            stateEmitter.fire({ oldState: State.Stopped, newState: State.Running });
+            assert.strictEqual(extensionContext.client, undefined);
+            assert.strictEqual(isHoverVerbosityProviderActiveFor(mockClient), false);
+        } finally {
+            retireLanguageClient(mockClient);
+            stateEmitter.dispose();
+            extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
+            if (!previousClient) {
+                extensionContext.setServerStopped();
+            }
+        }
+    });
+
+    test('rejects pending startup completion when retiring or stopping before readiness', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        await activateExtension(docUri);
+
+        const stateEmitter = new vscode.EventEmitter<{ oldState: State; newState: State }>();
+        const notificationListeners = new Map<string, (params: unknown) => void>();
+        let stopCalls = 0;
+
+        const mockClient = {
+            onDidChangeState: stateEmitter.event,
+            onNotification: (method: string, handler: (params: unknown) => void) => {
+                notificationListeners.set(method, handler);
+                return { dispose: () => notificationListeners.delete(method) };
+            },
+            stop: async () => {
+                stopCalls += 1;
+            },
+        } as unknown as LanguageClient;
+
+        const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
+        const handlers = registerLanguageClientStateHandlers(mockClient);
+        extensionContext.client = mockClient;
+
+        try {
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            assert.strictEqual(handlers.isReady(), false);
+
+            await vscode.commands.executeCommand('gluals.stopServer');
+            assert.strictEqual(stopCalls, 1);
+
+            await assert.rejects(
+                () => handlers.completion,
+                /GLuaLS startup cancelled/,
+            );
+        } finally {
+            retireLanguageClient(mockClient);
+            stateEmitter.dispose();
+            extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
+            if (!previousClient) {
+                extensionContext.setServerStopped();
+            }
+        }
+    });
+
+    test('LuaLanguageConfiguration wordPattern does not match whole quoted string literals', () => {
+        const config = new LuaLanguageConfiguration();
+        const matchWords = (line: string): string[] => {
+            const regex = new RegExp(config.wordPattern.source, config.wordPattern.flags);
+            return Array.from(line.matchAll(regex), (match) => match[0]);
+        };
+
+        assert.deepStrictEqual(matchWords('local msg = "hello world"'), ['local', 'msg', 'hello', 'world']);
+        assert.deepStrictEqual(matchWords("local path = 'models/props/box.mdl'"), ['local', 'path', 'models', 'props', 'box', 'mdl']);
+        assert.deepStrictEqual(matchWords('local n = -1.5 + 3.14'), ['local', 'n', '-1.5', '3.14']);
     });
 });

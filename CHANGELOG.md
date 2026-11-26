@@ -2,6 +2,23 @@
 
 ---
 
+## [1.4.3] [Pre-Release] - 2026-11-26
+> Memory Usage & Leak Hotfix
+
+## VS Code Extension
+
+- Fix hovers getting stuck or failing after the language server restarts.
+- Fix typing inside strings or comments accidentally accepting completions that would overwrite what you typed.
+- Fix language server stalling if a start/stop is requested while it is already starting or stopping.
+
+## Language Server
+
+- Improve memory usage on large workspaces by over 60%.
+- Fix memory leaks during long editing sessions that caused RAM to climb over time or spike while editing.
+- Fix exponential slowdowns and memory spikes when analysing recursive `net` message helper chains, improving initial indexing speed on large codebases.
+
+---
+
 ## [1.4.2] [Stable] - 2026-11-24
 
 - All changes from 1.0.15 -> 1.4.2

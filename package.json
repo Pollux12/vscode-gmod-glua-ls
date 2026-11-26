@@ -1901,11 +1901,11 @@
         "configurationDefaults": {
             "[glua]": {
                 "editor.quickSuggestions": {
-                    "other": true,
-                    "comments": true,
-                    "strings": true
+                    "other": "on",
+                    "comments": "off",
+                    "strings": "off"
                 },
-                "editor.snippetSuggestions": "top",
+                "editor.snippetSuggestions": "inline",
                 "editor.wordBasedSuggestions": "off",
                 "editor.stickyScroll.defaultModel": "foldingProviderModel",
                 "editor.semanticHighlighting.enabled": true

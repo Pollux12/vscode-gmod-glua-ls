@@ -105,9 +105,9 @@ export class LuaLanguageConfiguration implements LanguageConfiguration {
 
     /**
      * Build word pattern for Lua
-     * Matches strings, numbers, and identifiers
+     * Matches numbers and identifiers
      */
     private buildWordPattern(): RegExp {
-        return /((?<=')[^']+(?='))|((?<=")[^"]+(?="))|(-?\d*\.\d\w*)|([^\`\~\!\@\$\^\&\*\(\)\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\-\s]+)/g;
+        return /(-?\d*\.\d\w*)|([^\`\~\!\@\$\^\&\*\(\)\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\-\s]+)/g;
     }
 }
