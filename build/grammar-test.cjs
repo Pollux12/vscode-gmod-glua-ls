@@ -292,9 +292,27 @@ function assertManifest(packageJson) {
             `expected ${debuggerContribution.type} to target glua`
         );
     }
+    const gluaDefaults = packageJson.contributes?.configurationDefaults?.["[glua]"];
     assert.ok(
-        packageJson.contributes?.configurationDefaults?.["[glua]"],
+        gluaDefaults,
         "expected glua language-specific configuration defaults"
+    );
+    assert.equal(
+        gluaDefaults["editor.quickSuggestions"]?.comments === false ||
+            gluaDefaults["editor.quickSuggestions"]?.comments === "off",
+        true,
+        "expected glua quickSuggestions to be disabled inside comments"
+    );
+    assert.equal(
+        gluaDefaults["editor.quickSuggestions"]?.strings === false ||
+            gluaDefaults["editor.quickSuggestions"]?.strings === "off",
+        true,
+        "expected glua quickSuggestions to be disabled inside strings"
+    );
+    assert.notEqual(
+        gluaDefaults["editor.snippetSuggestions"],
+        "top",
+        "expected glua snippetSuggestions not to force snippets above identifier completions"
     );
     assert.equal(
         packageJson.contributes?.configurationDefaults?.["[lua]"],

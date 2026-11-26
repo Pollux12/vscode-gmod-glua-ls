@@ -7,6 +7,7 @@ import * as fs from 'fs';
 
 import { LanguageClient, LanguageClientOptions, ServerOptions, State, StreamInfo } from 'vscode-languageclient/node';
 import { LuaLanguageConfiguration } from './languageConfiguration';
+import { HoverVerbosityProvider } from './hoverVerbosityProvider';
 import { EmmyContext, ServerState } from './emmyContext';
 import { IServerLocation, IServerPosition } from './lspExtension';
 import { onDidChangeConfiguration } from './annotator';
@@ -120,6 +121,10 @@ let gmodErrorViewProvider: GmodErrorViewProvider | undefined;
 let gmodEntityExplorerProvider: GmodEntityExplorerProvider | undefined;
 let languageConfigurationDisposable: vscode.Disposable | undefined;
 let hoverProviderRegistration: vscode.Disposable | undefined;
+let hoverProviderClient: LanguageClient | undefined;
+let managedClient: LanguageClient | undefined;
+const retiredClients = new WeakSet<LanguageClient>();
+const clientHandlers = new WeakMap<LanguageClient, StartupStateHandlerRegistration>();
 let hasGmodDebugConfiguration = false;
 const gmodSessionRealms = new Map<string, GmodRealm>();
 const GMOD_REALM_WORKSPACE_KEY_PREFIX = 'gluals.gmod.realm.workspace.';
@@ -199,6 +204,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * Extension deactivation
  */
 export async function deactivate(): Promise<void> {
+    retireClient(managedClient ?? extensionContext?.client);
     disposeHoverProviderRegistration();
     try {
         await extensionContext?.stopServer();
@@ -548,7 +554,8 @@ async function runServerStart(startupRunId: number): Promise<void> {
         onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
     } catch (reason) {
         const errorMessage = reason instanceof Error ? reason.message : String(reason);
-        const client = extensionContext.client;
+        const client = managedClient ?? extensionContext.client;
+        retireClient(client, reason instanceof Error ? reason : new Error(errorMessage));
         extensionContext.client = undefined;
         if (client) {
             try {
@@ -622,10 +629,11 @@ function presentStartupFailure(errorMessage: string): void {
     });
 }
 
-function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
+export function registerLanguageClientStateHandlers(client: LanguageClient): StartupStateHandlerRegistration {
     let startupSettled = false;
     let readinessState = createStartupReadinessState();
     let lastStartupPhase = 'awaiting startup progress';
+    let stateChangeDisposable: vscode.Disposable | undefined;
     let notificationDisposable: vscode.Disposable | undefined;
     let progressDisposable: vscode.Disposable | undefined;
     let startupTimeout: NodeJS.Timeout | undefined;
@@ -639,10 +647,14 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         }
     };
 
-    const cleanup = (): void => {
+    const disposeListeners = (): void => {
         clearStartupTimeout();
+        stateChangeDisposable?.dispose();
+        stateChangeDisposable = undefined;
         notificationDisposable?.dispose();
+        notificationDisposable = undefined;
         progressDisposable?.dispose();
+        progressDisposable = undefined;
     };
 
     const resolveStartup = (): void => {
@@ -661,7 +673,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         }
 
         startupSettled = true;
-        cleanup();
+        disposeListeners();
         rejectStartupPromise(error);
     };
 
@@ -671,29 +683,68 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     });
     void completion.catch(() => undefined);
 
-    client.onDidChangeState((event) => {
-        const isActiveClient = extensionContext.client === client;
+    const handlers: StartupStateHandlerRegistration = {
+        completion,
+        isReady(): boolean {
+            return readinessState.ready;
+        },
+        isDiagnosticsInProgress(): boolean {
+            return readinessState.diagnosticsInProgress;
+        },
+        dispose(error?: Error): void {
+            if (!error) {
+                disposeListeners();
+                return;
+            }
+            rejectStartup(error);
+            disposeListeners();
+        },
+    };
+    managedClient = client;
+    clientHandlers.set(client, handlers);
+
+    stateChangeDisposable = client.onDidChangeState((event) => {
+        if (retiredClients.has(client)) {
+            return;
+        }
 
         switch (event.newState) {
             case State.Starting:
-                lastStartupPhase = 'client starting';
-                if (isActiveClient) {
-                    extensionContext.setServerStarting();
+                if (startupSettled) {
+                    // Auto-restart spawns a fresh language server process; reset readiness tracking.
+                    readinessState = createStartupReadinessState();
                 }
+                lastStartupPhase = 'client starting';
+                extensionContext.client = client;
+                activeStartupStateHandlers = { client, handlers };
+                extensionContext.setServerStarting();
                 break;
             case State.Running:
-                if (isActiveClient && !readinessState.ready) {
+                extensionContext.client = client;
+                activeStartupStateHandlers = { client, handlers };
+                ensureHoverProviderRegistered(client);
+                if (!readinessState.ready) {
                     lastStartupPhase = 'workspace loading and diagnostics in progress';
                     extensionContext.setServerStarting('Loading workspace and diagnostics...');
+                } else {
+                    reportStartedServerStatus(handlers);
                 }
+                onDidChangeActiveTextEditor(vscode.window.activeTextEditor);
                 break;
             case State.Stopped:
+            case State.StartFailed: {
+                const isStartFailed = event.newState === State.StartFailed;
+                if (isStartFailed) {
+                    retiredClients.add(client);
+                }
                 if (activeStartupStateHandlers?.client === client) {
                     activeStartupStateHandlers = undefined;
                 }
-                if (isActiveClient) {
-                    extensionContext.client = undefined;
+                if (hoverProviderClient === client) {
                     disposeHoverProviderRegistration();
+                }
+                if (extensionContext.client === client) {
+                    extensionContext.client = undefined;
                     if (extensionContext.serverStatus.state !== ServerState.Error) {
                         extensionContext.setServerStopped();
                     }
@@ -703,15 +754,17 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                     if (startupSettled) {
                         // The indexing timeout already settled startup, so no
                         // rejection can carry this failure to the caller.
-                        cleanup();
-                        if (isActiveClient) {
-                            presentStartupFailure(message);
-                        }
+                        clearStartupTimeout();
+                        presentStartupFailure(message);
                     } else {
                         rejectStartup(new Error(message));
                     }
                 }
+                if (isStartFailed) {
+                    disposeListeners();
+                }
                 break;
+            }
             default:
                 break;
         }
@@ -720,6 +773,9 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     notificationDisposable = client.onNotification(
         SERVER_STATUS_NOTIFICATION,
         (params: ServerStatusNotificationParams) => {
+            if (retiredClients.has(client)) {
+                return;
+            }
             readinessState = applyServerStartupState(readinessState, params.state);
             if (params.state === 'workspaceLoaded') {
                 logLanguageServerOutput(client, 'Workspace loaded; diagnostics may continue in the background.');
@@ -737,7 +793,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
                 extensionContext.setServerRunning();
             }
             if (params.state === 'startupComplete') {
-                cleanup();
+                clearStartupTimeout();
             }
         }
     );
@@ -745,7 +801,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
     progressDisposable = client.onNotification(
         LSP_PROGRESS_NOTIFICATION,
         (params: ProgressNotificationParams) => {
-            if (!isStartupProgressToken(params.token)) {
+            if (retiredClients.has(client) || !isStartupProgressToken(params.token)) {
                 return;
             }
 
@@ -779,7 +835,7 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
             if (extensionContext.client === client && !readinessState.diagnosticsInProgress) {
                 extensionContext.setServerRunning();
                 if (params.token === STARTUP_DIAGNOSE_PROGRESS_TOKEN) {
-                    cleanup();
+                    clearStartupTimeout();
                 }
             }
         }
@@ -817,31 +873,70 @@ function registerLanguageClientStateHandlers(client: LanguageClient): StartupSta
         resolveStartup();
     }, STARTUP_COMPLETE_TIMEOUT_MS);
 
-    return {
-        completion,
-        isReady(): boolean {
-            return readinessState.ready;
-        },
-        isDiagnosticsInProgress(): boolean {
-            return readinessState.diagnosticsInProgress;
-        },
-        dispose(error?: Error): void {
-            if (!error) {
-                cleanup();
-                return;
-            }
-            rejectStartup(error);
-        },
+    return handlers;
+}
+
+export function isHoverVerbosityProviderActiveFor(client: LanguageClient): boolean {
+    return hoverProviderRegistration !== undefined && hoverProviderClient === client;
+}
+
+export function createHoverMiddleware(
+    getClient: () => LanguageClient | undefined,
+): NonNullable<NonNullable<LanguageClientOptions['middleware']>['provideHover']> {
+    return async (document, position, token, next) => {
+        const client = getClient();
+        if (client && isHoverVerbosityProviderActiveFor(client)) {
+            // Suppress the language client's default hover while our custom
+            // HoverVerbosityProvider is registered so VS Code doesn't duplicate hovers.
+            return undefined;
+        }
+        return next(document, position, token);
     };
+}
+
+function ensureHoverProviderRegistered(client: LanguageClient): void {
+    if (isHoverVerbosityProviderActiveFor(client)) {
+        return;
+    }
+    disposeHoverProviderRegistration();
+    hoverProviderClient = client;
+    hoverProviderRegistration = vscode.languages.registerHoverProvider(
+        { language: extensionContext.LANGUAGE_ID, scheme: 'file' },
+        new HoverVerbosityProvider(client),
+    );
+}
+
+export function retireLanguageClient(client: LanguageClient | undefined, error?: Error): void {
+    if (!client) {
+        return;
+    }
+    retiredClients.add(client);
+    if (managedClient === client) {
+        managedClient = undefined;
+    }
+    if (hoverProviderClient === client) {
+        disposeHoverProviderRegistration();
+    }
+    const handlers = clientHandlers.get(client);
+    if (activeStartupStateHandlers?.client === client) {
+        activeStartupStateHandlers = undefined;
+    }
+    handlers?.dispose(error);
+}
+
+function retireClient(client: LanguageClient | undefined, error?: Error): void {
+    retireLanguageClient(client, error);
 }
 
 function disposeHoverProviderRegistration(): void {
     hoverProviderRegistration?.dispose();
     hoverProviderRegistration = undefined;
+    hoverProviderClient = undefined;
 }
 
 async function cleanupExistingClient(): Promise<void> {
-    const existingClient = extensionContext.client;
+    const existingClient = managedClient ?? extensionContext.client;
+    retireClient(existingClient);
     disposeHoverProviderRegistration();
     if (!existingClient) {
         return;
@@ -877,6 +972,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         }
     }
 
+    let client: LanguageClient | undefined;
     const clientOptions: LanguageClientOptions = {
         outputChannel: extensionContext.outputChannel,
         documentSelector: [{ scheme: 'file', language: extensionContext.LANGUAGE_ID }],
@@ -895,11 +991,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
                 return enableCompletionColorPreviewHtml(resolvedItem);
             },
-            async provideHover() {
-                // Suppress the language client's default hover.
-                // Our custom HoverVerbosityProvider handles all hover requests.
-                return undefined;
-            },
+            provideHover: createHoverMiddleware(() => client),
         },
     };
 
@@ -916,7 +1008,7 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
 
     throwIfStartupCancelled(startupRunId);
 
-    const client = new LanguageClient(
+    client = new LanguageClient(
         extensionContext.LANGUAGE_ID,
         'GLua Language Server',
         serverOptions,
@@ -942,21 +1034,13 @@ async function doStartServer(startupRunId: number): Promise<StartupStateHandlerR
         await startupStateHandlers.completion;
     } catch (error) {
         const startupError = error instanceof Error ? error : new Error(String(error));
-        startupStateHandlers.dispose(startupError);
+        retireClient(client, startupError);
         throw startupError;
     }
     throwIfStartupCancelled(startupRunId);
     console.log('GLua Language Server started successfully');
 
-    // Register the custom hover provider with verbosity controls (+/− buttons).
-    const { HoverVerbosityProvider } = await import('./hoverVerbosityProvider.js');
-    throwIfStartupCancelled(startupRunId);
-    const verbosityProvider = new HoverVerbosityProvider(client);
-    disposeHoverProviderRegistration();
-    hoverProviderRegistration = vscode.languages.registerHoverProvider(
-        { language: extensionContext.LANGUAGE_ID, scheme: 'file' },
-        verbosityProvider,
-    );
+    ensureHoverProviderRegistered(client);
 
     return startupStateHandlers;
 }
@@ -1186,6 +1270,7 @@ async function stopServer(): Promise<void> {
             // Stopping while startup is in-flight is intentional, so suppress startup-failed toast.
             cancelPendingStartupRun();
         }
+        retireClient(managedClient ?? extensionContext.client);
         disposeHoverProviderRegistration();
         await extensionContext.stopServer();
         if (pendingStart) {
