@@ -7,13 +7,14 @@
 
 ## VS Code Extension
 
-- Fix hovers getting stuck or stopping after the language server restarts, by retrying failed hover requests, falling back to standard hovers, and restoring hover registration automatically.
-- Fix typing inside strings or comments accidentally accepting completions that overwrite what you typed, by turning off quick suggestions in strings and comments by default, moving snippet suggestions inline, and excluding whole strings from the GLua word pattern.
+- Fix hovers getting stuck or failing after the language server restarts.
+- Fix typing inside strings or comments accidentally accepting completions that would overwrite what you typed.
+- Fix language server stalling if a start/stop is requested while it is already starting or stopping.
 
 ## Language Server
 
-- Improve memory usage on large workspaces by over 60% by compacting internal indexes, evicting unused syntax trees until needed, and freeing temporary analysis caches and heap pages between stages.
-- Fix memory leaks during long editing sessions that caused RAM to climb over time or spike while editing, by bounding and clearing per-thread caches and cleaning up closed or removed file state.
+- Improve memory usage on large workspaces by over 60%.
+- Fix memory leaks during long editing sessions that caused RAM to climb over time or spike while editing.
 - Fix exponential slowdowns and memory spikes when analysing recursive `net` message helper chains, improving initial indexing speed on large codebases.
 
 ---
