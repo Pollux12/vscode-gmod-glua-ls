@@ -715,6 +715,56 @@ suite('Extension Integration', () => {
         }
     });
 
+    test('rejects pending startup completion when retiring or stopping before readiness', async () => {
+        const docUri = getFixtureUri('sample.lua');
+        await activateExtension(docUri);
+
+        const stateEmitter = new vscode.EventEmitter<{ oldState: State; newState: State }>();
+        const notificationListeners = new Map<string, (params: unknown) => void>();
+        let stopCalls = 0;
+
+        const mockClient = {
+            onDidChangeState: stateEmitter.event,
+            onNotification: (method: string, handler: (params: unknown) => void) => {
+                notificationListeners.set(method, handler);
+                return { dispose: () => notificationListeners.delete(method) };
+            },
+            stop: async () => {
+                stopCalls += 1;
+            },
+        } as unknown as LanguageClient;
+
+        const previousClient = extensionContext.client;
+        const wasHoverProviderActive = previousClient
+            ? isHoverVerbosityProviderActiveFor(previousClient)
+            : false;
+        const handlers = registerLanguageClientStateHandlers(mockClient);
+        extensionContext.client = mockClient;
+
+        try {
+            stateEmitter.fire({ oldState: State.Starting, newState: State.Running });
+            assert.strictEqual(handlers.isReady(), false);
+
+            await vscode.commands.executeCommand('gluals.stopServer');
+            assert.strictEqual(stopCalls, 1);
+
+            await assert.rejects(
+                () => handlers.completion,
+                /GLuaLS startup cancelled/,
+            );
+        } finally {
+            retireLanguageClient(mockClient);
+            stateEmitter.dispose();
+            extensionContext.client = previousClient;
+            if (wasHoverProviderActive && previousClient) {
+                ensureHoverProviderRegistered(previousClient);
+            }
+            if (!previousClient) {
+                extensionContext.setServerStopped();
+            }
+        }
+    });
+
     test('LuaLanguageConfiguration wordPattern does not match whole quoted string literals', () => {
         const config = new LuaLanguageConfiguration();
         const matchWords = (line: string): string[] => {

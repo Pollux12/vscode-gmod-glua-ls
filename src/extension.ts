@@ -696,11 +696,7 @@ export function registerLanguageClientStateHandlers(client: LanguageClient): Sta
             return readinessState.diagnosticsInProgress;
         },
         dispose(error?: Error): void {
-            if (!error) {
-                disposeListeners();
-                return;
-            }
-            rejectStartup(error);
+            rejectStartup(error ?? new StartupCancelledError());
             disposeListeners();
         },
     };
